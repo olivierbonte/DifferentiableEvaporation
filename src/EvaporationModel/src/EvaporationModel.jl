@@ -4,7 +4,7 @@ using ComponentArrays
 using Parameters
 
 include("resistances.jl")
-export jarvis_stewart
+export jarvis_stewart, aerodynamic_resistance
 
 greet() = print("Hello World!")
 
