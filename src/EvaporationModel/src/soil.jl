@@ -1,4 +1,4 @@
-function C1(w_g::AbstractFloat, w_sat::AbstractFloat, b::AbstractFloat, C1_sat::AbstractFloat)
+function C_1(w_g::AbstractFloat, w_sat::AbstractFloat, b::AbstractFloat, C1_sat::AbstractFloat)
     return C1_sat * (w_g / w_sat) ^ (b / 2 + 1)
 end
 

@@ -1,7 +1,8 @@
 ## Idea of defining the ODE model here
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
-using Plots, Revise, Dates, Statistics
+using Revise
+using Plots, Dates, Statistics
 using EvaporationModel, Bigleaf
 using YAXArrays, NetCDF, ComponentArrays, DimensionalData
 plotlyjs()
@@ -50,6 +51,11 @@ C2ref = 1.8 # [-]
 a_ch = 0.219
 b_ch = 4.9
 p_ch = 4.0
+
+#test soil parameters assuming fixed SM
+c_1_test = C_1(0.35, w_sat, b_ch, C1sat)
+c_2_test = C_2(0.35, w_sat, C2ref)
+w_geq_test = w_geq(0.35, w_sat, a_ch, p_ch)
 
 #site info
 z_measur = Float64(ds_flux_sub.reference_height.data[:,:][1])
