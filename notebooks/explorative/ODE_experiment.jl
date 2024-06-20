@@ -1,7 +1,7 @@
 ## Idea of defining the ODE model here
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
-using Plots, Revise, Dates
+using Plots, Revise, Dates, Statistics
 using EvaporationModel, Bigleaf
 using YAXArrays, NetCDF, ComponentArrays, DimensionalData
 plotlyjs()
@@ -24,8 +24,8 @@ plotlyjs()
 ds_meteo = open_dataset(datadir("exp_raw","BE-Bra_2004-2014_FLUXNET2015_Met.nc"));
 ds_flux = open_dataset(datadir("exp_raw","BE-Bra_2004-2014_FLUXNET2015_Flux.nc"));
 #now make a shorter subset of the data
-start_date = DateTime(2005,07,01,00)
-end_date = DateTime(2005,07,04,00)
+start_date = DateTime(2006,07,01,00)
+end_date = DateTime(2006,07,06,00)
 ds_meteo_sub = ds_meteo[time = DimensionalData.Between(start_date, end_date)]
 ds_flux_sub = ds_flux[time = DimensionalData.Between(start_date, end_date)]
 
@@ -55,7 +55,7 @@ p_ch = 4.0
 z_measur = Float64(ds_flux_sub.reference_height.data[:,:][1])
 h_veg = Float64(ds_flux_sub.canopy_height.data[:,:][1])
 z0m = 0.1 * h_veg
-z0h = Bigleaf.roughness_z0h(z0m, log(10.0))
+z0h = Bigleaf.roughness_z0h(z0m, 8) #8 according to Ridgen & Salvucci, 2015
 d = 2/3 * h_veg
 
 
@@ -135,9 +135,14 @@ et_pred, le_pred = calculate_evaporation(
 corr_test = Statistics.cor(le_pred, ds_flux_sub.Qle_cor[:])
 plot(time_sub, le_pred, label = "predicted")
 plot!(time_sub, ds_flux_sub.Qle_cor[:], label = "observed")
+#plot!(time_sub, ds_flux_sub.Rnet[:], label = "Rₙ")
 yaxis!("Latent heat [W/m²]")
 using Printf
 title!(Printf.@sprintf("Correlation: %.4f", corr_test))
 #title!("Correlation: $corr_test%.4f")
 # NCDataset.@select(meteo_data["Tair"], start_date .≤ time .≤ end_date)
 
+scatter(le_pred, ds_flux_sub.Qle_cor[:])
+xaxis!("Predicted LE")
+yaxis!("Observed LE")
+plot!(ds_flux_sub.Qle_cor[:], ds_flux_sub.Qle_cor[:])
