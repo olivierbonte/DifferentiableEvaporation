@@ -2,10 +2,10 @@
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using Revise
-using Plots, Dates, Statistics
-using EvaporationModel, Bigleaf
+using Plots, Dates, Statistics, Parameters
+using EvaporationModel, Bigleaf, DifferentialEquations
 using YAXArrays, NetCDF, ComponentArrays, DimensionalData
-plotlyjs()
+gr()
 
 
 
@@ -25,10 +25,12 @@ plotlyjs()
 ds_meteo = open_dataset(datadir("exp_raw","BE-Bra_2004-2014_FLUXNET2015_Met.nc"));
 ds_flux = open_dataset(datadir("exp_raw","BE-Bra_2004-2014_FLUXNET2015_Flux.nc"));
 #now make a shorter subset of the data
-start_date = DateTime(2006,07,01,00)
-end_date = DateTime(2006,07,06,00)
+start_date = DateTime(2006,04,01,00)
+end_date = DateTime(2006,07,01,00)
 ds_meteo_sub = ds_meteo[time = DimensionalData.Between(start_date, end_date)]
 ds_flux_sub = ds_flux[time = DimensionalData.Between(start_date, end_date)]
+
+plot(collect(ds_meteo_sub.Ti), ds_meteo_sub["Precip"][:])
 
 # Define parameters for initial experiment
 # All defined in Float64 for type stability 
@@ -51,11 +53,17 @@ C2ref = 1.8 # [-]
 a_ch = 0.219
 b_ch = 4.9
 p_ch = 4.0
+#Get X_Clay from C_2ref
+X_clay = 10 # [%]
+C3 = 5.327 * X_clay^(-1.043)
+
+d_1 = 0.1 # [m]
+d_2 = 2 # [m], based on description in ds_meteo_sub.properties["soil_type"]
 
 #test soil parameters assuming fixed SM
-c_1_test = C_1(0.35, w_sat, b_ch, C1sat)
-c_2_test = C_2(0.35, w_sat, C2ref)
-w_geq_test = w_geq(0.35, w_sat, a_ch, p_ch)
+c_1_test = compute_c_1(0.35, w_sat, b_ch, C1sat)
+c_2_test = compute_c_2(0.35, w_sat, C2ref)
+w_geq_test = compute_w_geq(0.35, w_sat, a_ch, p_ch)
 
 #site info
 z_measur = Float64(ds_flux_sub.reference_height.data[:,:][1])
@@ -152,3 +160,89 @@ scatter(le_pred, ds_flux_sub.Qle_cor[:])
 xaxis!("Predicted LE")
 yaxis!("Observed LE")
 plot!(ds_flux_sub.Qle_cor[:], ds_flux_sub.Qle_cor[:])
+
+## Experiment with ODE for w_g
+using DataInterpolations, Dates
+#convert to numeric ms for interpolation 
+interp_Rnet = ConstantInterpolation(
+    ds_flux_sub["Rnet"][:],
+    Dates.datetime2epochms.(collect(ds_flux_sub.Ti)), 
+    dir = :left, extrapolate = true
+)
+t_plot = collect(range(start_date, end_date, step = Minute(5)))
+scatter(collect(ds_flux_sub.Ti), ds_flux_sub["Rnet"][:], label = "Data")
+plot!(t_plot, interp_Rnet(Dates.datetime2epochms.(t_plot)); label = "Constant interpolation")
+
+#keep w_2 as constant for now
+#same interpolation everywhere
+t_interp = Float64.(Dates.datetime2epochms.(collect(ds_flux_sub.Ti)))
+
+@with_kw struct struct_forcing_wg 
+    r_net = ConstantInterpolation(ds_flux_sub["Rnet"][:], t_interp, dir = :left)
+    vpd = ConstantInterpolation(ds_meteo_sub["VPD"][:], t_interp, dir = :left)
+    t_air = ConstantInterpolation(ds_meteo_sub["Tair"][:], t_interp, dir = :left)
+    p_surf = ConstantInterpolation(ds_meteo_sub["Psurf"][:], t_interp, dir = :left)
+    precip = ConstantInterpolation(ds_meteo_sub["Precip"][:], t_interp, dir = :left)
+    wind = ConstantInterpolation(ds_meteo_sub["Wind"][:], t_interp, dir = :left)
+    s_in = ConstantInterpolation(ds_meteo_sub["SWdown"][:], t_interp, dir = :left)
+    lai = ConstantInterpolation(ds_meteo_sub["LAI"][:], t_interp, dir = :left)
+end
+param_all = ComponentArray(
+    d_1 = d_1,
+    d_2 = d_2,
+    τ = 24, #[h]
+    w_sat = w_sat,
+    c1_sat = C1sat,
+    c2_ref = C2ref,
+    c_3 = C3, 
+    a = a_ch,
+    b = b_ch,
+    p = p_ch, 
+    w_fc = w_fc,
+    w_wilt = w_wp,
+    gd = gD,
+    r_smin = rsmin,
+    d = d,
+    z0m = z0m,
+    z0h = z0h,
+    z_measur = z_measur
+)
+#p_total_wg = ComponentArray(forcing = forcing_wg, parameters = param_wg)
+ @with_kw struct struct_total_pwg
+    forcings = struct_forcing_wg() 
+    params = param_all
+ end
+
+ function compute_penman(Tair, Psurf, Rnet, VPD, r_a, r_s; kwargs...)
+    et, le = Bigleaf.potential_ET(
+            Val(:PenmanMonteith), Tair ,Psurf, Rnet, VPD, 1.0 /r_a,
+            G = 0.05*Rnet; Gs_pot = ms_to_mol(1.0 ./r_s, Tair + 273.15, Psurf*1000), #eenheden aanpassen! mol m-2 s-1 moet het zijn 
+            kwargs...
+        )
+    return et, le 
+ end
+
+ function wg_conservation(du,u,p,t)
+    #t in ms because this easiest to work with for now
+    @unpack forcings, params = p
+    @unpack d_1, d_2, τ, w_sat, c1_sat, c2_ref, c_3, a, b, p, d, z0m, z0h, z_measur, 
+            w_fc, w_wilt, gd, r_smin = params
+    @unpack r_net, vpd, t_air, p_surf, precip, wind, s_in, lai = forcings
+    #w_2 = 0.25 #temporarily
+    r_a = EvaporationModel.aerodynamic_resistance(wind(t), d, z0m, z0h, z_measur)
+    r_s = EvaporationModel.jarvis_stewart(s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin)
+    c_1 = compute_c_1(u[1], w_sat, b, c1_sat)
+    c_2 = compute_c_2(u[2], w_sat, c2_ref)
+    w_geq = compute_w_geq(u[2], w_sat, a, p) #0.25 is temporarily
+    e_g = compute_penman(t_air(t) - 273.15, p_surf(t)/1000, r_net(t), vpd(t)/10, r_a, r_s)[1] #kg/(m^2 s)
+    du[1] = 1/1000*(c_1/(d_1 * ρ_w) * (precip(t) - e_g) - c_2 / 86400 * (u[1] - w_geq))
+    du[2] = 1/1000*(1 / (ρ_w * d_2) * (precip(t) - e_g) - c_3 / (d_2 * 86400) * max(u[2] - w_fc, 0.0)) 
+ end 
+
+wg_conservation(zeros(2), [0.4, 0.25], struct_total_pwg(), t_interp[1])
+
+prob = ODEProblem(wg_conservation, [0.4, 0.4], (t_interp[1],t_interp[end]), struct_total_pwg())
+sol = solve(prob, ImplicitEuler(), saveat = t_interp, dt = (Millisecond(Minute(30))).value, adaptive = false)
+plot(collect(ds_flux_sub.Ti), sol.u[1])
+plot!(twinx(), collect(ds_flux_sub.Ti), ds_meteo_sub["Precip"][:], color = :red, linestyle = :dot)
+display(sol.destats)
