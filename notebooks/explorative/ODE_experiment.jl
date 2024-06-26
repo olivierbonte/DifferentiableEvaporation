@@ -237,6 +237,7 @@ param_all = ComponentArray(
     e_g = compute_penman(t_air(t) - 273.15, p_surf(t)/1000, r_net(t), vpd(t)/10, r_a, r_s)[1] #kg/(m^2 s)
     du[1] = 1/1000*(c_1/(d_1 * ρ_w) * (precip(t) - e_g) - c_2 / 86400 * (u[1] - w_geq))
     du[2] = 1/1000*(1 / (ρ_w * d_2) * (precip(t) - e_g) - c_3 / (d_2 * 86400) * max(u[2] - w_fc, 0.0)) 
+    return nothing 
  end 
 
 wg_conservation(zeros(2), [0.4, 0.25], struct_total_pwg(), t_interp[1])
