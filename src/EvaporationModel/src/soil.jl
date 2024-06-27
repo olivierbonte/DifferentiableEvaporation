@@ -1,22 +1,48 @@
-function compute_c_1(w_g, w_sat, b, C1_sat)
-    return C1_sat * (w_g / w_sat)^(b / 2 + 1)
+"""
+    compute_c_1(w_g, w_sat, b, c_1_sat)
+
+Compute force coefficient `c_1` of force restore framework for soil mositure.
+See equation 20 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
+
+# Arguments
+- `w_g`: Surface soil moisutre [m³ m⁻³]
+- `w_sat`: Saturated soil moisture [m³ m⁻³]
+- `b`: the Brooks-Corey/Clapp-Hornberger parameter, see [compute_b](@ref compute_b)
+- `c_1_sat`: See [compute_c_1_sat](@ref compute_c_1_sat)
+
+"""
+function compute_c_1(w_g, w_sat, b, c_1_sat)
+    return c_1_sat * (w_g / w_sat)^(b / 2 + 1)
 end
 
-function compute_c_2(w_2, w_sat, C2_ref)
-    return C2_ref * (w_2 / (w_sat - w_2 + 0.01))
+"""
+    compute_c_2(w_2, w_sat, c2_ref)
+
+Compute restore coefficient `c_2` of force restore framework for soil moisture
+See equation 21 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
+
+# Arguments
+- `w_2`: The second layer soil mositure [m³ m⁻³]
+- `w_sat`: The saturated soil moisture [m³ m⁻³]
+- `c2_ref`: See [compute_c_2_ref](@ref compute_c_2_ref)
+
+"""
+function compute_c_2(w_2, w_sat, c2_ref)
+    return c2_ref * (w_2 / (w_sat - w_2 + 0.01))
 end
 
 """
     compute_w_geq(w_2, w_sat, a, p)
 
 Compute `w_geq`, the equilibrium surface soil moisture (i.e. when capillary and 
-gravitational forces are in equilibrium)
+gravitational forces are in equilibrium).
+See equation 19 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
 # Arguments
 - `w_2`: The second layer soil moisture [m³ m⁻³].
 - `w_sat`: The saturated soil moisture [m³ m⁻³].
-- `a`: Clapp-Hornberger parameter `a` (see [`compute_a`](@ref))
-- `p`: A parameter for the calculation
+- `a`: Clapp-Hornberger parameter `a` (see [compute_a](@ref compute_a))
+- `p`: Clapp-Hornberger parameter `a` (see [compute_p](@ref compute_p))
 """
 function compute_w_geq(w_2, w_sat, a, p)
     return w_2 - a * w_sat * (w_2 / w_sat)^p * (1 - (w_2 / w_sat)^(8 * p))
@@ -43,7 +69,7 @@ For the `Val(:van_genuchten)` approach, the parameter equivalence between the Br
 and van Genuchten, is based on [Morel-Seytoux et al., 1996](https://doi.org/10.1029/96WR00069). 
 Note that in this paper, `M` is equivalent to `b`. 
 """
-function compute_b(approach::Val{:clay}, perc_clay)
+function compute_b(approach, perc_clay)
     return compute_b(approach, perc_clay)
 end
 
