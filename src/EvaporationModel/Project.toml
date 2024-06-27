@@ -4,5 +4,6 @@ authors = ["Olivier Bonte <olivier.bonte@hotmail.com>"]
 version = "0.1.0"
 
 [deps]
+Bigleaf = "e2ae9153-b66f-47c5-85f1-c6d65380123f"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"

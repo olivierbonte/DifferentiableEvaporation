@@ -242,8 +242,10 @@ param_all = ComponentArray(
 
 wg_conservation(zeros(2), [0.4, 0.25], struct_total_pwg(), t_interp[1])
 
-prob = ODEProblem(wg_conservation, [0.4, 0.4], (t_interp[1],t_interp[end]), struct_total_pwg())
+w_init = w_sat
+prob = ODEProblem(wg_conservation, [w_sat, w_sat], (t_interp[1],t_interp[end]), struct_total_pwg())
 sol = solve(prob, ImplicitEuler(), saveat = t_interp, dt = (Millisecond(Minute(30))).value, adaptive = false)
-plot(collect(ds_flux_sub.Ti), sol.u[1])
+plot(collect(ds_flux_sub.Ti), sol[1,:], label = "w_g")
+plot!(collect(ds_flux_sub.Ti), sol[2,:], label = "w_2")
 plot!(twinx(), collect(ds_flux_sub.Ti), ds_meteo_sub["Precip"][:], color = :red, linestyle = :dot)
 display(sol.destats)

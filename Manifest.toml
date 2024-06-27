@@ -552,7 +552,7 @@ uuid = "2702e6a9-849d-5ed8-8c21-79e8b8f9ee43"
 version = "0.0.20230411+0"
 
 [[deps.EvaporationModel]]
-deps = ["ComponentArrays", "Parameters"]
+deps = ["Bigleaf", "ComponentArrays", "Parameters"]
 path = "src/EvaporationModel"
 uuid = "49da8130-70c8-449e-9091-2395ad2fb07e"
 version = "0.1.0"
