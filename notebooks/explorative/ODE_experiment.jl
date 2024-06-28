@@ -24,6 +24,8 @@ gr()
 #Download the data to a folder
 ds_meteo = open_dataset(datadir("exp_raw","BE-Bra_2004-2014_FLUXNET2015_Met.nc"));
 ds_flux = open_dataset(datadir("exp_raw","BE-Bra_2004-2014_FLUXNET2015_Flux.nc"));
+
+ds_meteo_LM = open_dataset(datadir("exp_raw","ES-LM1_2014-2020_FLUXDATAKIT_Met.nc"));
 #now make a shorter subset of the data
 start_date = DateTime(2006,04,01,00)
 end_date = DateTime(2006,07,01,00)
