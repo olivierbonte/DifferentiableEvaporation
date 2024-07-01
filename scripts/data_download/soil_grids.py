@@ -6,9 +6,7 @@ import numpy as np
 from pyproj import CRS, Transformer
 from soilgrids import SoilGrids
 from owslib.wcs import WebCoverageService
-
-datadir = os.path.join("..","..","data")
-data_ec_dir = os.path.join(datadir, "exp_raw","eddy_covariance")
+from conf import datadir, ec_dir, sites
 
 #%% Clay information 
 var_of_interest = 'clay'
@@ -18,13 +16,10 @@ wcs = WebCoverageService(url, version = '1.0.0')
 mean_names = [k for k in wcs.contents.keys() if k.find("mean") != -1]
 uncertainty_names = [k for k in wcs.contents.keys() if k.find("uncertainty") != -1]
 
-# %%Define sites of interest
-sites = ["BE-Bra", "ES-LM1"]
-
 # %% Store and process data for each site 
 for site in sites:
-    files = [k for k in os.listdir(data_ec_dir) if site in k]
-    ds_site = xr.open_dataset(os.path.join(data_ec_dir , files[0]))
+    files = [k for k in os.listdir(ec_dir) if site in k]
+    ds_site = xr.open_dataset(os.path.join(ec_dir , files[0]))
     output_folder  = os.path.join(datadir,"exp_raw","soilgrids",site)
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)

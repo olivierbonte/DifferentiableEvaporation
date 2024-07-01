@@ -6,9 +6,8 @@ import rioxarray
 import ee  
 import os
 import glob
-import rasterio
-import hvplot.xarray 
 from rasterio.enums import Resampling
+from conf import soilgrids_dir, hihydrosoil_dir,sites
 ee.Initialize(opt_url = "https://earthengine-highvolume.googleapis.com")
 
 #%% Define variables of interest from HiHydroSoilv2
@@ -41,11 +40,6 @@ depth_values = [
 base_url = "ee://projects/sat-io/open-datasets/HiHydroSoilv2_0/"
 
 #%% Extract to match with data from soilgrids
-sites = ["BE-Bra","ES-LM1"]
-datadir = os.path.join("..","..","data")
-datarawdir = os.path.join(datadir,"exp_raw")
-soilgrids_dir = os.path.join(datarawdir, "soilgrids")
-hihydrosoil_dir = os.path.join(datarawdir, "hihydrosoil")
 if not os.path.exists(hihydrosoil_dir):
     os.makedirs(hihydrosoil_dir)
 
