@@ -1,8 +1,8 @@
 #%%
 import rioxarray
 import os
-import subprocess
 import xarray as xr
+import numpy as np 
 from pyproj import CRS, Transformer
 from soilgrids import SoilGrids
 from owslib.wcs import WebCoverageService
@@ -21,16 +21,13 @@ uncertainty_names = [k for k in wcs.contents.keys() if k.find("uncertainty") != 
 # %%Define sites of interest
 sites = ["BE-Bra", "ES-LM1"]
 
-# %% Store data for each 
+# %% Store and process data for each site 
 for site in sites:
     files = [k for k in os.listdir(data_ec_dir) if site in k]
     ds_site = xr.open_dataset(os.path.join(data_ec_dir , files[0]))
     output_folder  = os.path.join(datadir,"exp_raw","soilgrids",site)
-    output_pro_folder = os.path.join(datadir, "exp_pro","soilgrids",site)
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    if not os.path.exists(output_pro_folder):
-        os.makedirs(output_pro_folder)
     
     # EPSG:4326 coordinates 
     lon = float(ds_site["longitude"].values[0][0])
@@ -46,6 +43,7 @@ for site in sites:
     dist = 2000 # m
     ds_list = []
     for id in (mean_names + uncertainty_names):
+        #Download raw data 
         out_path_tif = os.path.join(output_folder, id + '.tif')
         out_path_nc = os.path.join(output_folder, id + '.nc')
         data = soil_grids.get_coverage_data(
@@ -58,19 +56,39 @@ for site in sites:
             crs="urn:ogc:def:crs:EPSG::152160", # Homolsine;
             output = out_path_tif
         )
-        # #Convert to NetCDF with GDAL 
-        # subprocess.run(["gdal_translate", "-of" ,"NetCDF",
-        #                 os.path.abspath(out_path_tif),
-        #                 os.path.abspath(out_path_nc)],
-        #                 capture_output=True)
+
         ds_temp = rioxarray.open_rasterio(out_path_tif,mask_and_scale=True)
+        # Extra masking for uncertainty at int16 max of 32767
+        if ds_temp.max().values == 32767:
+            ds_temp = ds_temp.where(ds_temp != ds_temp.max())
         ds_temp.name = id
         ds_list.append(
             ds_temp.isel(band=0)
         )
-    #Make 1 datacube per site 
+
+    # Select center pixel (around point) + 2 extra pixels to each side
+    # --> 1250 x 1250 m cube, close to 1500 x 1500 m MODIS LAI or 
+    # 1000 x 1000 Copernicus LAI from Ukkola et al. (2019),
+    # https://doi.org/10.5194/essd-14-449-2022
+    # Make 1 datacube per site 
+    nr_pixels = 2
     ds_cube = xr.merge(ds_list)
-    ds_cube.to_netcdf(os.path.join(output_pro_folder,site + '_' + var_of_interest + ".nc"))
+    ds_point = ds_cube.sel(x = coords_homolsine[0], y =coords_homolsine[1], method = "nearest")
+    x_index = np.where((ds_point.x == ds_cube.x).values)[0][0]
+    y_index = np.where((ds_point.y == ds_cube.y).values)[0][0]
+    ds_cube = ds_cube.isel(
+        x = range(x_index - nr_pixels, x_index + nr_pixels + 1),
+        y = range(y_index -  nr_pixels, y_index + nr_pixels + 1)
+    )
+    # Add metadata
+    ds_cube.attrs["site_code"] = ds_site.attrs["site_code"]
+    ds_cube.attrs["site_name"] = ds_site.attrs["site_name"]
+    ds_cube.attrs["lon_EPSG_4326"] = lon
+    ds_cube.attrs["lat_EPSG_4326"] = lat
+    ds_cube.attrs["x_ESRI_54052"] = coords_homolsine[0]
+    ds_cube.attrs["y_ESRI_54052"] = coords_homolsine[1]
+    # Write to NetCDF
+    ds_cube.to_netcdf(os.path.join(output_folder,site + '_' + var_of_interest + ".nc"))
 
     
 
