@@ -6,8 +6,13 @@ dependencies:
   - python=3.12
   - xee
   - matplotlib
+  - hvplot 
+  - geoviews
   - jupyterlab 
   - netcdf4
   - owslib
   - rioxarray
   - soilgrids 
+  - pip
+  - pip:
+    - zenodo_get
