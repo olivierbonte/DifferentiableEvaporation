@@ -11,7 +11,7 @@ flux_url = r"https://thredds.nci.org.au/thredds/dodsC/ks32/CLEX_Data/PLUMBER2/v1
 met_url = r"https://thredds.nci.org.au/thredds/dodsC/ks32/CLEX_Data/PLUMBER2/v1-0/Met/BE-Bra_2004-2014_FLUXNET2015_Met.nc"
 urls = [flux_url, met_url]
 
-datadir = os.path.join("..","data")
+datadir = os.path.join("..","..","data")
 data_ec_dir = os.path.join(datadir, "exp_raw","eddy_covariance")
 if not os.path.exists(data_ec_dir):
     os.makedirs(data_ec_dir)

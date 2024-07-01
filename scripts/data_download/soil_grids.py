@@ -7,7 +7,7 @@ from pyproj import CRS, Transformer
 from soilgrids import SoilGrids
 from owslib.wcs import WebCoverageService
 
-datadir = os.path.join("..","data")
+datadir = os.path.join("..","..","data")
 data_ec_dir = os.path.join(datadir, "exp_raw","eddy_covariance")
 
 #%% Clay information 

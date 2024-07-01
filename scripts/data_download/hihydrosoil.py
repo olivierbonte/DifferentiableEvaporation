@@ -42,7 +42,7 @@ base_url = "ee://projects/sat-io/open-datasets/HiHydroSoilv2_0/"
 
 #%% Extract to match with data from soilgrids
 sites = ["BE-Bra","ES-LM1"]
-datadir = os.path.join("..","data")
+datadir = os.path.join("..","..","data")
 datarawdir = os.path.join(datadir,"exp_raw")
 soilgrids_dir = os.path.join(datarawdir, "soilgrids")
 hihydrosoil_dir = os.path.join(datarawdir, "hihydrosoil")
