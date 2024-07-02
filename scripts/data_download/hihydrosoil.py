@@ -42,6 +42,7 @@ units_dict = {
     "w_wp": "[m^3/m^3]",
 }
 depth_values = ["0-5cm", "5-15cm", "15-30cm", "30-60cm", "60-100cm", "100-200cm"]
+layer_depths = [0.05, 0.1, 0.1, 0.3, 0.4, 1.0]  # m
 base_url = "ee://projects/sat-io/open-datasets/HiHydroSoilv2_0/"
 
 # %% Extract to match with data from soilgrids
@@ -71,10 +72,14 @@ for site in sites:
             ),
             scale=scale,
         )
+        # save crs
+        crs_temp = ds_temp.crs
         # Convert to correct units by multiplying by 0.0001, see:
         # https://gee-community-catalog.org/projects/hihydro_soil/
         ds_temp = ds_temp * 0.0001
         ds_temp = ds_temp.rename({list(ds_temp.data_vars.keys())[0]: var})
+        # write crs with rioxarray
+        ds_temp = ds_temp.rio.write_crs(crs_temp)
         ds_temp[var].attrs["GEE_var_name"] = gee_var
         ds_temp[var].attrs["units"] = units_dict[var]
         ds_temp[var].attrs["full_name"] = full_names_dict[var]
@@ -90,6 +95,12 @@ for site in sites:
         "Intervals of soil depth below the surface"
     )
     ds_hihydrosoil = ds_hihydrosoil.assign_coords(depth=depth_values)
+    # Add layer depth variable
+    da_depth = xr.DataArray(
+        layer_depths, dims=("depth"), coords={"depth": depth_values}
+    )
+    da_depth.attrs = {"units": "m"}
+    ds_hihydrosoil["layer_depth"] = da_depth
     # Clean up metadata
     [ds_hihydrosoil.attrs.pop(attr) for attr in ["GEE_var_name", "units", "full_name"]]
     ds_hihydrosoil.attrs["url"] = (
