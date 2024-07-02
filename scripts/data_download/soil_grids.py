@@ -12,6 +12,7 @@ from conf import datadir, ec_dir, sites
 var_of_interest = "clay"
 soil_grids = SoilGrids()
 url = soil_grids.MAP_SERVICES[var_of_interest]["link"]
+units = soil_grids.MAP_SERVICES[var_of_interest]["units"]
 wcs = WebCoverageService(url, version="1.0.0")
 mean_names = [k for k in wcs.contents.keys() if k.find("mean") != -1]
 uncertainty_names = [k for k in wcs.contents.keys() if k.find("uncertainty") != -1]
@@ -54,12 +55,22 @@ for site in sites:
             output=out_path_tif,
         )
 
-        ds_temp = rioxarray.open_rasterio(out_path_tif, mask_and_scale=True)
+        da_temp = rioxarray.open_rasterio(out_path_tif, mask_and_scale=True)
         # Extra masking for uncertainty at int16 max of 32767
-        if ds_temp.max().values == 32767:
-            ds_temp = ds_temp.where(ds_temp != ds_temp.max())
-        ds_temp.name = id
-        ds_list.append(ds_temp.isel(band=0))
+        if da_temp.max().values == 32767:
+            da_temp = da_temp.where(da_temp != da_temp.max())
+        da_temp.name = id
+        da_temp.attrs = {
+            "url_doi": "https://doi.org/10.5194/soil-7-217-2021",
+            "url_OGC": "https://maps.isric.org/",
+        }
+        if "mean" in id:
+            da_temp.attrs["units"] = units
+        else:
+            da_temp.attrs["description"] = (
+                "(95th percentile - 5th percentile)/median*10"
+            )
+        ds_list.append(da_temp.isel(band=0))
 
     # Select center pixel (around point) + 2 extra pixels to each side
     # --> 1250 x 1250 m cube, close to 1500 x 1500 m MODIS LAI or
@@ -84,5 +95,6 @@ for site in sites:
     ds_cube.attrs["lat_EPSG_4326"] = lat
     ds_cube.attrs["x_ESRI_54052"] = coords_homolsine[0]
     ds_cube.attrs["y_ESRI_54052"] = coords_homolsine[1]
+    ds_cube.attrs.pop(units)
     # Write to NetCDF
     ds_cube.to_netcdf(os.path.join(output_folder, site + "_" + var_of_interest + ".nc"))
