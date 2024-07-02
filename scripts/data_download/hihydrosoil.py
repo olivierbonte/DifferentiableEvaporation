@@ -71,17 +71,19 @@ for site in sites:
             ),
             scale=scale,
         )
+        # Convert to correct units by multiplying by 0.0001, see:
+        # https://gee-community-catalog.org/projects/hihydro_soil/
+        ds_temp = ds_temp * 0.0001
         ds_temp = ds_temp.rename({list(ds_temp.data_vars.keys())[0]: var})
-        ds_temp[var].attrs.pop("id")
         ds_temp[var].attrs["GEE_var_name"] = gee_var
         ds_temp[var].attrs["units"] = units_dict[var]
         ds_temp[var].attrs["full_name"] = full_names_dict[var]
+        ds_temp[var].attrs[
+            "url"
+        ] = "https://gee-community-catalog.org/projects/hihydro_soil/"
         da_list.append(ds_temp[var])
     # Data cube creation
     ds_hihydrosoil = xr.merge(da_list)
-    # Convert to correct units by multiplying by 0.0001, see:
-    # https://gee-community-catalog.org/projects/hihydro_soil/
-    ds_hihydrosoil = ds_hihydrosoil * 0.0001
     # Rename depth dimension
     ds_hihydrosoil = ds_hihydrosoil.rename({"time": "depth"})
     ds_hihydrosoil.depth.attrs["Description"] = (
