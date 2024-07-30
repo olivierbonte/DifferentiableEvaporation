@@ -49,7 +49,7 @@ for site in sites:
     # Merge soilgrids and hihydrosoil
     ds_soil = xr.merge([ds_soilgrids_depth, ds_hihydrosoil])
     # Add useful metadata
-    [ds_soilgrids.attrs.pop(attr) for attr in ["url_doi", "url_OGC", "units"]]
+    [ds_soilgrids.attrs.pop(attr) for attr in ["url_doi", "url_OGC"]]
     ds_soil.attrs = ds_soilgrids.attrs
     ds_soil.to_netcdf(os.path.join(soil_pro_dir, site + "_soil_cube.nc"))
 

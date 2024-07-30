@@ -95,6 +95,6 @@ for site in sites:
     ds_cube.attrs["lat_EPSG_4326"] = lat
     ds_cube.attrs["x_ESRI_54052"] = coords_homolsine[0]
     ds_cube.attrs["y_ESRI_54052"] = coords_homolsine[1]
-    ds_cube.attrs.pop(units)
+    ds_cube.attrs.pop("units")
     # Write to NetCDF
     ds_cube.to_netcdf(os.path.join(output_folder, site + "_" + var_of_interest + ".nc"))
