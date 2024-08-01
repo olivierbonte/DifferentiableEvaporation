@@ -1,13 +1,14 @@
-#%% Configuration file for the data downloads
+# %% Configuration file for the data downloads
 import os
 
-#%% folder paths
-datadir = os.path.join("..","..","data")
-datarawdir = os.path.join(datadir,"exp_raw")
+# %% folder paths
+datadir = os.path.join("..", "..", "data")
+datarawdir = os.path.join(datadir, "exp_raw")
 
 soilgrids_dir = os.path.join(datarawdir, "soilgrids")
 hihydrosoil_dir = os.path.join(datarawdir, "hihydrosoil")
-ec_dir = os.path.join(datarawdir,"eddy_covariance")
+ec_dir = os.path.join(datarawdir, "eddy_covariance")
+veg_dir = os.path.join(datarawdir, "vegetation")
 
-#%% sites of interest
-sites = ["BE-Bra","ES-LM1"]
+# %% sites of interest
+sites = ["BE-Bra", "ES-LM1"]

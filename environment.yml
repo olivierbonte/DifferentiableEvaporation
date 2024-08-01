@@ -13,6 +13,7 @@ dependencies:
   - owslib
   - rioxarray
   - soilgrids 
+  - cubo
   - pip
   - pip:
     - zenodo_get
