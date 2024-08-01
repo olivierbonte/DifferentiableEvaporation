@@ -20,14 +20,19 @@ using the Penman-Monteith equation.
 - `et`: Potential evapotranspiration [kg/(m^2 * s)].
 - `le`: Latent heat flux [W/m²].
 """
-function penman_monteith(t_air, p_surf, r_net, vpd, r_a, r_s; g = 0.0, kwargs...)
+function penman_monteith(t_air, p_surf, r_net, vpd, r_a, r_s; g=0.0, kwargs...)
     cp = Bigleaf.bigleaf_constants()
     et, le = Bigleaf.potential_ET(
-        Val(:PenmanMonteith), t_air - cp[:Kelvin], p_surf * cp[:Pa2kPa], r_net, 
-        vpd * cp[:Pa2kPa], 1.0 / r_a, G = g, 
-        Gs_pot = Bigleaf.ms_to_mol(1.0 / r_s, t_air - cp[:Kelvin], p_surf * cp[:Pa2kPa])
+        Val(:PenmanMonteith),
+        t_air - cp[:Kelvin],
+        p_surf * cp[:Pa2kPa],
+        r_net,
+        vpd * cp[:Pa2kPa],
+        1.0 / r_a;
+        G=g,
+        Gs_pot=Bigleaf.ms_to_mol(1.0 / r_s, t_air - cp[:Kelvin], p_surf * cp[:Pa2kPa]),
     )
-    return et, le 
+    return et, le
 end
 
 """
@@ -53,4 +58,16 @@ function compute_g_from_r_net(r_net, lai)
         g = r_net * (0.05 + 0.18 * exp(-0.521 * lai))
     end
     return g
+end
+
+function compute_soil_evaporation_stress(w_g, w_crit, w_res)
+    return max(1.0, (w_g - w_res) / (w_crit - w_res))
+end
+
+function compute_bare_soil_evaporation(et_pot, f_veg, stress)
+    return (1.0 - f_veg) * stress * et_pot
+end
+
+function compute_transpiration(et, f_veg, f_wet)
+    return f_veg * (1 - f_wet) * et
 end
