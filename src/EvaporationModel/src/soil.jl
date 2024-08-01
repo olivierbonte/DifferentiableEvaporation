@@ -12,7 +12,7 @@ See equation 20 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 
 """
 function compute_c_1(w_g, w_sat, b, c_1_sat)
-    return c_1_sat * (w_g / w_sat)^(b / 2 + 1)
+    return c_1_sat * (w_g / w_sat)^(b / 2. + 1.)
 end
 
 """
@@ -45,7 +45,7 @@ See equation 19 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `p`: Clapp-Hornberger parameter `a` (see [compute_p](@ref compute_p))
 """
 function compute_w_geq(w_2, w_sat, a, p)
-    return w_2 - a * w_sat * (w_2 / w_sat)^p * (1 - (w_2 / w_sat)^(8 * p))
+    return w_2 - a * w_sat * (w_2 / w_sat)^p * (1. - (w_2 / w_sat)^(8. * p))
 end
 
 """
@@ -78,7 +78,7 @@ function compute_b(::Val{:clay}, perc_clay)
 end
 
 function compute_b(::Val{:van_genuchten}, n)
-    return -1.0 + n / (n - 1.0)
+    return -1. + n / (n - 1.)
 end
 
 """
