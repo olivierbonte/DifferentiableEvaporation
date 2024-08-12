@@ -36,7 +36,9 @@ for site in sites:
     # rename array to avoid writing issues
     da_modis_vcf.name = "MODIS_VCF"
     # take the spatial mean over the
-    da_modis_vcf_mean = da_modis_vcf.mean(dim=["x", "y"])
+    da_modis_vcf_mean = da_modis_vcf.mean(dim=["x", "y"], keep_attrs=True)
+    # drop incorrect attributes after mean operation
+    [da_modis_vcf_mean.attrs.pop(attr) for attr in ["resolution", "edge_size"]]
     # write to disk
     da_modis_vcf.to_netcdf(os.path.join(veg_dir, site + "_cube.nc"))
     da_modis_vcf_mean.to_netcdf(os.path.join(veg_dir, site + "_horizontal_agg.nc"))
