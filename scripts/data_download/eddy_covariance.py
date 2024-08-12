@@ -19,9 +19,9 @@ for url in urls:
     (xr.open_dataset(url)).to_netcdf(os.path.join(ec_dir, url.split("/")[-1]))
 
 # %% FluxDataKit data
-# Available on Zenodo at https://doi.org/10.5281/zenodo.11370417
+# Available on Zenodo at https://doi.org/10.5281/zenodo.12818273
 # Only download FLUXDATAKIT_LSM.tar.gz
-os.system("zenodo_get 10.5281/zenodo.11370417 -g FLUXDATAKIT_LSM.tar.gz")
+os.system("zenodo_get 10.5281/zenodo.12818273 -g FLUXDATAKIT_LSM.tar.gz")
 
 # Extract to folder
 with tarfile.open("FLUXDATAKIT_LSM.tar.gz", "r") as tar:
