@@ -2,6 +2,7 @@
 import xarray as xr
 import os
 import tarfile
+import shutil
 from conf import ec_dir, sites
 
 # %% PLUMBER 2 data
@@ -20,8 +21,12 @@ for url in urls:
 
 # %% FluxDataKit data
 # Available on Zenodo at https://doi.org/10.5281/zenodo.12818273
-# Only download FLUXDATAKIT_LSM.tar.gz
+# Download FLUXDATAKIT_LSM.tar.gz
 os.system("zenodo_get 10.5281/zenodo.12818273 -g FLUXDATAKIT_LSM.tar.gz")
+# Download metadata in tabular form
+os.system("zenodo_get 10.5281/zenodo.12818273 -g fdk_site_info.csv")
+# Download data containing sequences of good-quality data
+os.system("zenodo_get 10.5281/zenodo.12818273 -g fdk_site_fullyearsequence.csv")
 
 # Extract to folder
 with tarfile.open("FLUXDATAKIT_LSM.tar.gz", "r") as tar:
@@ -32,3 +37,10 @@ with tarfile.open("FLUXDATAKIT_LSM.tar.gz", "r") as tar:
 # Remove the .tar.gz and download check file
 os.remove("FLUXDATAKIT_LSM.tar.gz")
 os.remove("md5sums.txt")
+
+# Move metadata to correct folder
+shutil.move("fdk_site_info.csv", os.path.join(ec_dir, "fdk_site_info.csv"))
+shutil.move(
+    "fdk_site_fullyearsequence.csv",
+    os.path.join(ec_dir, "fdk_site_fullyearsequence.csv"),
+)
