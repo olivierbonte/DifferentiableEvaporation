@@ -281,6 +281,7 @@ using BenchmarkTools
 #try implementing saving callback
 using DiffEqCallbacks
 saved_values = SavedValues(Float64, Tuple{Float64, Float64})
+# saved_values = SavedValues(Float64, NamedTuple{(:value1, :value2), Tuple{Float64, Float64}})
 function save_func(u, t , integrator)
     @unpack d, z0m, z0h, z_measur,
     w_res, w_crit, w_fc, w_wilt, gd, r_smin = integrator.p
@@ -330,6 +331,7 @@ plot!(
     linestyle=:dot, ylabel="precipitation [kg/(m² s)]", label=""
 )
 savefig(projectdir("plots","test_picture.png"))
+# plot 
 
 #plot saved values
 E_total = map(x -> x[1], saved_values.saveval) + map(x -> x[2], saved_values.saveval)
@@ -345,7 +347,27 @@ sol_explicit = solve(prob, Euler(), saveat=t_interp, dt=(Second(Minute(30))).val
 sol_stiff = solve(prob, KenCarp4(), saveat=t_interp)
 
 #benchmark
-display(@benchmark solve(prob, ImplicitEuler(), saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false))
+# using LineSearches
+# display(@benchmark solve(prob, ImplicitEuler(nlsolve = NLNewton(relax=BackTracking())), saveat=t_interp, 
+#     dt=(Second(Minute(30))).value, adaptive=false))
+display(@benchmark solve(prob, ImplicitEuler(), saveat=t_interp, 
+    dt=(Second(Minute(30))).value, adaptive=false))
 display(@benchmark solve(prob, Euler(), saveat=t_interp, dt=(Second(Minute(30))).value))
-display(@benchmark solve(prob, KenCarp4(), saveat=t_interp))
+# display(@benchmark solve(prob, QNDF(), saveat=t_interp))
+display(@benchmark solve(prob, Rodas5P(), saveat=t_interp))
+#Rodas4P() also good (more robust)
 
+# test out of domain callback!
+# More info on how to constrain the solution, see https://doi.org/10.1016/j.amc.2004.12.011
+sol_Tsit5 = solve(prob, Tsit5(), cb = PositiveDomain(), abstol = 1e-8, reltol = 1e-8)
+plot(sol_Tsit5)
+# Works somewhat, but this solver can not handle the stiffness...
+sol_Heun = solve(prob, Heun(), cb = PositiveDomain(), abstol = 1e-6, reltol = 1e-5)
+plot(sol_Heun)
+# https://docs.sciml.ai/DiffEqDocs/stable/basics/common_solver_opts/
+# The stiff solver Rodas5P with reltol set to 1e-4
+# This mean accurate op to 0.0001 for soil moisture
+# so max 0.0001 difference between the two orders used 
+
+sol = solve(prob, alg_hints = [:stiff])
+plot(sol)
