@@ -1,5 +1,3 @@
-import Bigleaf
-
 """
     penman_monteith(t_air, p_surf, r_net, vpd, r_a, r_s; g = 0.0, kwargs...)
 
