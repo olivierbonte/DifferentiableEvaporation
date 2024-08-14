@@ -44,7 +44,7 @@ for site in conf_module.sites:
     df_join = df_fpar[["FPAR", "FPAR_clim", "year"]].merge(
         total_veg_cover[["year", "MODIS_VCF"]], how="left", on="year"
     )
-    df_join.index = ds_met.isel(x=0, y=0).to_dataframe().index
+    df_join = df_join.set_index(ds_met.isel(x=0, y=0).to_dataframe().index)
     df_join["f_veg"] = df_join["MODIS_VCF"] * df_join["FPAR"] / df_join["FPAR_clim"]
     # Correction 1: limit to max 1
     # Analogous to Trautman et al. (2022): https://doi.org/10.5194/hess-26-1089-2022
