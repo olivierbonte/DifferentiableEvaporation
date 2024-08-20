@@ -1,9 +1,10 @@
 # %% imports
-import xarray as xr
 import os
+import shutil
 import subprocess
 import tarfile
-import shutil
+
+import xarray as xr
 from conf import ec_dir, sites
 
 ec_dir.mkdir(exist_ok=True)

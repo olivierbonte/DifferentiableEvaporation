@@ -1,12 +1,14 @@
 # %%
-import rioxarray
 import os
-import xarray as xr
+from glob import glob
+
 import numpy as np
+import rioxarray
+import xarray as xr
+from conf import datadir, ec_dir, sites, soilgrids_dir
+from owslib.wcs import WebCoverageService
 from pyproj import CRS, Transformer
 from soilgrids import SoilGrids
-from owslib.wcs import WebCoverageService
-from conf import datadir, ec_dir, sites
 
 # %% Clay information
 var_of_interest = "clay"
@@ -19,11 +21,10 @@ uncertainty_names = [k for k in wcs.contents.keys() if k.find("uncertainty") != 
 
 # %% Store and process data for each site
 for site in sites:
-    files = [k for k in os.listdir(ec_dir) if site in k]
-    ds_site = xr.open_dataset(os.path.join(ec_dir, files[0]))
-    output_folder = os.path.join(datadir, "exp_raw", "soilgrids", site)
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    files = glob(str(ec_dir / ("*" + site + "*FLUXDATAKIT_Flux.nc")))
+    ds_site = xr.open_dataset(files[0])
+    output_folder = soilgrids_dir / site
+    output_folder.mkdir(exist_ok=True)
 
     # EPSG:4326 coordinates
     lon = float(ds_site["longitude"].values[0][0])
@@ -42,8 +43,8 @@ for site in sites:
     ds_list = []
     for id in mean_names + uncertainty_names:
         # Download raw data
-        out_path_tif = os.path.join(output_folder, id + ".tif")
-        out_path_nc = os.path.join(output_folder, id + ".nc")
+        out_path_tif = output_folder / (id + ".tif")
+        out_path_nc = output_folder / (id + ".nc")
         data = soil_grids.get_coverage_data(
             service_id="clay",
             coverage_id=id,
@@ -52,7 +53,7 @@ for site in sites:
             south=coords_homolsine[1] - dist,
             north=coords_homolsine[1] + dist,
             crs="urn:ogc:def:crs:EPSG::152160",  # Homolsine;
-            output=out_path_tif,
+            output=str(out_path_tif),
         )
 
         da_temp = rioxarray.open_rasterio(out_path_tif, mask_and_scale=True)
@@ -97,4 +98,4 @@ for site in sites:
     ds_cube.attrs["y_ESRI_54052"] = coords_homolsine[1]
     ds_cube.attrs.pop("units")
     # Write to NetCDF
-    ds_cube.to_netcdf(os.path.join(output_folder, site + "_" + var_of_interest + ".nc"))
+    ds_cube.to_netcdf(output_folder / (site + "_" + var_of_interest + ".nc"))

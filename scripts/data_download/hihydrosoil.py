@@ -4,15 +4,18 @@ import subprocess
 subprocess.run(
     "earthengine authenticate --quiet", shell=True, capture_output=True, text=True
 )
-import xarray as xr
-import rioxarray
-import ee
-import os
 import glob
+import os
+
+import ee
+import rioxarray
+import xarray as xr
+from conf import hihydrosoil_dir, sites, soilgrids_dir
 from rasterio.enums import Resampling
-from conf import soilgrids_dir, hihydrosoil_dir, sites
 
 ee.Initialize(opt_url="https://earthengine-highvolume.googleapis.com")
+
+hihydrosoil_dir.mkdir(exist_ok=True)
 
 # %% Define variables of interest from HiHydroSoilv2
 # https://gee-community-catalog.org/projects/hihydro_soil/
@@ -46,12 +49,10 @@ layer_depths = [0.05, 0.1, 0.1, 0.3, 0.4, 1.0]  # m
 base_url = "ee://projects/sat-io/open-datasets/HiHydroSoilv2_0/"
 
 # %% Extract to match with data from soilgrids
-if not os.path.exists(hihydrosoil_dir):
-    os.makedirs(hihydrosoil_dir)
-
+# NOTE 20/08/2024: consider refactoring to using Cubo later
 for site in sites:
     # Get bounding box from soilgrids data
-    soilgrids_file = glob.glob(os.path.join(soilgrids_dir, site, "*" + site + "*.nc"))
+    soilgrids_file = glob.glob(str(soilgrids_dir / site / ("*" + site + "*.nc")))
     ds_soilgrids = xr.open_dataset(soilgrids_file[0], decode_coords="all")
     ds_soilgrids_wgs84 = ds_soilgrids.rio.reproject(
         dst_crs="EPSG:4326", resampling=Resampling.bilinear
@@ -111,4 +112,4 @@ for site in sites:
         "High-Resolution-Soil-Maps-of-Global-Hydraulic-Properties_v2.pdf"
     )
     # Write to disk as NetCDF
-    ds_hihydrosoil.to_netcdf(os.path.join(hihydrosoil_dir, site + ".nc"))
+    ds_hihydrosoil.to_netcdf(hihydrosoil_dir / (site + ".nc"))
