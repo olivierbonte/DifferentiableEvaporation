@@ -1,26 +1,18 @@
 # %% Imports
-import sys
-import os
-import xarray as xr
-import numpy as np
-from pathlib import Path
-from importlib.machinery import SourceFileLoader
 from glob import glob
 
-scripts_folder = Path(__file__).resolve().parent.parent
-conf_module = SourceFileLoader(
-    "conf", os.path.join(scripts_folder, "data_download", "conf.py")
-).load_module()
-if not os.path.exists(conf_module.veg_pro_dir):
-    os.makedirs(conf_module.veg_pro_dir)
+import numpy as np
+import xarray as xr
+from conf import conf_module
+
+conf_module.veg_pro_dir.mkdir(exist_ok=True)
 
 # %%
 for site in conf_module.sites:
-    ds_veg = xr.open_dataset(
-        os.path.join(conf_module.veg_dir, site + "_horizontal_agg.nc")
-    )
+    print(f"site in progress: {site}")
+    ds_veg = xr.open_dataset(conf_module.veg_dir / (site + "_horizontal_agg.nc"))
     ds_met = xr.open_dataset(
-        glob(os.path.join(conf_module.ec_dir, "*" + site + "*Met.nc"))[0]
+        glob(str(conf_module.ec_dir / ("*" + site + "*Met.nc")))[0]
     )
     ## Option 1: Based on Zhong et al. (2022) https://doi.org/10.5194/hess-26-5647-2022
     ## VCF and FPAR dependence
@@ -71,6 +63,6 @@ for site in conf_module.sites:
         see https://doi.org/10.1016/S0022-1694(01)00392-4"""
     }
     ds_join.attrs = dict(list(ds_met.attrs.items())[2:4])
-    ds_join.to_netcdf(os.path.join(conf_module.veg_pro_dir, site + ".nc"))
+    ds_join.to_netcdf(conf_module.veg_pro_dir / (site + ".nc"))
 
 # %%
