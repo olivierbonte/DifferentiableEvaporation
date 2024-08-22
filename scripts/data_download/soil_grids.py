@@ -1,11 +1,13 @@
 # %%
 import os
+import shutil
 from glob import glob
 
 import numpy as np
 import rioxarray
 import xarray as xr
-from conf import datadir, ec_dir, sites, soilgrids_dir
+from conf import datarawdir, ec_dir, essd_dir, sites, soilgrids_dir
+from osgeo import gdal
 from owslib.wcs import WebCoverageService
 from pyproj import CRS, Transformer
 from soilgrids import SoilGrids
@@ -19,8 +21,52 @@ wcs = WebCoverageService(url, version="1.0.0")
 mean_names = [k for k in wcs.contents.keys() if k.find("mean") != -1]
 uncertainty_names = [k for k in wcs.contents.keys() if k.find("uncertainty") != -1]
 
+# %% European Soil Database Derived data: root depth
+netcdf_dir = essd_dir / "NetCDF"
+netcdf_dir.mkdir(exist_ok=True)
+netcdf_file = netcdf_dir / "soil_depth_test.nc"
+dataset = gdal.Open(essd_dir / "STU_EU_DEPTH_ROOTS.rst")
+x_size = dataset.RasterXSize
+y_size = dataset.RasterYSize
+bands = dataset.RasterCount
+geo_transform = dataset.GetGeoTransform()
+projection = dataset.GetProjection()
+# Create the NetCDF file
+netcdf_driver = gdal.GetDriverByName("NetCDF")
+netcdf_ds = netcdf_driver.Create(
+    str(netcdf_file), x_size, y_size, bands, gdal.GDT_Float32
+)
+# Allows for multiple bands if present
+for i in range(1, bands + 1):
+    rst_band = dataset.GetRasterBand(i)
+    data = rst_band.ReadAsArray()
+    netcdf_band = netcdf_ds.GetRasterBand(i)
+    netcdf_band.WriteArray(data)
+# Set georeference and projection
+# Manually define the CRS, which is ETRS89-extended / LAEA Europe (https://epsg.io/3035),
+# which is manually read from metadata (.RDC file)
+crs_epsg3035 = CRS.from_epsg(3035)
+# proj4_epsg3035 = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs"
+netcdf_ds.SetGeoTransform(geo_transform)
+netcdf_ds.SetProjection(crs_epsg3035.to_wkt())
+# Close the datasets
+dataset = None
+netcdf_ds = None
+
+# read netcdf with xarray, append features and write out
+da_root_depth = xr.open_dataarray(netcdf_file, decode_coords="all").load()
+da_root_depth.close()
+da_root_depth = da_root_depth.rename("root_depth")
+da_root_depth.attrs = {
+    "units": "cm",
+    "long_name": "Depth available to roots",
+    "url": "https://esdac.jrc.ec.europa.eu/content/european-soil-database-derived-data#tabs-0-description=0",
+}
+da_root_depth.to_netcdf(datarawdir / "temp.nc")
+shutil.move(datarawdir / "temp.nc", netcdf_file)
 # %% Store and process data for each site
 for site in sites:
+    print(f"site in progress: {site}")
     files = glob(str(ec_dir / ("*" + site + "*FLUXDATAKIT_Flux.nc")))
     ds_site = xr.open_dataset(files[0])
     output_folder = soilgrids_dir / site
@@ -35,9 +81,14 @@ for site in sites:
     crs_homolsine = CRS.from_proj4(
         "+proj=igh +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
     )
+    # Transofmer lat/lon to both CRS
     transformer = Transformer.from_crs(4326, crs_homolsine, always_xy=True)
+    transformer_epsg3035 = Transformer.from_crs(4326, crs_epsg3035, always_xy=True)
     coords_homolsine = transformer.transform(lon, lat)
+    coords_epsg3035 = transformer_epsg3035.transform(lon, lat)
 
+    ## SoilGrids
+    # ----------
     # Take bounding box of 4 km around site
     dist = 2000  # m
     ds_list = []
@@ -99,3 +150,11 @@ for site in sites:
     ds_cube.attrs.pop("units")
     # Write to NetCDF
     ds_cube.to_netcdf(output_folder / (site + "_" + var_of_interest + ".nc"))
+
+    ## European Soil Database
+    # -----------------------
+    # Select 1 x 1 km pixel closest to site
+    da_root_depth_site = da_root_depth.sel(
+        x=coords_epsg3035[0], y=coords_epsg3035[1], method="nearest"
+    )
+    da_root_depth_site.to_netcdf(netcdf_dir / (site + "_root_depth.nc"))
