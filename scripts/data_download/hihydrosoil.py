@@ -45,12 +45,13 @@ units_dict = {
     "w_wp": "[m^3/m^3]",
 }
 depth_values = ["0-5cm", "5-15cm", "15-30cm", "30-60cm", "60-100cm", "100-200cm"]
-layer_depths = [0.05, 0.1, 0.1, 0.3, 0.4, 1.0]  # m
+layer_depths = [0.05, 0.1, 0.15, 0.3, 0.4, 1.0]  # m
 base_url = "ee://projects/sat-io/open-datasets/HiHydroSoilv2_0/"
 
 # %% Extract to match with data from soilgrids
 # NOTE 20/08/2024: consider refactoring to using Cubo later
 for site in sites:
+    print(f"site in progress: {site}")
     # Get bounding box from soilgrids data
     soilgrids_file = glob.glob(str(soilgrids_dir / site / ("*" + site + "*.nc")))
     ds_soilgrids = xr.open_dataset(soilgrids_file[0], decode_coords="all")
