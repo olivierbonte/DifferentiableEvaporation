@@ -37,3 +37,8 @@ Besides Julia, also Python is used in this project. The required dependencies to
 conda env create -f environment.yml
 conda activate DifferentiableEvaporation
 ```
+
+## Data processing
+For more information on the data processing, follow the instructions in the folders in the order given below:
+1. Data download information, see [here](scripts/data_download/README.md)
+2. Data processing information, see [here](scripts/data_processing/README.md)
