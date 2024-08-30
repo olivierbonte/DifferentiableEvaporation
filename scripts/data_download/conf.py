@@ -12,14 +12,14 @@ hihydrosoil_dir = datarawdir / "hihydrosoil"
 ec_dir = datarawdir / "eddy_covariance"
 veg_dir = datarawdir / "vegetation"
 essd_dir = datarawdir / "STU_EU_Layers"  # European Soil Database Derived data
-fluxnet_dir = datadir / "fluxnet_for_soil_moisture"
+fluxnet_dir = datarawdir / "fluxnet_for_soil_moisture"
 
 ec_pro_dir = datadir / "exp_pro" / "eddy_covariance"
 soil_pro_dir = datadir / "exp_pro" / "soil"
 veg_pro_dir = datadir / "exp_pro" / "vegetation"
 
 # %% sites of interest
-sites = ["BE-Bra", "ES-LM1", "DE-Hai", "DE-Tha"]
+sites = ["BE-Bra", "DE-Hai", "DE-Tha"]
 # DE-Tha, NL-Loo also potentially a good site
 
 # %% List of input variables needed for the model (for quality check)
