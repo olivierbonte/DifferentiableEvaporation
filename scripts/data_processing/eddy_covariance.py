@@ -79,7 +79,10 @@ for site in conf_module.sites:
         logging.warning(
             f"For {site}, the total amount of water evaporated is higher than the rainfall"
         )
-
+    # Add metadata to coordinates
+    ds_og = xr.open_dataset(files[0])
+    for coord in ds_ec_sel.coords:
+        ds_ec_sel[coord].attrs = ds_og[coord].attrs
     # Write to disk
     ds_ec_sel.to_netcdf(conf_module.ec_pro_dir / (site + ".nc"))
 
