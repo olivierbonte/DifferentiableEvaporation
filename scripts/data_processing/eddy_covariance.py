@@ -1,11 +1,11 @@
 # %% Imports
 import logging
+from datetime import datetime
 from glob import glob
 
-import hvplot.xarray
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pytz
 import xarray as xr
 from conf import conf_module
 
@@ -50,8 +50,6 @@ for site in conf_module.sites:
             print(slice_list)
             print(length_list)
             ds_ec_sel = ds_ec_sel.isel(time=selected_slice)
-            # fig, ax = plt.subplots()
-            # ds_ec_sel.Rnet.plot(ax=ax)
             print(
                 f"""Selected data: Start = {ds_ec_sel.time[0].values},
                     End = {ds_ec_sel.time[-1].values}"""
@@ -83,6 +81,21 @@ for site in conf_module.sites:
     ds_og = xr.open_dataset(files[0])
     for coord in ds_ec_sel.coords:
         ds_ec_sel[coord].attrs = ds_og[coord].attrs
+    # Change timezone to constant UTC offset excluding daylight saving time (DST)
+    # See p.4 of Pastorello et al. (2020): https://doi.org/10.1038/s41597-020-0534-3
+    timezone = pytz.timezone(ds_ec_sel.time.attrs["time_zone"])
+    if ds_ec_sel["latitude"].values[0][0] > 0:  # Norther Hemisphere
+        reference_date = timezone.localize(datetime(2020, 1, 1))  # Guaranteed no DST
+    else:  # Southern Hemisphere
+        reference_date = timezone.localize(datetime(2020, 7, 1))
+    utc_offset_hours = reference_date.utcoffset().seconds / 3600
+    ds_ec_sel.time.attrs["UTC_offset"] = utc_offset_hours
+    # !!CAUTION: Etc/GMT-x is equal to UTC+x!!
+    if utc_offset_hours >= 0:
+        ds_ec_sel.time.attrs["time_zone"] = f"Etc/GMT-{int(utc_offset_hours)}"
+    else:
+        ds_ec_sel.time.attrs["time_zone"] = f"Etc/GMT+{int(utc_offset_hours)}"
+
     # Write to disk
     ds_ec_sel.to_netcdf(conf_module.ec_pro_dir / (site + ".nc"))
 
