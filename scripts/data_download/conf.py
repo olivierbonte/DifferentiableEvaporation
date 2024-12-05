@@ -6,6 +6,7 @@ conf_file_path = pathlib.Path(__file__)
 root_project_path = conf_file_path.parent.parent.parent
 datadir = root_project_path / "data"
 datarawdir = datadir / "exp_raw"
+dataprodir = datadir / "exp_pro"
 
 soilgrids_dir = datarawdir / "soilgrids"
 hihydrosoil_dir = datarawdir / "hihydrosoil"
@@ -14,10 +15,10 @@ veg_dir = datarawdir / "vegetation"
 essd_dir = datarawdir / "STU_EU_Layers"  # European Soil Database Derived data
 fluxnet_dir = datarawdir / "fluxnet_for_soil_moisture"
 
-ec_pro_dir = datadir / "exp_pro" / "eddy_covariance"
-soil_pro_dir = datadir / "exp_pro" / "soil"
-veg_pro_dir = datadir / "exp_pro" / "vegetation"
-fluxnet_pro_dir = datadir / "exp_pro" / "fluxnet_for_soil_moisture"
+ec_pro_dir = dataprodir / "eddy_covariance"
+soil_pro_dir = dataprodir / "soil"
+veg_pro_dir = dataprodir / "vegetation"
+fluxnet_pro_dir = dataprodir / "fluxnet_for_soil_moisture"
 
 # %% sites of interest
 sites = ["BE-Bra", "DE-Hai", "DE-Tha"]

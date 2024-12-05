@@ -7,6 +7,7 @@ import pytz
 import xarray as xr
 from conf import conf_module
 
+conf_module.fluxnet_pro_dir.mkdir(exist_ok=True)
 # %% Process soil moisture data
 date_format = "%Y%m%d%H%M"
 for site in conf_module.sites:
@@ -16,8 +17,9 @@ for site in conf_module.sites:
     site_fluxnet_folder = list(
         conf_module.fluxnet_dir.glob("*" + site + "*FLUXNET2015*")
     )[0]
+    site_fluxnet_file = list(site_fluxnet_folder.iterdir())[0]
     df_fluxnet_hh = pd.read_csv(
-        list(site_fluxnet_folder.iterdir())[0],
+        site_fluxnet_file,
         na_values=-9999,
         index_col=0,
         date_format=date_format,
@@ -34,9 +36,9 @@ for site in conf_module.sites:
     # Combined dataset
     if df_fluxnet_hh.index[-1] < df_l2_hh.index[1]:
         logging.warning(
-            f"The Fluxnet dataset (ending on {df_fluxnet_hh.index[-1]})"
-            "and the L2 archive dataset (starting on {df_fluxnet_hh.index[1]}"
-            "do not overlap in time)"
+            f"""The Fluxnet dataset (ending on {df_fluxnet_hh.index[-1]})
+            and the L2 archive dataset (starting on {df_fluxnet_hh.index[1]}
+            do not overlap in time)"""
         )
     df_combined_hh = pd.concat([df_fluxnet_hh, df_l2_hh])
     df_combined_hh["TIMESTAMP_END"] = pd.to_datetime(
@@ -73,20 +75,20 @@ for site in conf_module.sites:
             r"^SWC_F_MDS_\d+$", regex=True
         )
     ]
-    # Site metadata
+    # Site metadata: check if timezone checks out with FluxDataKit timezone
     time_metadata = xr.open_dataset(conf_module.ec_pro_dir / (site + ".nc")).time.attrs
     site_metadata_file = list(site_l2_folder.glob("*" + site + "_SITEINFO_L2.csv"))[0]
     df_site_meta = pd.read_csv(site_metadata_file)
-    utc_offset = df_site_meta[df_site_meta["VARIABLE"].str.contains("UTC_OFFSET")][
-        "DATAVALUE"
-    ].values[0]
-    time_metadata["UTC_offset"] = int(utc_offset)
-    # Convert to format suitable for use in pytz.timezone(utc_offset_str)
-    # !!CAUTION: Etc/GMT-x is equal to UTC+x!!
-    if int(utc_offset) >= 0:
-        time_metadata["time_zone"] = "Etc/GMT-" + utc_offset
-    else:
-        time_metadata["time_zone"] = "Etc/GMT+" - utc_offset
+    utc_offset = int(
+        df_site_meta[df_site_meta["VARIABLE"].str.contains("UTC_OFFSET")][
+            "DATAVALUE"
+        ].values[0]
+    )
+    if time_metadata["UTC_offset"] != utc_offset:
+        raise ValueError(
+            f"""UTC offset mismatch: {time_metadata['UTC_offset']} from FluxDataKit, 
+            {utc_offset} read from FLUXNET metadata"""
+        )
 
     # Convert to .nc
     df_sel_wide = df_sel.reset_index().melt(
@@ -102,11 +104,33 @@ for site in conf_module.sites:
         .astype(float)
     )  # Links variable name with sensor depth
     depth_series = depth_series * -1  # Define depth below ground positive
-    df_sel_wide["depth"] = df_sel_wide["depth"].replace(depth_series.to_dict())
+    df_sel_wide["depth"] = (
+        df_sel_wide["depth"].replace(depth_series.to_dict()).infer_objects(copy=False)
+    )
+    df_sel_wide.rename(columns={"TIMESTAMP_START": "time"}, inplace=True)
     ds_swc = (
-        df_sel_wide.set_index(["TIMESTAMP_START", "depth"])
+        df_sel_wide.set_index(["time", "depth"])
         .pivot(values="SWC", columns="variable")
         .to_xarray()
     )
+    # Add metadata to .nc
+    ds_swc.time.attrs = time_metadata
+    ds_swc.depth.attrs = {"units": "m", "long_name": "Depth below ground"}
+    ds_swc.SWC.attrs = {
+        "units": df_var_meta_wide_swc["VAR_INFO_UNIT"].iloc[0],
+        "long_name": "Volumetric soil moisture content of layer X (defined by depth)",
+        "Fluxnet_name": df_var_meta_wide_swc["VAR_INFO_VARNAME"]
+        .replace(r"_\d+$", "_X", regex=True)
+        .iloc[0],
+        "standard_name": "volume_fraction_of_condensed_water_in_soil",
+    }
+    ds_swc.SWC_QC.attrs = {
+        "units": "-",
+        "long_name": "SWC control flag",
+        "Fluxnet_name": "NULL",
+        "standard_name": "NULL",
+    }
+    # Write to disk
+    ds_swc.to_netcdf(conf_module.fluxnet_pro_dir / f"{site}.nc")
 
 # %%
