@@ -11,8 +11,8 @@ conf_module.soil_pro_dir.mkdir(exist_ok=True)
 # %% Datacube creation
 for site in conf_module.sites:
     print(f"site in progress: {site}")
-    ds_soilgrids = xr.open_dataset(
-        glob.glob(str(conf_module.soilgrids_dir / site / "*.nc"))[0],
+    ds_soilgrids = xr.open_mfdataset(
+        glob.glob(str(conf_module.soilgrids_dir / site / "*.nc")),
         decode_coords="all",
     )
     ds_hihydrosoil = xr.open_dataset(
