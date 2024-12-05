@@ -25,3 +25,6 @@ sites = ["BE-Bra", "DE-Hai", "DE-Tha"]
 
 # %% List of input variables needed for the model (for quality check)
 input_variables = ["Tair", "SWdown", "VPD", "Psurf", "Rnet", "Qle", "Qle_cor", "Qh"]
+
+# %% List of variables of interest from SoilGrids
+soil_vars_of_interest = ["clay", "sand"]
