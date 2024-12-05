@@ -14,7 +14,6 @@ dependencies:
   - rioxarray
   - soilgrids 
   - cubo
-  - gdal
   - pip
   - pip:
     - zenodo_get
