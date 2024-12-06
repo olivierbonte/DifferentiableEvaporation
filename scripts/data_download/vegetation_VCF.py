@@ -1,13 +1,13 @@
 # %% Imports
 import glob
-import os
 
 import cubo
-import matplotlib.pyplot as plt
+import ee
 import xarray as xr
 from conf import ec_dir, sites, veg_dir
 
 veg_dir.mkdir(exist_ok=True)
+ee.Initialize(opt_url="https://earthengine-highvolume.googleapis.com")
 
 # %% Define variables of interest
 var_list_vcf = [
@@ -20,9 +20,9 @@ collection_vcf = "MODIS/006/MOD44B"
 
 # %% Extract data for 1250m x 1250m grid
 for site in sites:
-    # Get bounding box from soilgrids data (copy paste from hihydrosoil.py...)
     ec_file = glob.glob(str(ec_dir / ("*" + site + "*Flux.nc")))
     ds_ec = xr.open_dataset(ec_file[0], decode_coords="all")
+    # Get data in UTM grid (see https://cubo.readthedocs.io/en/stable/index.html#how-does-it-work)
     da_modis_vcf = cubo.create(
         lat=ds_ec["latitude"].item(),
         lon=ds_ec["longitude"].item(),
