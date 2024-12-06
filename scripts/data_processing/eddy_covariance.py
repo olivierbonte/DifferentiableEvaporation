@@ -35,7 +35,7 @@ for site in conf_module.sites:
     ds_ec = xr.open_mfdataset(files)
     ds_ec_sel = ds_ec.sel(time=slice(str(start_year), str(end_year)))
 
-    # Quality of intput variable to model check
+    # Quality of input variable to model check
     for var in conf_module.input_variables:
         if ds_ec_sel[var].isnull().any():
             print(f"{var} misses data")

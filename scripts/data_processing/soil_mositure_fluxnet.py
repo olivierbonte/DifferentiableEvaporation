@@ -13,7 +13,7 @@ date_format = "%Y%m%d%H%M"
 for site in conf_module.sites:
     print(f"site in progress: {site}")
 
-    # FLUXNET2015 data
+    ## FLUXNET2015 data
     site_fluxnet_folder = list(
         conf_module.fluxnet_dir.glob("*" + site + "*FLUXNET2015*")
     )[0]
@@ -25,7 +25,7 @@ for site in conf_module.sites:
         date_format=date_format,
     )
 
-    # More recent data in FLUXNET format
+    ## More recent data in FLUXNET format
     # Further info on the format in supplementary material of https://doi.org/10.1038/s41597-020-0534-3
     site_l2_folder = list(conf_module.fluxnet_dir.glob("*" + site + "*ARCHIVE_L2"))[0]
     site_l2_data_file = list(site_l2_folder.glob("*" + site + "_FLUXNET_HH_L2.csv"))[0]
@@ -33,7 +33,7 @@ for site in conf_module.sites:
         site_l2_data_file, na_values=-9999, index_col=0, date_format=date_format
     )
 
-    # Combined dataset
+    ## Combined dataset
     if df_fluxnet_hh.index[-1] < df_l2_hh.index[1]:
         logging.warning(
             f"""The Fluxnet dataset (ending on {df_fluxnet_hh.index[-1]})
@@ -60,7 +60,7 @@ for site in conf_module.sites:
         qc_col = swc_col + "_QC"
         df_sel.loc[:, swc_col] = df_sel[swc_col].where(df_sel[qc_col] <= 2)
 
-    # Metadata files
+    ## Metadata files
     # Variable metadata
     var_metadata_file = list(
         site_l2_folder.glob("*" + site + "_VARINFO_FLUXNET_HH_L2.csv")
@@ -76,7 +76,8 @@ for site in conf_module.sites:
         )
     ]
     # Site metadata: check if timezone checks out with FluxDataKit timezone
-    time_metadata = xr.open_dataset(conf_module.ec_pro_dir / (site + ".nc")).time.attrs
+    ds_ec = xr.open_dataset(conf_module.ec_pro_dir / f"{site}.nc")
+    time_metadata = ds_ec.time.attrs
     site_metadata_file = list(site_l2_folder.glob("*" + site + "_SITEINFO_L2.csv"))[0]
     df_site_meta = pd.read_csv(site_metadata_file)
     utc_offset = int(
@@ -90,7 +91,7 @@ for site in conf_module.sites:
             {utc_offset} read from FLUXNET metadata"""
         )
 
-    # Convert to .nc
+    ## Convert to .nc
     df_sel_wide = df_sel.reset_index().melt(
         id_vars=["TIMESTAMP_START"], var_name="depth", value_name="SWC"
     )
@@ -103,6 +104,9 @@ for site in conf_module.sites:
         .set_index("VAR_INFO_VARNAME")["VAR_INFO_HEIGHT"]
         .astype(float)
     )  # Links variable name with sensor depth
+    df_sel_wide = df_sel_wide[
+        df_sel_wide["depth"].isin(list(depth_series.index))
+    ]  # Only keep variables with metadata
     depth_series = depth_series * -1  # Define depth below ground positive
     df_sel_wide["depth"] = (
         df_sel_wide["depth"].replace(depth_series.to_dict()).infer_objects(copy=False)
@@ -130,7 +134,12 @@ for site in conf_module.sites:
         "Fluxnet_name": "NULL",
         "standard_name": "NULL",
     }
-    # Write to disk
-    ds_swc.to_netcdf(conf_module.fluxnet_pro_dir / f"{site}.nc")
+
+    ## Combine with eddy covariance data cube
+    # For now, don't mind the gaps and just add within data period of cube
+    ds_comb = xr.merge([ds_ec, ds_swc.astype(np.float32)], join="left")
+    # ds_swc.to_netcdf(conf_module.fluxnet_pro_dir / f"{site}.nc")
+    ds_ec.close()
+    ds_comb.to_netcdf(conf_module.ec_pro_dir / f"{site}.nc", mode="a")
 
 # %%
