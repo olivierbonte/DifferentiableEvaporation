@@ -20,6 +20,7 @@ collection_vcf = "MODIS/006/MOD44B"
 
 # %% Extract data for 1250m x 1250m grid
 for site in sites:
+    print(f"site in progress: {site}")
     ec_file = glob.glob(str(ec_dir / ("*" + site + "*Flux.nc")))
     ds_ec = xr.open_dataset(ec_file[0], decode_coords="all")
     # Get data in UTM grid (see https://cubo.readthedocs.io/en/stable/index.html#how-does-it-work)

@@ -6,7 +6,7 @@ import numpy as np
 from conf import fluxnet_dir, sites
 from icoscp_core.icos import auth, data, meta
 
-# auth.init_config_file()  # Only do this once per computer
+auth.init_config_file()  # Only do this once per computer
 fluxnet_dir.mkdir(exist_ok=True)
 
 # %% Download FLUXNET data for each site
