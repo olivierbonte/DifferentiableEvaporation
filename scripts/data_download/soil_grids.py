@@ -19,11 +19,18 @@ from pyproj import CRS, Transformer
 from soilgrids import SoilGrids
 
 # %% Define necessary folders/files
+if not essd_dir.exists():
+    raise FileNotFoundError(
+        f"""The directory {essd_dir} does not exist.
+        Please download the data from European Soil Database Derived (ESSD)
+        data manually as specified in the README.md"""
+    )
+soilgrids_dir.mkdir(exist_ok=True)
 netcdf_dir = essd_dir / "NetCDF"
 gtiff_dir = essd_dir / "geotiff"
 netcdf_dir.mkdir(exist_ok=True)
 gtiff_dir.mkdir(exist_ok=True)
-netcdf_file = netcdf_dir / "soil_depth_test_test.nc"
+netcdf_file = netcdf_dir / "root_depth.nc"
 gtiff_file = gtiff_dir / "root_depth.tif"
 for site in sites:
     output_folder = soilgrids_dir / site
@@ -84,6 +91,7 @@ for site in sites:
     ## SoilGrids
     # ----------
     for var_of_interest in soil_vars_of_interest:
+        output_folder = soilgrids_dir / site
         var_of_interest = var_of_interest
         soil_grids = SoilGrids()
         url = soil_grids.MAP_SERVICES[var_of_interest]["link"]
@@ -99,7 +107,6 @@ for site in sites:
         for id in mean_names + uncertainty_names:
             # Download raw data
             out_path_tif = output_folder / (id + ".tif")
-            out_path_nc = output_folder / (id + ".nc")
             data = soil_grids.get_coverage_data(
                 service_id=var_of_interest,
                 coverage_id=id,
@@ -152,6 +159,7 @@ for site in sites:
         ds_cube.attrs["y_ESRI_54052"] = coords_homolsine[1]
         ds_cube.attrs.pop("units")
         # Write to NetCDF
+        ds_cube = ds_cube.astype(np.float32)
         ds_cube.to_netcdf(output_folder / (site + "_" + var_of_interest + ".nc"))
 
     ## European Soil Database
