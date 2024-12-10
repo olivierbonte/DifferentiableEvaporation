@@ -29,6 +29,8 @@ def check_download_move(file_name, zenodo_doi):
     if not (ec_dir / file_name).exists():
         subprocess.run(["zenodo_get", zenodo_doi, "-g", file_name])
         shutil.move(file_name, ec_dir / file_name)
+    else:
+        print(f"No new download, a version of {file_name} was present on disk")
 
 
 zenodo_repo = "10.5281/zenodo.12818273"
