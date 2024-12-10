@@ -4,7 +4,7 @@ channels:
   - defaults 
 dependencies:
   - python=3.12
-  - xee
+  - xee=0.0.19
   - matplotlib
   - hvplot 
   - geoviews
@@ -12,9 +12,9 @@ dependencies:
   - netcdf4
   - owslib
   - rioxarray
-  - soilgrids 
-  - cubo
+  - soilgrids=0.1.4 
+  - cubo=2024.8.0
   - pip
   - pip:
     - zenodo_get
-    - icoscp
+    - icoscp==0.2.2
