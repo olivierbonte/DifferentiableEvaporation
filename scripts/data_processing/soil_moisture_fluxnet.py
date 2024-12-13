@@ -27,8 +27,8 @@ for site in conf_module.sites:
 
     ## More recent data in FLUXNET format
     # Further info on the format in supplementary material of https://doi.org/10.1038/s41597-020-0534-3
-    site_l2_folder = list(conf_module.fluxnet_dir.glob("*" + site + "*ARCHIVE_L2"))[0]
-    site_l2_data_file = list(site_l2_folder.glob("*" + site + "_FLUXNET_HH_L2.csv"))[0]
+    site_l2_folder = list(conf_module.fluxnet_dir.glob("*" + site + "*ARCHIVE*"))[0]
+    site_l2_data_file = list(site_l2_folder.glob("*" + site + "_FLUXNET_HH*.csv"))[0]
     df_l2_hh = pd.read_csv(
         site_l2_data_file, na_values=-9999, index_col=0, date_format=date_format
     )
@@ -37,9 +37,20 @@ for site in conf_module.sites:
     if df_fluxnet_hh.index[-1] < df_l2_hh.index[1]:
         logging.warning(
             f"""The Fluxnet dataset (ending on {df_fluxnet_hh.index[-1]})
-            and the L2 archive dataset (starting on {df_fluxnet_hh.index[1]}
+            and the L2 archive dataset (starting on {df_l2_hh.index[1]}
             do not overlap in time)"""
         )
+        non_included_times = pd.date_range(
+            start=df_fluxnet_hh.index[-1],
+            end=df_l2_hh.index[1],
+            freq="30min",
+            inclusive="neither",
+        )
+        nan_df = pd.DataFrame(index=non_included_times, columns=df_fluxnet_hh.columns)
+        nan_df["TIMESTAMP_END"] = (
+            non_included_times + pd.Timedelta(minutes=30)
+        ).strftime(date_format)
+        df_fluxnet_hh = pd.concat([df_fluxnet_hh, nan_df])
     df_combined_hh = pd.concat([df_fluxnet_hh, df_l2_hh])
     df_combined_hh["TIMESTAMP_END"] = pd.to_datetime(
         df_combined_hh["TIMESTAMP_END"], format=date_format
