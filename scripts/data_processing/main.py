@@ -12,6 +12,7 @@ py_functions_module = SourceFileLoader(
 ).load_module()
 
 # %% Logging set up
+conf_module.dataprodir.mkdir(exist_ok=True, parents=True)
 current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M")
 log_file = Path(conf_module.dataprodir / f"data_process_log_{current_datetime}.txt")
 logging.basicConfig(
