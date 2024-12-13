@@ -78,7 +78,7 @@ for site in conf_module.sites:
             f"For {site}, the total amount of water evaporated is higher than the rainfall"
         )
     # Add metadata to coordinates
-    ds_og = xr.open_dataset(files[0])
+    ds_og = xr.open_dataset([file for file in files if "Flux" in file][0])
     for coord in ds_ec_sel.coords:
         ds_ec_sel[coord].attrs = ds_og[coord].attrs
     # Change timezone to constant UTC offset excluding daylight saving time (DST)
