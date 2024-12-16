@@ -24,7 +24,7 @@ for url in urls:
 
 
 # %% FluxDataKit data
-# Available on Zenodo at https://doi.org/10.5281/zenodo.12818273
+# Available on Zenodo at https://doi.org/10.5281/zenodo.13748398
 def check_download_move(file_name, zenodo_doi):
     if not (ec_dir / file_name).exists():
         subprocess.run(["zenodo_get", zenodo_doi, "-g", file_name])
@@ -33,7 +33,7 @@ def check_download_move(file_name, zenodo_doi):
         print(f"No new download, a version of {file_name} was present on disk")
 
 
-zenodo_repo = "10.5281/zenodo.12818273"
+zenodo_repo = "10.5281/zenodo.13748398"
 check_download_move("FLUXDATAKIT_LSM.tar.gz", zenodo_repo)  # Data
 check_download_move("fdk_site_info.csv", zenodo_repo)  # Tabular metadata
 check_download_move(
