@@ -5,8 +5,6 @@ import numpy as np
 import xarray as xr
 from conf import conf_module
 
-conf_module.veg_pro_dir.mkdir(exist_ok=True)
-
 # %%
 for site in conf_module.sites:
     print(f"site in progress: {site}")

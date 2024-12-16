@@ -17,8 +17,6 @@ fluxnet_dir = datarawdir / "fluxnet_for_soil_moisture"
 
 ec_pro_dir = dataprodir / "eddy_covariance"
 soil_pro_dir = dataprodir / "soil"
-veg_pro_dir = dataprodir / "vegetation"
-fluxnet_pro_dir = dataprodir / "fluxnet_for_soil_moisture"
 
 # %% sites of interest
 sites = ["BE-Bra", "DE-Hai", "DE-Tha"]

@@ -7,7 +7,6 @@ import pytz
 import xarray as xr
 from conf import conf_module
 
-conf_module.fluxnet_pro_dir.mkdir(exist_ok=True)
 # %% Process soil moisture data
 date_format = "%Y%m%d%H%M"
 for site in conf_module.sites:
@@ -149,7 +148,6 @@ for site in conf_module.sites:
     ## Combine with eddy covariance data cube
     # For now, don't mind the gaps and just add within data period of cube
     ds_comb = xr.merge([ds_ec, ds_swc.astype(np.float32)], join="left")
-    # ds_swc.to_netcdf(conf_module.fluxnet_pro_dir / f"{site}.nc")
     ds_ec.close()
     ds_comb.to_netcdf(conf_module.ec_pro_dir / f"{site}.nc", mode="a")
 
