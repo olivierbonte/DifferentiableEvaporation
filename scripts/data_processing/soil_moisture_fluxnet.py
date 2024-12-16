@@ -55,8 +55,13 @@ for site in conf_module.sites:
         df_combined_hh["TIMESTAMP_END"], format=date_format
     )
     # Sort index and take average if duplicate timestamps
-    df_combined_hh = df_combined_hh.sort_index()
-    df_combined_hh = df_combined_hh.groupby(df_combined_hh.index).mean()
+    if not df_combined_hh.index.is_monotonic_increasing:
+        df_combined_hh = df_combined_hh.sort_index()
+    if not df_combined_hh.index.is_unique:
+        duplicates = df_combined_hh[df_combined_hh.index.duplicated(keep=False)]
+        duplicates_agg = duplicates.groupby(duplicates.index).mean()
+        df_combined_hh = df_combined_hh[~df_combined_hh.index.duplicated(keep="first")]
+        df_combined_hh.loc[duplicates_agg.index] = duplicates_agg
     # Select columns with SM data
     col_bool = df_combined_hh.columns.str.contains(
         "SWC"
