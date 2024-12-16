@@ -46,6 +46,7 @@ for site in conf_module.sites:
             inclusive="neither",
         )
         nan_df = pd.DataFrame(index=non_included_times, columns=df_fluxnet_hh.columns)
+        nan_df.index.name = df_fluxnet_hh.index.name
         nan_df["TIMESTAMP_END"] = (
             non_included_times + pd.Timedelta(minutes=30)
         ).strftime(date_format)
@@ -78,7 +79,7 @@ for site in conf_module.sites:
     ## Metadata files
     # Variable metadata
     var_metadata_file = list(
-        site_l2_folder.glob("*" + site + "_VARINFO_FLUXNET_HH_L2.csv")
+        site_l2_folder.glob("*" + site + "_VARINFO_FLUXNET_HH*.csv")
     )[0]
     df_var_meta = pd.read_csv(var_metadata_file)
     df_var_meta_sel = df_var_meta[["GROUP_ID", "VARIABLE", "DATAVALUE"]]
@@ -93,7 +94,7 @@ for site in conf_module.sites:
     # Site metadata: check if timezone checks out with FluxDataKit timezone
     ds_ec = xr.open_dataset(conf_module.ec_pro_dir / f"{site}.nc")
     time_metadata = ds_ec.time.attrs
-    site_metadata_file = list(site_l2_folder.glob("*" + site + "_SITEINFO_L2.csv"))[0]
+    site_metadata_file = list(site_l2_folder.glob("*" + site + "_SITEINFO*.csv"))[0]
     df_site_meta = pd.read_csv(site_metadata_file)
     utc_offset = int(
         df_site_meta[df_site_meta["VARIABLE"].str.contains("UTC_OFFSET")][
