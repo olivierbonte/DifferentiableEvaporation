@@ -12,7 +12,7 @@ See equation 20 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 
 """
 function compute_c_1(w_g, w_sat, b, c_1_sat)
-    return c_1_sat * (w_g / w_sat)^(b / 2. + 1.)
+    return c_1_sat * (w_g / w_sat)^(b / 2 + 1)
 end
 
 """
@@ -45,7 +45,7 @@ See equation 19 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `p`: Clapp-Hornberger parameter `a` (see [compute_p](@ref compute_p))
 """
 function compute_w_geq(w_2, w_sat, a, p)
-    return w_2 - a * w_sat * (w_2 / w_sat)^p * (1. - (w_2 / w_sat)^(8. * p))
+    return w_2 - a * w_sat * (w_2 / w_sat)^p * (1 - (w_2 / w_sat)^(8 * p))
 end
 
 """
@@ -73,12 +73,12 @@ function compute_b(approach, perc_clay)
     return compute_b(approach, perc_clay)
 end
 
-function compute_b(::Val{:clay}, perc_clay)
-    return 0.137 * perc_clay + 3.501
+function compute_b(::Val{:clay}, perc_clay::T) where {T}
+    return T(0.137) * perc_clay + T(3.501)
 end
 
 function compute_b(::Val{:van_genuchten}, n)
-    return -1. + n / (n - 1.)
+    return -1 + n / (n - 1)
 end
 
 """
@@ -95,8 +95,8 @@ See equation 32 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `c_1_sat`: The computed value of `c_1_sat`.
 
 """
-function compute_c_1_sat(perc_clay)
-    return (5.58 * perc_clay + 84.88) * 1e-2
+function compute_c_1_sat(perc_clay::T) where {T}
+    return (T(5.58) * perc_clay + T(84.88)) * T(1e-2)
 end
 
 """
@@ -110,8 +110,8 @@ See equation 33 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `perc_clay`: The percentage of clay in the soil [%].
 
 """
-function compute_c_2_ref(perc_clay)
-    return 13.815 * perc_clay^(-0.954)
+function compute_c_2_ref(perc_clay::T) where {T}
+    return T(13.815) * perc_clay^(T(-0.954))
 end
 
 """
@@ -124,8 +124,8 @@ See equation 34 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `perc_clay`: The percentage of clay in the soil [%].
 
 """
-function compute_c_3(perc_clay)
-    return 5.327 * perc_clay^(-1.043)
+function compute_c_3(perc_clay::T) where {T}
+    return T(5.327) * perc_clay^(T(-1.043))
 end
 
 """
@@ -138,8 +138,8 @@ See equation 35 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `perc_clay`: The percentage of clay in the soil [%].
 
 """
-function compute_a(perc_clay)
-    return 732.43e-3 * perc_clay^(-0.539)
+function compute_a(perc_clay::T) where {T}
+    return T(732.43e-3) * perc_clay^(T(-0.539))
 end
 
 """
@@ -152,6 +152,6 @@ See equation 36 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `perc_clay`: The percentage of clay in the soil [%].
 
 """
-function compute_p(perc_clay)
-    return 0.134 * perc_clay + 3.4
+function compute_p(perc_clay::T) where {T}
+    return T(0.134) * perc_clay + T(3.4)
 end
