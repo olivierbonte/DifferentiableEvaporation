@@ -7,14 +7,19 @@ CurrentModule = EvaporationModel
 Pages = ["index.md",]
 ```
 
-## evaporation
+## Evaporation
 ```@autodocs
 Modules = [EvaporationModel]
 Pages = ["evaporation.jl"]
 ```
 
-## soil
+## Soil
 ```@autodocs
 Modules = [EvaporationModel]
 Pages = ["soil.jl"]
+```
+## Utils
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["utils.jl"]
 ```
