@@ -1,9 +1,10 @@
 module EvaporationModel
 
+using Bigleaf
 using ComponentArrays
-using Parameters
 using DataFrames
-using Bigleaf 
+using LinearSolve
+using Parameters
 
 include("config.jl")
 export df_veg
@@ -22,12 +23,9 @@ include("resistances.jl")
 export jarvis_stewart, aerodynamic_resistance
 
 include("soil.jl")
-export compute_c_1,
-    compute_c_2,
-    compute_c_3, 
-    compute_w_geq, 
-    compute_a, 
-    compute_b, 
-    compute_p
+export compute_c_1, compute_c_2, compute_c_3, compute_w_geq, compute_a, compute_b, compute_p
+
+include("utils.jl")
+export fourier_series, fit_fourier_coefficients
 
 end # module EvaporationModel

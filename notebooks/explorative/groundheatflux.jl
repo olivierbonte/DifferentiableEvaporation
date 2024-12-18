@@ -13,6 +13,8 @@ using LinearAlgebra
 using LinearSolve
 using Statistics
 using LaTeXStrings
+using ComponentArrays
+using Parameters
 
 # %% Read in data
 # FluxDataKit data
@@ -41,7 +43,6 @@ axlist = (
 )
 da_lw_out_sel = YAXArray(axlist, df_lw_out_sel.LW_OUT)
 da_tsoil1 = YAXArray(axlist, df_lw_out_sel.TS_F_MDS_1)
-tsoil1 = YAXArray(axlist,)
 # cubes = [ds_meteo_sel.LWdown[x =1,y=1],da_lw_out_sel]
 # var_axis = Dim{:variable}(["LWdown","LWup"])
 # ds_LW = concatenatecubes(cubes, var_axis)
@@ -73,50 +74,29 @@ ds_comb = Dataset(; arrays...)
 ds_comb_day = ds_comb[Ti=DateTime(2015, 06, 16, 00, 00) .. DateTime(2015, 06, 16, 23, 30)]
 #2013-04-15 for max for DE-Hai
 
-# %% Define the Fourier series function
-function fourier_series(t, coeffs, ω)
-    k = length(coeffs) - 1
-    M = Int(k / 2)
-    a0, a, b = coeffs[1], coeffs[2:M+1], coeffs[M+2:end]
-    series = a0 .+ sum(a[n] .* cos.(n * ω * t) for n in 1:M) + sum(b[n] .* sin.(n * ω * t) for n in 1:M)
-    return series, (a0, a, b)
-end
-
 # Number of terms in the Fourier series
 M_terms = 12 # as in Verhoef (2004)
 ω = 2π / (24 * 60 * 60) # radial velocity in rad/s, period of 1 day
 t = Dates.value.(Second.(ds_comb_day.Ti .- ds_comb_day.Ti[1]))
 Ts_true = collect(ds_comb_day.Ts)
 
-# Create the design matrix
-X = hcat(ones(length(t)), [cos.(n * ω * t) for n in 1:M_terms]..., [sin.(n * ω * t) for n in 1:M_terms]...)
-
-# Solve the linear system
-prob = LinearProblem(X, Ts_true)
-linsolve = init(prob)
-sol = solve(linsolve)
-# coeffs = X \ Ts_true
-coeffs = sol.u
-
-# Print the coefficients
-println("Coefficients: ", coeffs)
+# Fit fourier coefficients
+coeffs = fit_fourier_coefficients(t, Ts_true, M_terms, ω)
 # Make the Fourier predictions
-Ts_fourier, coeff_tuple = fourier_series(t, coeffs, ω)
-T_mean = coeff_tuple[1]
-A_n = coeff_tuple[2]
-B_n = coeff_tuple[3]
+Ts_fourier = fourier_series.(t, Ref(coeffs), ω)
 # Plot the data
 plot(ds_comb_day.Ts, label="Original data", xrotation=10)
 plot!(collect(ds_comb_day.Ti), Ts_fourier, label="Fourier series: M = $M_terms")
 ylabel!("Surface temperature [K]")
 
 # %% Adapted Fourier Coefficents
-A_bn = @. √(A_n^2 + B_n^2)
-ϕ_bn = @. atan(A_n, B_n) #https://en.wikipedia.org/wiki/Atan2
+@unpack a0, an, bn = coeffs
+A_bn = @. √(an^2 + bn^2)
+ϕ_bn = @. atan(an, bn) #https://en.wikipedia.org/wiki/Atan2
 # CRUCIAL to use Atan2 to get angle between positive x axis and
 # point defined by cos and sin combination on unit circle! 
 #Test to get same fourier series
-Ts_test = T_mean .+ sum(A_bn[n] .* sin.(n * ω * t .+ ϕ_bn[n]) for n in 1:M_terms)
+Ts_test = a0 .+ sum(A_bn[n] .* sin.(n * ω * t .+ ϕ_bn[n]) for n in 1:M_terms)
 plot!(collect(ds_comb_day.Ti), Ts_test, label="Test Fourier")
 
 
