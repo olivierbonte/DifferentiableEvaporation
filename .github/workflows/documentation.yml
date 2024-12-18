@@ -23,8 +23,10 @@ jobs:
           version: "1"
       - uses: julia-actions/cache@v2
       - name: Install dependencies
+        working-directory: src/EvaporationModel
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy
+        working-directory: src/EvaporationModel
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
