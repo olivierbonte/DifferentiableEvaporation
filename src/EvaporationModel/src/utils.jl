@@ -38,3 +38,21 @@ function fit_fourier_coefficients(t::AbstractVector, x::AbstractVector, M::Int, 
     coeffs = sol.u
     return ComponentArray(; a0=coeffs[1], an=coeffs[2:(M + 1)], bn=coeffs[(M + 2):end])
 end
+
+"""
+    compute_amplitude_and_phase(an::AbstractVector, bn::AbstractVector)
+
+Translate the fourier coefficients from sin-cos form (see 
+[fourier_series](@ref fourier_series)) to amplitude phase form:
+
+``f(t) = a_0 + \\sum_{n=1}^M \\left( a_{bn} \\sin(n \\omega t + \\phi) \\right)``
+
+Specifically, it returns both `a_{bn}` and `\\phi` vectors.
+FYI: proof of conversion found [here](http://wrean.ca/cazelais/math252/lc-trig.pdf).
+Crucial to use atan2 function
+"""
+function compute_amplitude_and_phase(an::AbstractVector, bn::AbstractVector)
+    a_bn = @. √(an^2 + bn^2)
+    ϕ = @. atan(an, bn)
+    return a_bn, ϕ
+end

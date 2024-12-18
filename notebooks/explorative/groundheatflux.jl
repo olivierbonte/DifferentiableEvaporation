@@ -91,12 +91,8 @@ ylabel!("Surface temperature [K]")
 
 # %% Adapted Fourier Coefficents
 @unpack a0, an, bn = coeffs
-A_bn = @. √(an^2 + bn^2)
-ϕ_bn = @. atan(an, bn) #https://en.wikipedia.org/wiki/Atan2
-# CRUCIAL to use Atan2 to get angle between positive x axis and
-# point defined by cos and sin combination on unit circle! 
-#Test to get same fourier series
-Ts_test = a0 .+ sum(A_bn[n] .* sin.(n * ω * t .+ ϕ_bn[n]) for n in 1:M_terms)
+a_bn, ϕ = compute_amplitude_and_phase(an, bn)
+Ts_test = a0 .+ sum(a_bn[n] .* sin.(n * ω * t .+ ϕ[n]) for n in 1:M_terms)
 plot!(collect(ds_comb_day.Ti), Ts_test, label="Test Fourier")
 
 

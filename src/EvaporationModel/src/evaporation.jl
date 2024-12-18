@@ -33,31 +33,6 @@ function penman_monteith(t_air, p_surf, r_net, vpd, r_a, r_s; g=0.0, kwargs...)
     return et, le
 end
 
-"""
-    compute_g_from_r_net(r_net, lai)
-
-Compute the ground heat flux [W/m²] from net radiation (and LAI)
-
-# Arguments
-- `r_net`: The net radiation [W/m²].
-- `lai`: The leaf area index [m²/m²].
-
-# Details
-This implementation follows the approach of the METRIC model.
-See Equation 27 of 
-[Allen et al., 2007](https://doi.org/10.1061/(ASCE)0733-9437(2007)133:4(380))
-
-"""
-function compute_g_from_r_net(r_net, lai)
-    if lai < 0.5
-        @error "Ground heat flux from net radiation for LAI < 0.5
-        not yet implemented"
-    else
-        g = r_net * (0.05 + 0.18 * exp(-0.521 * lai))
-    end
-    return g
-end
-
 function compute_soil_evaporation_stress(w_g, w_crit, w_res)
     return max(1.0, (w_g - w_res) / (w_crit - w_res))
 end
