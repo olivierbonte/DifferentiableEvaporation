@@ -8,6 +8,7 @@ import pandas as pd
 import pytz
 import xarray as xr
 from conf import conf_module
+from timezonefinder import TimezoneFinder
 
 conf_module.ec_pro_dir.mkdir(exist_ok=True)
 
@@ -83,8 +84,16 @@ for site in conf_module.sites:
         ds_ec_sel[coord].attrs = ds_og[coord].attrs
     # Change timezone to constant UTC offset excluding daylight saving time (DST)
     # See p.4 of Pastorello et al. (2020): https://doi.org/10.1038/s41597-020-0534-3
-    timezone = pytz.timezone(ds_ec_sel.time.attrs["time_zone"])
-    if ds_ec_sel["latitude"].values[0][0] > 0:  # Norther Hemisphere
+    if not "time_zone" in ds_ec_sel.time.attrs:
+        tf = TimezoneFinder()
+        timezone_tmp = tf.timezone_at(
+            lat=ds_ec_sel.latitude.values.flat[0],
+            lng=ds_ec_sel.longitude.values.flat[0],
+        )
+    else:
+        timezone_tmp = ds_ec_sel.time.attrs["time_zone"]
+    timezone = pytz.timezone(timezone_tmp)
+    if ds_ec_sel.latitude.values.flat[0] > 0:  # Norther Hemisphere
         reference_date = timezone.localize(datetime(2020, 1, 1))  # Guaranteed no DST
     else:  # Southern Hemisphere
         reference_date = timezone.localize(datetime(2020, 7, 1))

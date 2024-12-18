@@ -18,3 +18,4 @@ dependencies:
   - pip:
     - zenodo_get
     - icoscp==0.2.2
+    - timezonefinder
