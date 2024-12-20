@@ -233,6 +233,7 @@ function compute_penman(Tair, Psurf, Rnet, VPD, r_a, r_s; kwargs...)
 end
 
 using StaticArrays
+using SimulationLogs
 function wg_conservation(u, p, t)
     #t in ms because this easiest to work with for now
     #@unpack forcings, params = p
@@ -269,6 +270,8 @@ function wg_conservation(u, p, t)
     w_min = min(u[1], u[2])
     e_g = max(w_min - w_res, 0.0) * e_g
     e_tr = max(u[2] - w_wilt, 0.0) * e_tr
+    @log e_g_wm2 = Bigleaf.ET_to_LE(e_g, t_air(t))
+    @log e_tr_wm2 = Bigleaf.ET_to_LE(e_tr, t_air(t))
     dwg = c_1 / (d_1 * ρ_w) * (precip(t) - e_g) - c_2 / τ * (u[1] - w_geq)
     dw2 = 1 / (ρ_w * d_2) * (precip(t) - e_g - e_tr) - c_3 / (d_2 * τ) * max(u[2] - w_fc, 0.0)
     SA[dwg, dw2]
@@ -277,6 +280,12 @@ end
 @unpack r_net, vpd, t_air, p_surf, precip, wind, s_in, lai = struct_forcing_wg()
 using BenchmarkTools
 @benchmark wg_conservation(SA[0.4, 0.25], param_all, t_interp[1])
+
+w_init = w_fc
+prob = ODEProblem(wg_conservation, SA[w_init, w_init], (t_interp[1], t_interp[end]), param_all)
+sol = solve(prob, ImplicitEuler(), saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false)
+out = get_log(sol)
+scope(sol, [:e_g_wm2, :e_tr_wm2])
 
 #try implementing saving callback
 using DiffEqCallbacks
@@ -318,6 +327,7 @@ w_init = w_fc
 prob = ODEProblem(wg_conservation, SA[w_init, w_init], (t_interp[1], t_interp[end]), param_all)
 sol = solve(prob, ImplicitEuler(), saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false, callback = cb)
 display(sol.destats)
+
 #plot
 color1, color2 = :blue, :black
 p = plot(collect(ds_flux_sub.Ti), sol[1, :], label="w_g", color=color1, dpi = 400)

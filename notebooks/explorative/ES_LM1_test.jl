@@ -30,6 +30,7 @@ ds_soil_avg = mapslices(mean, ds_soil, dims = "depth")
 
 # Vegetation parameters 
 veg_par = EvaporationModel.df_veg
+println(collect(colmetadata(veg_par)))
 IGBP_land_cover = strip(join(collect(ds_meteo.IGBP_veg_long.data)))
 print("Vegetation type: " * IGBP_land_cover)
 # Assume Interruped forest here as closest from the ECMWF table for Savanna

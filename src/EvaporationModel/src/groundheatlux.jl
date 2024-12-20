@@ -31,8 +31,9 @@ Compute the sum of harmonic terms `\\Gamma_s` as defined in equation 1 of
 [Murray and Verhoef (2007)](https://doi.org/10.1016/j.agrformet.2007.06.009)
 """
 function compute_harmonic_sum(
-    t::Real, a_bn::AbstractVector, ϕ::AbstractVector, ω::Real, Δt::Real
+    t::Real, a_bn::AbstractVector, ϕ::AbstractVector, ω::Real, Δt::Real=0
 )
+    M_terms = length(a_bn)
     return sum(
         a_bn[n] * √(n * ω) * sin(n * ω * t + ϕ[n] + π / 4 - π * Δt / 12) for n in 1:M_terms
     )
@@ -45,7 +46,11 @@ end
 Applies broadcasting of the function for when `t::AbstractVector` 
 """
 function compute_harmonic_sum(
-    t::AbstractVector, a_bn::AbstractVector, ϕ::AbstractVector, ω::Real, Δt::Real
+    t::AbstractVector,
+    a_bn::AbstractVector,
+    ϕ::AbstractVector,
+    ω::Real,
+    Δt::AbstractVector=zeros(length(t)),
 )
     return compute_harmonic_sum.(t, Ref(a_bn), Ref(ϕ), ω, Δt)
 end

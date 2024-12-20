@@ -19,7 +19,7 @@ ec_pro_dir = dataprodir / "eddy_covariance"
 soil_pro_dir = dataprodir / "soil"
 
 # %% sites of interest
-sites = ["BE-Bra", "DE-Hai", "DE-Tha"]
+sites = ["BE-Bra", "DE-Hai", "DE-Tha", "IT-Noe"]
 # DE-Tha, NL-Loo also potentially a good site
 
 # %% List of input variables needed for the model (for quality check)

@@ -18,7 +18,7 @@ using Parameters
 
 # %% Read in data
 # FluxDataKit data
-site = "DE-Hai"#"BE-Bra"#"ES-LM1"
+site = "IT-Noe"#"BE-Bra"#"ES-LM1"
 ds_ec = open_dataset(glob(site * ".nc", datadir("exp_pro", "eddy_covariance"))[1])
 ds_soil = open_dataset(glob(site * "_soil_horizontal_agg.nc", datadir("exp_pro", "soil"))[1])
 
@@ -57,6 +57,23 @@ arrays = Dict(
     :Tsoil1 => da_tsoil1
 )
 ds_LW = Dataset(; arrays...)
+
+# Look for depth of soil temperature sensor
+folder_meta = glob("ICOSETC*" * site * "*", datadir("exp_raw", "fluxnet_for_soil_moisture"))[1]
+file_var_meta = glob("*" * site * "*VARINFO_FLUXNET_HH*", folder_meta)[1]
+df_var_info = DataFrame(CSV.File(file_var_meta))
+df_var_info_wide = unstack(df_var_info, :GROUP_ID, :VARIABLE, :DATAVALUE)
+df_ts_soil1_info = filter(row ->
+        contains(row.VAR_INFO_VARNAME, "TS_F_MDS_1") && !contains(row.VAR_INFO_VARNAME, "_QC"),
+    df_var_info_wide)
+ds_G_info = filter(row ->
+        contains(row.VAR_INFO_VARNAME, "G_F_MDS") && !contains(row.VAR_INFO_VARNAME, "_QC"),
+    df_var_info_wide)
+depth_tsoil1 = parse(Float32, df_ts_soil1_info.VAR_INFO_HEIGHT[1])
+depth_G = parse(Float32, ds_G_info.VAR_INFO_HEIGHT[1])
+print("Depth of ground heat flux: $depth_G m \n")
+print("Depth of shallowest soil temperature sensor: $depth_tsoil1 m")
+
 # Start with Fixed emissivity
 const ϵ = 0.98f0 # Maes et al., 2019
 function calc_Ts(LW_out::T, LW_in::T, ϵ::T) where {T}
@@ -71,7 +88,7 @@ ds_comb = Dataset(; arrays...)
 # %% Select a random day to start
 # day_sel = Date("2012-08-10")
 # ds_comb_day = ds_comb[Ti = Where(x -> Date(x) == day_sel)]
-ds_comb_day = ds_comb[Ti=DateTime(2015, 06, 16, 00, 00) .. DateTime(2015, 06, 16, 23, 30)]
+ds_comb_day = ds_comb[Ti=DateTime(2007, 08, 16, 00, 00) .. DateTime(2007, 08, 16, 23, 30)]
 #2013-04-15 for max for DE-Hai
 
 # Number of terms in the Fourier series
@@ -85,15 +102,17 @@ coeffs = fit_fourier_coefficients(t, Ts_true, M_terms, ω)
 # Make the Fourier predictions
 Ts_fourier = fourier_series.(t, Ref(coeffs), ω)
 # Plot the data
-plot(ds_comb_day.Ts, label="Original data", xrotation=10)
-plot!(collect(ds_comb_day.Ti), Ts_fourier, label="Fourier series: M = $M_terms")
-ylabel!("Surface temperature [K]")
+plot(ds_comb_day.Ts, label=L"Original data $T_s$", xrotation=10)
+plot!(collect(ds_comb_day.Ti), Ts_fourier, label=L"Fourier series $T_s$: $M =$ %$M_terms")
+plot!(ds_comb_day.Tsoil1 .+ 273.15, label="Soil temperature, depth = $depth_tsoil1 m")
+ylabel!("Temperature [K]")
+title!("$site")
 
 # %% Adapted Fourier Coefficents
 @unpack a0, an, bn = coeffs
 a_bn, ϕ = compute_amplitude_and_phase(an, bn)
 Ts_test = a0 .+ sum(a_bn[n] .* sin.(n * ω * t .+ ϕ[n]) for n in 1:M_terms)
-plot!(collect(ds_comb_day.Ti), Ts_test, label="Test Fourier")
+plot!(collect(ds_comb_day.Ti), Ts_test, label="Test Fourier T")
 
 
 # %% Calculate the J_B term (harmonics terms surface temperature) of Verhoef (2007) (eq. 8)
@@ -101,16 +120,26 @@ plot!(collect(ds_comb_day.Ti), Ts_test, label="Test Fourier")
 # and Bhattacharya (2022)
 f_s = 1 .- collect(ds_comb_day.f_veg) ./ 100 # soil fraction
 Δt = (1 .- f_s) * 1.5 # hours , see Bhattacharya (2022) eq. 4
-J_B_no_shift = sum(@. A_bn[n] * √(n * ω) * sin(n * ω * t + ϕ_bn[n] + π / 4) for n in 1:M_terms)
-J_B = sum(@. A_bn[n] * √(n * ω) * sin(n * ω * t + ϕ_bn[n] + π / 4 - π * Δt / 12) for n in 1:M_terms)
+J_B_no_shift = compute_harmonic_sum(t, a_bn, ϕ, ω)
+J_B = compute_harmonic_sum(t, a_bn, ϕ, ω, Δt)
 # Illustrate the effect of delaying the shift 
 plot(collect(ds_comb_day.Ti), J_B_no_shift, label="no shift")
 plot!(collect(ds_comb_day.Ti), J_B, label="shift")
 
-
 # Calculate estimated summation of harmonic terms J_s
 J_s = (1 / 2 * f_s .+ 1 / 2) .* J_B
 
+#%% Calculate fourier series on soil temperature
+coeffs_soil = fit_fourier_coefficients(t, collect(ds_comb_day.Tsoil1), M_terms, ω)
+T_soil_fourier = fourier_series.(t, Ref(coeffs_soil), ω)
+plot(ds_comb_day.Tsoil1)
+plot!(collect(ds_comb_day.Ti), T_soil_fourier)
+an_soil, bn_soil = coeffs_soil.an, coeffs_soil.bn
+a_bn_soil, ϕ_soil = compute_amplitude_and_phase(an_soil, an_soil)
+J_soil = compute_harmonic_sum(t, a_bn_soil, ϕ_soil, ω)
+plot(collect(ds_comb_day.Ti), J_soil, label="Soil temperature")
+plot!(collect(ds_comb_day.Ti), J_s, label="Surface temperature adjusted")
+ylabel!("Harmonic sum")
 # %% Calculate thermal inertia using the near surface values
 # choice of near surface because of use in Verhoef (2012)
 min_measur_depth = ds_ec.SWC.depth[1] * 100 #m -> cm
@@ -160,7 +189,7 @@ end
 ssm_range = range(0, θsat, 100)
 K_e_range = Kersten.(ssm_range, θsat, f_sand)
 plot(ssm_range ./ θsat, K_e_range, xlabel="θ/θsat", ylabel=L"$K_e$ [-]")
-Γ_range = soil_thermal_inertia.(K_e, Γ_star, Γ_0)
+Γ_range = soil_thermal_inertia.(K_e_range, Γ_star, Γ_0)
 plot(ssm_range ./ θsat, Γ_range, label=missing,
     xlabel="θ/θsat",
     ylabel=L"$\Gamma$ (J m$^{-2}$ K$^{-1}$ s$^{-0.5}$)")
@@ -179,5 +208,6 @@ plot(ds_comb_day.G, xrotation=10, label="Observed", ylabel="G [W/m²]")
 plot!(collect(ds_comb_day.Ti), G_remote, label="Modelled")
 formatted_rmse = round(rmse; digits=3)
 title!("RMSE : $formatted_rmse W/m²")
-plot!(0.05 .* ds_comb_day.Rn[x=At(1), y=At(1)], label="Modelled GLEAM", legend=:topleft)
-plot!(twinx(), ds_comb_day.Ts, label="Surface temperature", colour=:black)
+plot!(0.05 .* ds_comb_day.Rn[x=At(1), y=At(1)], label="Modelled GLEAM",
+    ylabel=L"$G$ [W/m$^2$]", legend=:topleft)
+# plot!(twinx(), ds_comb_day.Ts, label="Surface temperature", colour=:black)
