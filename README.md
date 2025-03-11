@@ -15,7 +15,16 @@ To (locally) reproduce this project, do the following:
    ```
    git clone https://github.com/olivierbonte/DifferentiableEvaporation
    ```
-1. Open a Julia console, navigate to the folder DifferentiableEvaporation, and do:
+1. Make sure you have julia installed on your system. It is recommended to manage different julia versions with juliaup, which you can donwload [here](https://github.com/JuliaLang/juliaup). This project is written in Julia 1.10.7, which you can add in juliaup with the following command:
+   ```
+   juliaup add 1.10.7
+   ```
+
+2. Nex navigate to the folder DifferentiableEvaporation and open Julia by running
+   ```
+   julia +1.10.7
+   ``` 
+   and then do the following:
    ```
    julia> using Pkg
    julia> Pkg.add("DrWatson") # install globally, for using `quickactivate`
