@@ -14,6 +14,7 @@ ec_dir = datarawdir / "eddy_covariance"
 veg_dir = datarawdir / "vegetation"
 essd_dir = datarawdir / "STU_EU_Layers"  # European Soil Database Derived data
 fluxnet_dir = datarawdir / "fluxnet_for_soil_moisture"
+stocker_dir = datarawdir / "root_depth_stocker"
 
 ec_pro_dir = dataprodir / "eddy_covariance"
 soil_pro_dir = dataprodir / "soil"
