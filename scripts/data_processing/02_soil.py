@@ -9,6 +9,15 @@ from rasterio.enums import Resampling
 conf_module.soil_pro_dir.mkdir(exist_ok=True)
 
 # %% Datacube creation
+
+da_root_depth_stocker = (
+    xr.open_dataarray(conf_module.stocker_dir / "zroot_cwd80.nc") / 1000
+)  ## mm -> m
+da_root_depth_stocker.attrs["units"] = "m"
+da_root_depth_stocker.attrs["long name"] = "Root depth"
+da_root_depth_stocker.attrs["standard_name"] = "root_depth"  # CF name
+da_root_depth_stocker.attrs["url"] = "https://doi.org/10.5281/zenodo.10885724"
+
 for site in conf_module.sites:
     print(f"site in progress: {site}")
     ds_soilgrids = xr.open_mfdataset(
@@ -20,6 +29,15 @@ for site in conf_module.sites:
     )
     da_root_depth = xr.open_dataarray(
         conf_module.essd_dir / "NetCDF" / (site + "_root_depth.nc"), decode_coords="all"
+    )
+    if not da_root_depth.size == 1:
+        raise ValueError(
+            "Root depth data from ESSD should have only one value per site"
+        )
+    da_root_depth_stocker_site = da_root_depth_stocker.sel(
+        lon=ds_soilgrids.attrs["lon_EPSG_4326"],
+        lat=ds_soilgrids.attrs["lat_EPSG_4326"],
+        method="nearest",
     )
 
     ## Convert to 1 cube: (depth, lon, lat) + crs:ESRI_54052
@@ -50,30 +68,29 @@ for site in conf_module.sites:
     # Merge soilgrids and hihydrosoil
     ds_soil = xr.merge([ds_soilgrids_depth, ds_hihydrosoil])
     # Add root_depth
-    ds_soil["root_depth"] = float(da_root_depth.values)
-    ds_soil["root_depth"].attrs = da_root_depth.attrs
+    ds_soil["root_depth_ESSD"] = da_root_depth.values[0] / 100  # cm -> m
+    ds_soil["root_depth_ESSD"].attrs = da_root_depth.attrs
+    ds_soil["root_depth_ESSD"].attrs["units"] = "m"
+    ds_soil["root_depth"] = da_root_depth_stocker_site.values
+    ds_soil["root_depth"].attrs = da_root_depth_stocker_site.attrs
     # Add useful metadata
     [ds_soilgrids.attrs.pop(attr) for attr in ["url_doi", "url_OGC"]]
     ds_soil.attrs = ds_soilgrids.attrs
     ds_soil.to_netcdf(conf_module.soil_pro_dir / (site + "_soil_cube.nc"))
 
-    # Spatially horizontal data aggregation
+    ## Spatially horizontal data aggregation
     ds_soil_agg = ds_soil.mean(dim=["x", "y"], keep_attrs=True)
     ds_soil_agg.to_netcdf(conf_module.soil_pro_dir / (site + "_soil_horizontal_agg.nc"))
 
-    # Add vertical aggregation: weighted (on layer depth) mean per layer,
-    # max depth = root_depth
-    # ds_soil_agg_vert = ds_soil_agg.mean(dim=["depth"], keep_attrs=True)
+    ## Add vertical aggregation: weighted (on layer depth) mean per layer,
     # Select layers which are (partly at least) in the available root depth
     bool_vert = (
         ds_soil_agg.layer_depth.cumsum() - ds_soil_agg.layer_depth
-    ) < ds_soil_agg.root_depth.values / 100
+    ) < ds_soil_agg.root_depth.values
     ds_soil_agg_sel = ds_soil_agg.isel(depth=bool_vert)
     weights = ds_soil_agg_sel.layer_depth
     # For the deepest layer, the weight is root depth - bottom depth of previous layer!
-    weights[-1] = (
-        ds_soil_agg.root_depth / 100 - ds_soil_agg_sel.layer_depth.cumsum()[-2]
-    )
+    weights[-1] = ds_soil_agg_sel.root_depth - ds_soil_agg_sel.layer_depth.cumsum()[-2]
     # Usage of weights explained here: https://tutorial.xarray.dev/fundamentals/03.4_weighted.html
     ds_soil_agg_sel_weighted = ds_soil_agg_sel.weighted(weights)
     ds_soil_agg_vert = ds_soil_agg_sel_weighted.mean(dim="depth", keep_attrs=True)

@@ -11,8 +11,6 @@ project_folder = Path(__file__).parent.parent.parent.resolve()
 py_functions_module = SourceFileLoader(
     "py_functions", (project_folder / "src" / "py_functions.py").as_posix()
 ).load_module()
-# %% Set up log in icos
-auth.init_config_file()
 
 # %% Logging set up
 datarawdir.mkdir(exist_ok=True, parents=True)
@@ -36,3 +34,5 @@ logging.info("\n 4: Download data on vegetation cover fractions \n")
 py_functions_module.run_and_log("python 04_vegetation_VCF.py")
 logging.info("\n 5: Downloading auxiliary data from flux towers")
 py_functions_module.run_and_log("python 05_soil_moisture_fluxnet.py")
+logging.info("\n 6: Downloading root depth data from Stocker et al. (2023)")
+py_functions_module.run_and_log("python 06_root_depth_stocker.py")
