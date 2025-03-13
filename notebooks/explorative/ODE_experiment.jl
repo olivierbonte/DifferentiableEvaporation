@@ -58,11 +58,11 @@ a_ch = 0.219
 b_ch = 4.9
 p_ch = 4.0
 #Get X_Clay from C_2ref
-X_clay = 10 # [%]
+X_clay = 10.0 # [%]
 c_3 = EvaporationModel.compute_c_3(X_clay)
 
 d_1 = 0.1 # [m]
-d_2 = 2 # [m], based on description in ds_meteo_sub.properties["soil_type"]
+d_2 = 2.0 # [m], based on description in ds_meteo_sub.properties["soil_type"]
 
 #test soil parameters assuming fixed SM
 c_1_test = compute_c_1(0.35, w_sat, b_ch, C1sat)
@@ -198,7 +198,7 @@ end
 param_all = ComponentArray(
     d_1=d_1,
     d_2=d_2,
-    τ=24.0*3600, #[s]
+    τ=24.0 * 3600, #[s]
     w_sat=w_sat,
     c1_sat=C1sat,
     c2_ref=C2ref,
@@ -207,7 +207,7 @@ param_all = ComponentArray(
     b=b_ch,
     p=p_ch,
     w_res=w_res,
-    w_crit = w_crit,
+    w_crit=w_crit,
     w_fc=w_fc,
     w_wilt=w_wp,
     gd=gD,
@@ -289,13 +289,13 @@ scope(sol, [:e_g_wm2, :e_tr_wm2])
 
 #try implementing saving callback
 using DiffEqCallbacks
-saved_values = SavedValues(Float64, Tuple{Float64, Float64})
+saved_values = SavedValues(Float64, Tuple{Float64,Float64})
 # saved_values = SavedValues(Float64, NamedTuple{(:value1, :value2), Tuple{Float64, Float64}})
-function save_func(u, t , integrator)
+function save_func(u, t, integrator)
     @unpack d, z0m, z0h, z_measur,
     w_res, w_crit, w_fc, w_wilt, gd, r_smin = integrator.p
     r_a = EvaporationModel.aerodynamic_resistance(wind(t), d, z0m, z0h, z_measur)
-    r_s = EvaporationModel.jarvis_stewart(s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin) 
+    r_s = EvaporationModel.jarvis_stewart(s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin)
     f_veg = 0.95 #temp value
     f_wet = 0.0 #temp value  
     e_tr = EvaporationModel.compute_transpiration(
@@ -319,18 +319,18 @@ function save_func(u, t , integrator)
     w_min = min(u[1], u[2])
     e_g = max(w_min - w_res, 0.0) * e_g
     e_tr = max(u[2] - w_wilt, 0.0) * e_tr
-    return (e_g, e_tr)   
+    return (e_g, e_tr)
 end
-cb = SavingCallback(save_func, saved_values, saveat = t_interp)
+cb = SavingCallback(save_func, saved_values, saveat=t_interp)
 
 w_init = w_fc
 prob = ODEProblem(wg_conservation, SA[w_init, w_init], (t_interp[1], t_interp[end]), param_all)
-sol = solve(prob, ImplicitEuler(), saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false, callback = cb)
+sol = solve(prob, ImplicitEuler(), saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false, callback=cb)
 display(sol.destats)
 
 #plot
 color1, color2 = :blue, :black
-p = plot(collect(ds_flux_sub.Ti), sol[1, :], label="w_g", color=color1, dpi = 400)
+p = plot(collect(ds_flux_sub.Ti), sol[1, :], label="w_g", color=color1, dpi=400)
 plot!(
     collect(ds_flux_sub.Ti), sol[2, :], label="w_2", legend=:topleft, linestyle=:dash,
     color=color1, yguidefontcolor=color1, ylabel="soil moisture [-]", yforeground_color_axis=color1,
@@ -340,16 +340,16 @@ plot!(
     twinx(), collect(ds_flux_sub.Ti), ds_meteo_sub["Precip"][:], color=:black,
     linestyle=:dot, ylabel="precipitation [kg/(m² s)]", label=""
 )
-savefig(projectdir("plots","test_picture.png"))
+savefig(projectdir("plots", "test_picture.png"))
 # plot 
 
 #plot saved values
 E_total = map(x -> x[1], saved_values.saveval) + map(x -> x[2], saved_values.saveval)
-plot(collect(ds_flux_sub.Ti), ds_flux_sub.Qle_cor[:], label = "observed", ylabel = "LE [W/m²]", dpi = 400)
-plot!(collect(ds_flux_sub.Ti), E_total, label = "predicted", linestyle = :dash)
+plot(collect(ds_flux_sub.Ti), ds_flux_sub.Qle_cor[:], label="observed", ylabel="LE [W/m²]", dpi=400)
+plot!(collect(ds_flux_sub.Ti), E_total, label="predicted", linestyle=:dash)
 corr_model = Statistics.cor(E_total, ds_flux_sub.Qle_cor[:])
 title!(Printf.@sprintf("Correlation: %.4f", corr_model))
-savefig(projectdir("plots","test_picture_LE.png"))
+savefig(projectdir("plots", "test_picture_LE.png"))
 
 ## Try different solvers for the same problem
 sol_implicit = solve(prob, ImplicitEuler(), saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false)
@@ -360,7 +360,7 @@ sol_stiff = solve(prob, KenCarp4(), saveat=t_interp)
 # using LineSearches
 # display(@benchmark solve(prob, ImplicitEuler(nlsolve = NLNewton(relax=BackTracking())), saveat=t_interp, 
 #     dt=(Second(Minute(30))).value, adaptive=false))
-display(@benchmark solve(prob, ImplicitEuler(), saveat=t_interp, 
+display(@benchmark solve(prob, ImplicitEuler(), saveat=t_interp,
     dt=(Second(Minute(30))).value, adaptive=false))
 display(@benchmark solve(prob, Euler(), saveat=t_interp, dt=(Second(Minute(30))).value))
 # display(@benchmark solve(prob, QNDF(), saveat=t_interp))
@@ -369,15 +369,15 @@ display(@benchmark solve(prob, Rodas5P(), saveat=t_interp))
 
 # test out of domain callback!
 # More info on how to constrain the solution, see https://doi.org/10.1016/j.amc.2004.12.011
-sol_Tsit5 = solve(prob, Tsit5(), cb = PositiveDomain(), abstol = 1e-8, reltol = 1e-8)
+sol_Tsit5 = solve(prob, Tsit5(), cb=PositiveDomain(), abstol=1e-8, reltol=1e-8)
 plot(sol_Tsit5)
 # Works somewhat, but this solver can not handle the stiffness...
-sol_Heun = solve(prob, Heun(), cb = PositiveDomain(), abstol = 1e-6, reltol = 1e-5)
+sol_Heun = solve(prob, Heun(), cb=PositiveDomain(), abstol=1e-6, reltol=1e-5)
 plot(sol_Heun)
 # https://docs.sciml.ai/DiffEqDocs/stable/basics/common_solver_opts/
 # The stiff solver Rodas5P with reltol set to 1e-4
 # This mean accurate op to 0.0001 for soil moisture
 # so max 0.0001 difference between the two orders used 
 
-sol = solve(prob, alg_hints = [:stiff])
+sol = solve(prob, alg_hints=[:stiff])
 plot(sol)

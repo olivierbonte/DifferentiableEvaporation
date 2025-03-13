@@ -2,7 +2,7 @@
 
 julia_version = "1.10.7"
 manifest_format = "2.0"
-project_hash = "db43f666a134364c840095edf60f1f88233cff4a"
+project_hash = "f1032a242fa40b5dff249ce4a93701639a39cd27"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "016833eb52ba2d6bea9fcb50ca295980e728ee24"
@@ -1997,6 +1997,12 @@ version = "0.9.4"
 git-tree-sha1 = "58e6353e72cde29b90a69527e56df1b5c3d8c437"
 uuid = "ce78b400-467f-4804-87d8-8f486da07d0a"
 version = "1.1.0"
+
+[[deps.SimulationLogs]]
+deps = ["DiffEqBase", "RecipesBase", "SciMLBase"]
+git-tree-sha1 = "5877331fa8706745745917a65d12909abd60eac0"
+uuid = "e3c6736c-93d9-479d-93f3-96ff5e8836d5"
+version = "0.3.3"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
