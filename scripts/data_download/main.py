@@ -11,8 +11,6 @@ project_folder = Path(__file__).parent.parent.parent.resolve()
 py_functions_module = SourceFileLoader(
     "py_functions", (project_folder / "src" / "py_functions.py").as_posix()
 ).load_module()
-# %% Set up log in icos
-auth.init_config_file()
 
 # %% Logging set up
 datarawdir.mkdir(exist_ok=True, parents=True)
