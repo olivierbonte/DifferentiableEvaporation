@@ -4,10 +4,13 @@ import glob
 import cubo
 import ee
 import xarray as xr
-from conf import ec_dir, sites, veg_dir
+from conf import ec_dir, gee_project_id, sites, veg_dir
+from geoviews import project
 
 veg_dir.mkdir(exist_ok=True)
-ee.Initialize(opt_url="https://earthengine-highvolume.googleapis.com")
+ee.Initialize(
+    project=gee_project_id, opt_url="https://earthengine-highvolume.googleapis.com"
+)
 
 # %% Define variables of interest
 var_list_vcf = [
