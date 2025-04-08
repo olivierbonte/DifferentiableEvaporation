@@ -171,9 +171,9 @@ version = "1.6.0"
 
 [[deps.Bigleaf]]
 deps = ["AstroLib", "DataFrames", "Dates", "FillArrays", "LabelledArrays", "Missings", "Optim", "PaddedViews", "Parameters", "Pipe", "RecursiveArrayTools", "StaticArrays", "Statistics", "StatsBase", "Suppressor", "Tables", "TimeZones"]
-git-tree-sha1 = "1a96954583a5448b2987002029a029c6c79f5eb8"
-repo-rev = "fix/versioning"
-repo-url = "https://github.com/olivierbonte/Bigleaf.jl"
+git-tree-sha1 = "71d09f9b2a8b36a31eb91aff65011d4939b9636b"
+repo-rev = "main"
+repo-url = "https://github.com/EarthyScience/Bigleaf.jl"
 uuid = "e2ae9153-b66f-47c5-85f1-c6d65380123f"
 version = "0.3.1-DEV"
 
