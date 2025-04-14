@@ -1,106 +1,83 @@
 ## Vegetation parameters
-table_metadata = "Vegetation parameters for Jarvis-Stewart. \
-Origin: Table 8.1 of IFS Cy47r3 documentation (Physical processes), \
- see: https://doi.org/10.21957/eyrpir4vj"
+# Define vegeteation types as Julia abstract types
+abstract type VegetationType end
+abstract type Crops <: VegetationType end
+abstract type ShortGrass <: VegetationType end
+abstract type EvergreenNeedleleafTrees <: VegetationType end
+abstract type DeciduousNeedleleafTrees <: VegetationType end
+abstract type DeciduousBroadleafTrees <: VegetationType end
+abstract type EvergreenBroadleafTrees <: VegetationType end
+abstract type TallGrass <: VegetationType end
+abstract type Desert <: VegetationType end
+abstract type Tundra <: VegetationType end
+abstract type IrrigatedCrops <: VegetationType end
+abstract type Semidesert <: VegetationType end
+abstract type BogsAndMarshes <: VegetationType end
+abstract type EvergreenShrubs <: VegetationType end
+abstract type DeciduousShrubs <: VegetationType end
+abstract type MixedForestWoodland <: VegetationType end
+abstract type InterruptedForest <: VegetationType end
+abstract type WaterAndLandMixtures <: VegetationType end
+"""
+    get_default_value(vegtype::Type{<:VegetationType})
 
-df_veg = DataFrame(;
-    vegetation_type=[
-        "Crops, mixed farming",
-        "Short grass",
-        "Evergreen needleleaf trees",
-        "Deciduous needleleaf trees",
-        "Deciduous broadleaf trees",
-        "Evergreen broadleaf trees",
-        "Tall grass",
-        "Desert",
-        "Tundra",
-        "Irrigated crops",
-        "Semidesert",
-        "Ice caps and glaciers",
-        "Bogs and marshes",
-        "Inland water",
-        "Ocean",
-        "Evergreen shrubs",
-        "Deciduous shrubs",
-        "Mixed forest/woodland",
-        "Interrupted forest",
-        "Water and land mixtures",
-    ],
-    r_smin=[
-        100.0,
-        100.0,
-        250.0,
-        250.0,
-        175.0,
-        240.0,
-        100.0,
-        250.0,
-        80.0,
-        190.0,
-        150.0,
-        missing,
-        240.0,
-        missing,
-        missing,
-        225.0,
-        225.0,
-        250.0,
-        175.0,
-        150.0,
-    ],
-    f_veg=[
-        0.90,
-        0.85,
-        0.90,
-        0.90,
-        0.90,
-        0.99,
-        0.70,
-        0.0,
-        0.50,
-        0.90,
-        0.10,
-        missing,
-        0.60,
-        missing,
-        missing,
-        0.50,
-        0.50,
-        0.90,
-        0.90,
-        0.60,
-    ],
-    g_d=[
-        0.0,
-        0.0,
-        0.03,
-        0.03,
-        0.03,
-        0.03,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        missing,
-        0.0,
-        missing,
-        missing,
-        0.0,
-        0.0,
-        0.03,
-        0.03,
-        0.0,
-    ],
-)
-#https://dataframes.juliadata.org/stable/lib/metadata/#Examples 
-metadata!(df_veg, "caption", table_metadata; style=:note)
-colmetadata!(df_veg, :r_smin, "label", "Minimum stomatal resistance [s/m]"; style=:note)
-colmetadata!(df_veg, :f_veg, "label", "Static vegetation fraction cover [-]"; style=:note)
-colmetadata!(
-    df_veg,
-    :g_d,
-    "label",
-    "Coefficient relating vapour pressure deficit to somatal resistance hPa⁻¹";
-    style=:note,
-)
+Assign default values for minimal stomatal resistance and coefficient relating vapour pressure deficit 
+to stomatal resistance based on vegetation type. The values come from Table 8.1 of the 
+[IFS Cy49r1 documentation Part IV: Phyiscal processes](https://doi.org/10.21957/c731ee1102)
+"""
+function get_default_value(vegtype::Type{<:VegetationType})
+    params = Dict(
+        Crops => (125.0, 0.0),
+        ShortGrass => (80.0, 0.0),
+        EvergreenNeedleleafTrees => (395.0, 3.0),
+        DeciduousNeedleleafTrees => (320.0, 3.0),
+        DeciduousBroadleafTrees => (215.0, 3.0),
+        EvergreenBroadleafTrees => (320.0, 3.0),
+        TallGrass => (100.0, 0.0),
+        Desert => (250.0, 0.0),
+        Tundra => (45.0, 0.0),
+        IrrigatedCrops => (110.0, 0.0),
+        Semidesert => (45.0, 0.0),
+        BogsAndMarshes => (130.0, 0.0),
+        EvergreenShrubs => (230.0, 0.0),
+        DeciduousShrubs => (110.0, 0.0),
+        MixedForestWoodland => (180.0, 3.0),
+        InterruptedForest => (175.0, 3.0),
+        WaterAndLandMixtures => (150.0, 3.0),
+    )
+    if haskey(params, vegtype)
+        return params[vegtype]
+    else
+        error("Unknown vegetation type: $vegtype")
+    end
+end
+
+"""
+    VegetationParameters(;...)
+
+Default vegetation parameters for the Jarvis-Stewart model.
+The fields are:
+
+- `vegtype`: The type of vegetation (e.g., `Crops`, `ShortGrass`, etc.)
+- `rsmin`: Minimum stomatal resistance [s/m]
+- `gd`: Coefficient relating vapour pressure deficit to stomatal resistance [Pa⁻¹]
+
+Based on [get_default_value](@ref get_default_value) function, values of `rsmin` and `gd` 
+are set based on `vegtype`. Default values can be overridden by passing them as keyword arguments.
+
+## Examples
+```jldoctest
+# Get default parameters
+params_Default = VegetationParameters(vegtype=Crops)
+# Adapt a default value
+params = VegetationParameters(vegtype=Crops, rsmin=300.0) 
+params.rsmin == 300.0
+# output
+true
+```
+"""
+@with_kw struct VegetationParameters{FT}
+    vegtype::Type{<:VegetationType}
+    rsmin::FT = get_default_value(vegtype)[1]
+    gd::FT = get_default_value(vegtype)[2]
+end

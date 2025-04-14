@@ -6,6 +6,12 @@ CurrentModule = EvaporationModel
 ```@contents
 Pages = ["index.md",]
 ```
+## Config
+
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["config.jl"]
+```
 
 ## Evaporation
 ```@autodocs

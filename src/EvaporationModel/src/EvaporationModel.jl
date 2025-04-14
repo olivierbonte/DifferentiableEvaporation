@@ -2,19 +2,21 @@ module EvaporationModel
 
 using Bigleaf
 using ComponentArrays
-using DataFrames
 using LinearSolve
 using Parameters
 
 include("config.jl")
-export df_veg
+export VegetationParameters, VegetationType, Crops, ShortGrass, EvergreenNeedleleafTrees,
+    DeciduousNeedleleafTrees, DeciduousBroadleafTrees, EvergreenBroadleafTrees,
+    TallGrass, Desert, Tundra, IrrigatedCrops, Semidesert, BogsAndMarshes,
+    EvergreenShrubs, DeciduousShrubs, MixedForestWoodland, InterruptedForest,
+    WaterAndLandMixtures
 
 include("constants.jl")
 export ρ_w
 
 include("evaporation.jl")
 export penman_monteith,
-    compute_g_from_r_net,
     compute_soil_evaporation_stress,
     compute_bare_soil_evaporation,
     compute_transpiration
