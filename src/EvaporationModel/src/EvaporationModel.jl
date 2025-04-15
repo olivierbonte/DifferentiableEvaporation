@@ -8,7 +8,7 @@ using Parameters
 include("config.jl")
 export VegetationParameters, VegetationType, Crops, ShortGrass, EvergreenNeedleleafTrees,
     DeciduousNeedleleafTrees, DeciduousBroadleafTrees, EvergreenBroadleafTrees,
-    TallGrass, Desert, Tundra, IrrigatedCrops, Semidesert, BogsAndMarshes,
+    TallGrass, Desert, Tundra, IrrigatedCrops, SemiDesert, BogsAndMarshes,
     EvergreenShrubs, DeciduousShrubs, MixedForestWoodland, InterruptedForest,
     WaterAndLandMixtures
 
