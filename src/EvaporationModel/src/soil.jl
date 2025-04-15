@@ -91,7 +91,7 @@ See equation 32 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `x_clay`: The percentage of clay in the soil.
 
 # Returns
-- `c_1_sat`: The computed value of `c_1_sat`.
+- `c_1sat`: The computed value of `c_1sat`.
 
 """
 function c_1sat(x_clay::T) where {T}
