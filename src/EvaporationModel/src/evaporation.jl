@@ -1,8 +1,7 @@
 """
     penman_monteith(t_air, p_surf, r_net, vpd, r_a, r_s; g = 0.0, kwargs...)
 
-Compute evaporation (ET) and latent heat flux (LE) 
-using the Penman-Monteith equation.
+Compute evaporation (ET) and latent heat flux (LE)  using the Penman-Monteith equation.
 
 # Arguments
 - `t_air`: Air temperature [K].
@@ -15,20 +14,24 @@ using the Penman-Monteith equation.
 - `kwargs`: Additional keyword arguments.
 
 # Returns
-- `et`: Potential evapotranspiration [kg/(m^2 * s)].
+- `et`: Potential evapotranspiration [kg/(m² * s)].
 - `le`: Latent heat flux [W/m²].
+
+# See also
+[`Bigleaf.potential_ET`](https://earthyscience.github.io/Bigleaf.jl/dev/evapotranspiration/#Bigleaf.potential_ET)
+ for more details on the Penman-Monteith equation.
 """
-function penman_monteith(t_air, p_surf, r_net, vpd, r_a, r_s; g=0.0, kwargs...)
-    cp = Bigleaf.bigleaf_constants()
+function penman_monteith(t_air::T, p_surf::T, r_net::T, vpd::T, r_a::T, r_s::T; g=0, kwargs...) where {T}
+    con = Bigleaf.BigleafConstants()
     et, le = Bigleaf.potential_ET(
-        Val(:PenmanMonteith),
-        t_air - cp[:Kelvin],
-        p_surf * cp[:Pa2kPa],
+        PenmanMonteith(),
+        t_air - T(con.Kelvin),
+        p_surf * T(con.Pa2kPa),
         r_net,
-        vpd * cp[:Pa2kPa],
-        1.0 / r_a;
+        vpd * T(con.Pa2kPa),
+        1 / r_a;
         G=g,
-        Gs_pot=Bigleaf.ms_to_mol(1.0 / r_s, t_air - cp[:Kelvin], p_surf * cp[:Pa2kPa]),
+        Gs_pot=Bigleaf.ms_to_mol(1 / r_s, t_air - con.Kelvin, p_surf * con.Pa2kPa),
     )
     return et, le
 end
