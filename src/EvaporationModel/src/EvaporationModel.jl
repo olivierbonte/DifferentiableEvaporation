@@ -13,7 +13,7 @@ export VegetationParameters, VegetationType, Crops, ShortGrass, EvergreenNeedlel
     WaterAndLandMixtures
 
 include("constants.jl")
-export ρ_w
+export ρ_w, τ
 
 include("evaporation.jl")
 export penman_monteith,
