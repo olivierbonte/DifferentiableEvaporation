@@ -41,7 +41,7 @@ export jarvis_stewart,
     aerodynamic_resistance, soil_aerodynamic_resistance, ustar_from_u, surface_resistance
 
 include("soil.jl")
-export c_1, c_2, c_3, w_geq, compute_a, compute_b, compute_p
+export c_1, c_2, c_3, c_1sat, c_2ref, w_geq, compute_a, compute_b, compute_p
 
 include("utils.jl")
 export compute_amplitude_and_phase, fourier_series, fit_fourier_coefficients
