@@ -24,6 +24,13 @@ Pages = ["evaporation.jl"]
 Modules = [EvaporationModel]
 Pages = ["soil.jl"]
 ```
+
+## Resistances
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["resistances.jl"]
+```
+
 ## Utils
 ```@autodocs
 Modules = [EvaporationModel]
