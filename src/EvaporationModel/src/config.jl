@@ -1,5 +1,15 @@
 ## Vegetation parameters
 # Define vegeteation types as Julia abstract types
+"""
+    VegetationType 
+
+Abstract type defined to represent different types of vegetation.
+
+Below example provided on how to check all the subtypes:
+```julia
+subtypes(VegetationType)
+```
+"""
 abstract type VegetationType end
 abstract type Crops <: VegetationType end
 abstract type ShortGrass <: VegetationType end
@@ -18,12 +28,18 @@ abstract type DeciduousShrubs <: VegetationType end
 abstract type MixedForestWoodland <: VegetationType end
 abstract type InterruptedForest <: VegetationType end
 abstract type WaterAndLandMixtures <: VegetationType end
+
+
 """
     get_default_value(vegtype::Type{<:VegetationType})
 
-Assign default values for minimal stomatal resistance and coefficient relating vapour pressure deficit 
-to stomatal resistance based on vegetation type. The values come from Table 8.1 of the 
-[IFS Cy49r1 documentation Part IV: Phyiscal processes](https://doi.org/10.21957/c731ee1102)
+Assign default values for minimal stomatal resistance (rsmin) and coefficient relating 
+vapour pressure deficit to stomatal resistance (gd) based on vegetation type. 
+
+The values come from Table 8.1 of the 
+[IFS Cy49r1 documentation Part IV: Phyiscal processes](https://doi.org/10.21957/c731ee1102).
+Not part of public API, only used in [`VegetationParameters`](
+@ref VegetationParameters).
 """
 function get_default_value(vegtype::Type{<:VegetationType})
     params = Dict(
@@ -46,7 +62,8 @@ function get_default_value(vegtype::Type{<:VegetationType})
         WaterAndLandMixtures => (150.0, 3.0),
     )
     if haskey(params, vegtype)
-        return params[vegtype]
+        rsmin, gd = params[vegtype]
+        return (rsmin, gd)
     else
         error("Unknown vegetation type: $vegtype")
     end
@@ -62,7 +79,7 @@ The fields are:
 - `rsmin`: Minimum stomatal resistance [s/m]
 - `gd`: Coefficient relating vapour pressure deficit to stomatal resistance [Pa⁻¹]
 
-Based on [get_default_value](@ref get_default_value) function, values of `rsmin` and `gd` 
+Based on [`get_default_value`](@ref get_default_value) function, values of `rsmin` and `gd` 
 are set based on `vegtype`. Default values can be overridden by passing them as keyword arguments.
 
 ## Examples
