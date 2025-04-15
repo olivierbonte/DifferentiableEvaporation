@@ -62,11 +62,11 @@ canopy source height (``z_m = z_{0mc} + d_{c}``)
 # Arguments
 - approach: The approach to use for calculating soil aerodynamic resistance
 - ustar: Friction velocity [m/s]
-- η: Extinction coefficient of ``K`` in canopy [-]
 - h: Canopy height [m]
 - d_c: Canopy displacement height [m]
 - z_0mc: Roughness length for momentum transfer for canopy [m]
 - z_0ms: Roughness length for momentum transfer for soil [m]
+- η: Extinction coefficient of ``K`` in canopy, default = 3 [-]
 
 # Returns
 - r_as: Soil aerodynamic resistance [s/m]
@@ -76,7 +76,7 @@ With `approach = Choudhury1988soil()`, equation (25) of
 [Choudhury and Monteith (1988)](https://doi.org/10.1002/qj.49711448006) is used.  
 """
 function soil_aerodynamic_resistance(
-    approach::Choudhury1988soil, ustar::T, η::T, h::T, d_c::T, z_0mc::T, z_0ms::T
+    approach::Choudhury1988soil, ustar::T, h::T, d_c::T, z_0mc::T, z_0ms::T, η::T=3
 ) where {T}
     Kh = T(BigleafConstants().k) * ustar * (h - d_c)
     r_as = (h * exp(η) / (η * Kh)) * (exp(-η * (z_0mc + d_c) / h) - exp(-η * z_0ms / h))
