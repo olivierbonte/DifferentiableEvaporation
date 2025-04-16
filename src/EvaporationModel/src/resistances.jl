@@ -116,7 +116,30 @@ function aerodynamic_resistance(u, d, z0m, z0h, z_measur)
     return r_a
 end
 
-function ustar_from_u(u::T, z_obs::T, d::T, z_0m::T, ψ_m::T=0.0) where {T}
+@doc raw"""
+    ustar_from_u(u, z_obs, d, z_0m, ψ_m=0)
+
+Calculate the friction velocity from the wind speed at a given height assuming a logarithmic wind profile.
+
+# Arguments
+- `u`: Wind speed at the measurement height [m/s]
+- `z_obs`: Height of the wind speed measurement [m]
+- `d`: Displacement height [m]
+- `z_0m`: Roughness length for momentum transfer [m]
+- `ψ_m`: Stability correction for momentum transfer [m], default = 0
+
+# Returns
+- `u_star`: Friction velocity [m/s]
+
+# Details
+The friction velocity is calculated using the logarithmic wind profile equation, given by:
+
+``u(z) = \frac{u^*}{k} \ln \left( \frac{z - d}{z_{0m}} \right) - \psi_m``
+
+For more info on how to calculate ``\psi_m``, see the 
+[Bigleaf package documentation](https://earthyscience.github.io/Bigleaf.jl/dev/stability_correction/#Bigleaf.stability_parameter)
+"""
+function ustar_from_u(u::T, z_obs::T, d::T, z_0m::T, ψ_m::T=T(0)) where {T}
     return T(BigleafConstants().k) * (u + ψ_m) / log((z_obs - d) / z_0m)
 end
 
