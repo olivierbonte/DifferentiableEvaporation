@@ -43,10 +43,10 @@ function get_default_value(vegtype::VegetationType)
     params = Dict(
         Crops() => (125.0, 0.0),
         ShortGrass() => (80.0, 0.0),
-        EvergreenNeedleleafTrees() => (395.0, 3.0),
-        DeciduousNeedleleafTrees() => (320.0, 3.0),
-        DeciduousBroadleafTrees() => (215.0, 3.0),
-        EvergreenBroadleafTrees() => (320.0, 3.0),
+        EvergreenNeedleleafTrees() => (395.0, 3e-4),
+        DeciduousNeedleleafTrees() => (320.0, 3e-4),
+        DeciduousBroadleafTrees() => (215.0, 3e-4),
+        EvergreenBroadleafTrees() => (320.0, 3e-4),
         TallGrass() => (100.0, 0.0),
         Desert() => (250.0, 0.0),
         Tundra() => (45.0, 0.0),
@@ -55,9 +55,9 @@ function get_default_value(vegtype::VegetationType)
         BogsAndMarshes() => (130.0, 0.0),
         EvergreenShrubs() => (230.0, 0.0),
         DeciduousShrubs() => (110.0, 0.0),
-        MixedForestWoodland() => (180.0, 3.0),
-        InterruptedForest() => (175.0, 3.0),
-        WaterAndLandMixtures() => (150.0, 3.0),
+        MixedForestWoodland() => (180.0, 3e-4),
+        InterruptedForest() => (175.0, 3e-4),
+        WaterAndLandMixtures() => (150.0, 3e-4),
     )
     if haskey(params, vegtype)
         r_smin, g_d = params[vegtype]
