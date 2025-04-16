@@ -54,7 +54,7 @@ function surface_resistance(
     return r_s
 end
 """
-    soil_aerodynamic_resistance(::Choudhury1988soil, ustar, η, h, d_c, z_0mc, z_0ms)
+    soil_aerodynamic_resistance(::Choudhury1988soil, ustar, h, d_c, z_0mc, z_0ms, η=3)
 
 Calculate soil aerodynamic resistance, which is between the soil surface and the 
 canopy source height (``z_m = z_{0mc} + d_{c}``)
@@ -76,10 +76,10 @@ With `approach = Choudhury1988soil()`, equation (25) of
 [Choudhury and Monteith (1988)](https://doi.org/10.1002/qj.49711448006) is used.  
 """
 function soil_aerodynamic_resistance(
-    approach::Choudhury1988soil, ustar::T, h::T, d_c::T, z_0mc::T, z_0ms::T, η::T=3
+    approach::Choudhury1988soil, ustar::T, h::T, d_c::T, z_0mc::T, z_0ms::T, η::T=T(3)
 ) where {T}
     Kh = T(BigleafConstants().k) * ustar * (h - d_c)
-    r_as = (h * exp(η) / (η * Kh)) * (exp(-η * (z_0mc + d_c) / h) - exp(-η * z_0ms / h))
+    r_as = (h * exp(η) / (η * Kh)) * (exp(-η * z_0ms / h) - exp(-η * (z_0mc + d_c) / h))
     return r_as
 end
 
