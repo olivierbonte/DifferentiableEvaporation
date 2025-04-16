@@ -38,7 +38,14 @@ export compute_g_from_r_net, compute_harmonic_sum
 
 include("resistances.jl")
 export jarvis_stewart,
-    aerodynamic_resistance, soil_aerodynamic_resistance, ustar_from_u, surface_resistance
+    aerodynamic_resistance,
+    soil_aerodynamic_resistance,
+    ustar_from_u,
+    surface_resistance,
+    SurfaceResistanceMethod,
+    JarvisStewart,
+    SoilAerodynamicResistanceMethod,
+    Choudhury1988soil
 
 include("soil.jl")
 export c_1, c_2, c_3, c_1sat, c_2ref, w_geq, compute_a, compute_b, compute_p
