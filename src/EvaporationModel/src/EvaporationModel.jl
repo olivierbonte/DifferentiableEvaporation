@@ -31,7 +31,10 @@ export ρ_w, τ
 
 include("evaporation.jl")
 export penman_monteith,
-    compute_soil_evaporation_stress, compute_bare_soil_evaporation, compute_transpiration
+    total_evaporation,
+    compute_soil_evaporation_stress,
+    compute_bare_soil_evaporation,
+    compute_transpiration
 
 include("groundheatlux.jl")
 export compute_g_from_r_net, compute_harmonic_sum
