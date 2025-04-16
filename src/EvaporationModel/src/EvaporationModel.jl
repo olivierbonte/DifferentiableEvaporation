@@ -37,7 +37,7 @@ export penman_monteith,
     compute_transpiration
 
 include("groundheatlux.jl")
-export compute_g_from_r_net, compute_harmonic_sum
+export compute_g_from_r_n, compute_harmonic_sum
 
 include("resistances.jl")
 export jarvis_stewart,

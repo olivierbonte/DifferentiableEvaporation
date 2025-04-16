@@ -9,20 +9,20 @@ struct Martens17 <: SoilEvaporationEfficiencyMethod end
 struct Pielke92 <: SoilEvaporationEfficiencyMethod end
 
 """
-    surface_resistance(::JarvisStewart, s_in, vpd, t_air, w_2, w_fc, w_wilt, lai, g_d, r_smin)
+    surface_resistance(::JarvisStewart, SW_in, VPD, T_a, w_2, w_fc, w_wilt, LAI, g_d, r_smin)
 
 Calculate surface resistance
 
 # Arguments
 - `approach`: The approach to use for calculating surface resistance
-- `s_in`: Incoming solar radiation [W/m²]
-- `vpd`: Vapor pressure deficit [Pa]
-- `t_air`: Air temperature [K]
+- `SW_in`: Incoming solar radiation [W/m²]
+- `VPD`: Vapor pressure deficit [Pa]
+- `T_a`: Air temperature [K]
 - `w_2`: Root zone soil moisture [m³/m³]
 - `w_fc`: Soil moisture at field capacity [m³/m³]
 - `w_wilt`: Soil moisture at wilting point [m³/m³]
-- `lai`: Leaf area index [m²/m²]
-- `g_d`: Parameter relating `vpd` to stomatal conductance [Pa⁻¹]
+- `LAI`: Leaf area index [m²/m²]
+- `g_d`: Parameter relating `VPD` to stomatal conductance [Pa⁻¹]
 - `r_smin`: Minimum stomatal resistance [s/m]
 
 # Returns
@@ -39,22 +39,22 @@ equation (37), with the default value of ``T_{opt}`` set to 298.0 K
 """
 function surface_resistance(
     approach::JarvisStewart,
-    s_in::T,
-    vpd::T,
-    t_air::T,
+    SW_in::T,
+    VPD::T,
+    T_a::T,
     w_2::T,
     w_fc::T,
     w_wilt::T,
-    lai::T,
+    LAI::T,
     g_d::T,
     r_smin::T;
     T_opt::T=T(298.0),
 ) where {T}
-    f_1 = clamp((T(0.004) * s_in + T(0.05)) / (T(0.81) * (T(0.004) * s_in + T(1.0))), 0, 1)
+    f_1 = clamp((T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))), 0, 1)
     f_2 = clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1)
-    f_3 = clamp(exp(-g_d * vpd), 0, 1)
-    f_4 = clamp(1 - T(0.0016) * (T_opt - t_air)^2, 0, 1)
-    r_s = r_smin / lai * (f_1 * f_2 * f_3 * f_4)^(-1)
+    f_3 = clamp(exp(-g_d * VPD), 0, 1)
+    f_4 = clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1)
+    r_s = r_smin / LAI * (f_1 * f_2 * f_3 * f_4)^(-1)
     return r_s
 end
 """
@@ -88,17 +88,17 @@ function soil_aerodynamic_resistance(
 end
 
 function jarvis_stewart(forcing::ComponentArray, parameters::ComponentArray)
-    @unpack s_in, w_2, vpd, t_air, lai = forcing
+    @unpack SW_in, w_2, VPD, T_a, LAI = forcing
     @unpack w_fc, w_wilt, gd, r_smin = parameters
-    return jarvis_stewart.(s_in, w_2, vpd, t_air, lai, w_fc, w_wilt, gd, r_smin)
+    return jarvis_stewart.(SW_in, w_2, VPD, T_a, LAI, w_fc, w_wilt, gd, r_smin)
 end
 
-function jarvis_stewart(s_in, w_2, vpd, t_air, lai, w_fc, w_wilt, gd, r_smin)
-    f_1 = min(1.0, (0.004 * s_in + 0.05) / 0.81(0.004 * s_in + 1.0))
+function jarvis_stewart(SW_in, w_2, VPD, T_a, LAI, w_fc, w_wilt, gd, r_smin)
+    f_1 = min(1.0, (0.004 * SW_in + 0.05) / 0.81(0.004 *  SW_in + 1.0))
     f_2 = max(0.0, min((w_2 - w_wilt) / (w_fc - w_wilt), 1.0))
-    f_3 = exp(-gd * vpd)
-    #f_4 = @. max(1.0 - 0.0016*(298.0 - t_air)^2, 0.0)
-    r_s = r_smin ./ lai * (f_1 * f_2 * f_3)^(-1)
+    f_3 = exp(-gd * VPD)
+    #f_4 = @. max(1.0 - 0.0016*(298.0 - T_a)^2, 0.0)
+    r_s = r_smin ./ LAI * (f_1 * f_2 * f_3)^(-1)
     #max r_s of 50e3 s/max
     r_s = max(50e3, r_s)
     return r_s
