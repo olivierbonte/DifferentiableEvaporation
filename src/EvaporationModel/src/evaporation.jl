@@ -33,7 +33,9 @@ function penman_monteith(
         VPD * T(con.Pa2kPa),
         1 / r_a;
         G=g,
-        Gs_pot=Bigleaf.ms_to_mol(1 / r_s, T_a - T(con.Kelvin), P_a * T(con.Pa2kPa)))
+        Gs_pot=Bigleaf.ms_to_mol(1 / r_s, T_a - T(con.Kelvin), P_a * T(con.Pa2kPa)),
+        kwargs...
+    )
     return ET, λE
 end
 
@@ -64,7 +66,7 @@ function total_evaporation(
     P_s = r_aa * R_c * R_i / DE
     ET_p, λE_p = penman_monteith(T_a, P_a, A, VPD, r_aa, T(0)) # r_s = 0 -> Penman
     λE =
-        (Δ + γ) / γ * (P_c + P_i + P_s) * λe_p +
+        (Δ + γ) / γ * (P_c + P_i + P_s) * λE_p +
         Δ / (γ * r_aa) * (P_c * A_c * r_ac + P_i * A_c * r_ac + P_s * A_s * r_as)
     return λE, λE_p
 end
