@@ -42,10 +42,16 @@ export jarvis_stewart,
     soil_aerodynamic_resistance,
     ustar_from_u,
     surface_resistance,
+    soil_evaporation_efficiency,
+    beta_to_r_ss,
+    r_ss_to_beta,
     SurfaceResistanceMethod,
     JarvisStewart,
     SoilAerodynamicResistanceMethod,
-    Choudhury1988soil
+    Choudhury1988soil,
+    SoilEvaporationEfficiencyMethod,
+    Martens17,
+    Pielke92
 
 include("soil.jl")
 export c_1, c_2, c_3, c_1sat, c_2ref, w_geq, compute_a, compute_b, compute_p

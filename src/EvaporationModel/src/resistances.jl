@@ -4,6 +4,10 @@ struct JarvisStewart <: SurfaceResistanceMethod end
 abstract type SoilAerodynamicResistanceMethod end
 struct Choudhury1988soil <: SoilAerodynamicResistanceMethod end
 
+abstract type SoilEvaporationEfficiencyMethod end
+struct Martens17 <: SoilEvaporationEfficiencyMethod end
+struct Pielke92 <: SoilEvaporationEfficiencyMethod end
+
 """
     surface_resistance(::JarvisStewart, s_in, vpd, t_air, w_2, w_fc, w_wilt, lai, g_d, r_smin)
 
@@ -114,6 +118,24 @@ end
 
 function ustar_from_u(u::T, z_obs::T, d::T, z_0m::T, ψ_m::T=0.0) where {T}
     return T(BigleafConstants().k) * (u + ψ_m) / log((z_obs - d) / z_0m)
+end
+
+function soil_evaporation_efficiency(approach::Pielke92, w_1::T, w_fc::T) where {T}
+    return 1 / 4 * (1 - cos(π * w_1 / w_fc))^2
+end
+
+function soil_evaporation_efficiency(
+    approach::Martens17, w_1::T, w_res::T, w_c::T
+) where {T}
+    return clamp((w_1 - w_res) / (w_c - w_res), 0, 1)
+end
+
+function beta_to_r_ss(beta::T, r_as::T) where {T}
+    return r_as / beta - r_as
+end
+
+function r_ss_to_beta(r_ss::T, r_as::T) where {T}
+    return r_as / (r_as + r_ss)
 end
 
 # r_a,a: https://earthyscience.github.io/Bigleaf.jl/dev/aerodynamic_conductance/#Bigleaf.compute_Ram
