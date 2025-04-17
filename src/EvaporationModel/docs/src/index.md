@@ -19,6 +19,12 @@ Modules = [EvaporationModel]
 Pages = ["evaporation.jl"]
 ```
 
+## Ground heat flux
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["groundheatflux.jl"]
+```
+
 ## Soil
 ```@autodocs
 Modules = [EvaporationModel]

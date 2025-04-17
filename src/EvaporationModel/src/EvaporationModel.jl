@@ -36,7 +36,7 @@ export penman_monteith,
     compute_bare_soil_evaporation,
     compute_transpiration
 
-include("groundheatlux.jl")
+include("groundheatflux.jl")
 export compute_g_from_r_n, compute_harmonic_sum
 
 include("resistances.jl")
