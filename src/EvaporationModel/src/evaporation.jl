@@ -39,6 +39,41 @@ function penman_monteith(
     return ET, λE
 end
 
+"""
+    total_evaporation(T_a, P_a, VPD, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet)
+
+Compute total evaporation (ET) / latent heat flux (λE) using a multi-source model accounting for
+bare soil evaporation, transpiration and interception 
+
+# Arguments
+- `T_a`: Air temperature [K]
+- `P_a`: Surface pressure [Pa]
+- `VPD`: Vapor pressure deficit [Pa]
+- `A`: Total available energy [W/m²]
+- `A_c`: Available energy for canopy [W/m²]
+- `A_s`: Available energy for soil [W/m²]
+- `r_aa`: Aerodynamic resistance between canopy source height and observation height [s/m]
+- `r_ac`: Boundary layer resistance i.e. excess resistance to heat transfer [s/m]
+- `r_as`: Aerodynamic resistance between soil and canopy source height [s/m]
+- `r_sc`: Surface resistance for canopy [s/m]
+- `r_ss`: Surface resistance for soil [s/m]
+- `f_wet`: Fraction of canopy that is wet [-]
+
+# Returns
+- `λE`: Total latent heat flux [W/m²]
+- `λE_p`: Potential latent heat flux [W/m²]
+
+# Details 
+
+For a model description, see TO DO ADD FULL MODEL DESCRIPTION IN DOCS.
+
+The calculation is an extension of the model from
+[Shuttleworth & Wallace (1985)](https://doi.org/10.1002/qj.49711146910) to include
+interception. Equations are written in the notation of 
+[Lhomme et al. (2012)](https://doi.org/10.1007/s10546-012-9713-x), see e.g.
+equations (16) and (33)
+
+"""
 function total_evaporation(
     T_a::T,
     P_a::T,
