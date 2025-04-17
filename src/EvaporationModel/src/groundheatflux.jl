@@ -1,3 +1,35 @@
+abstract type GroundHeatFluxMethod end
+struct Allen07 <: GroundHeatFluxMethod end
+struct SantanelloFriedl03 <: GroundHeatFluxMethod end
+
+function ground_heat_flux(method::Allen07, R_n::T, LAI::T) where {T}
+    if LAI < 0.5
+        @error "Ground heat flux from net radiation for LAI < 0.5
+        not yet implemented"
+    else
+        G = R_n * (0.05 + 0.18 * exp(-0.521 * LAI))
+    end
+    return G
+end
+
+function ground_heat_flux(
+    method::SantanelloFriedl03,
+    R_ns::T,
+    w_1::T,
+    w_1sat::T,
+    t_soln::T,
+    c_gmin::T=T(0.31),
+    c_gmax::T=T(0.35),
+    t_gmin::T=T(74_000),
+    t_gmax::T=T(100_000),
+) where {T}
+    Θ = w_1 / w_1sat
+    c_g = c_gmax * (1 - Θ) + c_gmin * Θ
+    t_g = t_gmax * (1 - Θ) + t_gmin * Θ
+    G = c_g * cos(2π * (t_soln  + 10_800) / t_g) * R_ns
+    return G 
+end
+
 """
     compute_g_from_r_n(R_n, lai)
 

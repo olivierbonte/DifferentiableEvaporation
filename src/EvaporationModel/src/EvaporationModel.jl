@@ -38,7 +38,8 @@ export penman_monteith,
     compute_transpiration
 
 include("groundheatflux.jl")
-export compute_g_from_r_n, compute_harmonic_sum
+export ground_heat_flux,
+    compute_harmonic_sum, GroundHeatFluxMethod, Allen07, SantanelloFriedl03
 
 include("resistances.jl")
 export jarvis_stewart,
