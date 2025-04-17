@@ -61,6 +61,15 @@ export jarvis_stewart,
 include("soil.jl")
 export c_1, c_2, c_3, c_1sat, c_2ref, w_geq, compute_a, compute_b, compute_p
 
+include("soil_fluxes.jl")
+export surface_runoff,
+    diffusion_layer_1,
+    vertical_drainage_layer_2,
+    precip_below_canopy,
+    InfiltrationMethod,
+    StaticInfiltration,
+    VegetationInfiltration
+
 include("utils.jl")
 export compute_amplitude_and_phase,
     fourier_series, fit_fourier_coefficients, local_to_solar_time, seconds_since_solar_noon

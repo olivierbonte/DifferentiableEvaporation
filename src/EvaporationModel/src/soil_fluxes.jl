@@ -1,0 +1,33 @@
+abstract type InfiltrationMethod end
+struct StaticInfiltration <: InfiltrationMethod end
+struct VegetationInfiltration <: InfiltrationMethod end
+
+function surface_runoff(
+    approach::StaticInfiltration, P_s::T, w_2::T, w_fc::T, p_inf::T=T(2)
+) where {T}
+    Q_s = (w_2 / w_fc)^p_inf * P_s
+    return Q_s
+end
+
+function surface_runoff(
+    approach::VegetationInfiltration, P_s::T, w_2::T, w_fc::T, f_veg::T, s_inf::T=T(3)
+) where {T}
+    p_inf = f_veg * s_inf
+    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_fc, p_inf)
+    return Q_s
+end
+
+function diffusion_layer_1(w_1::T, w_1eq::T, C_2::T) where {T}
+    D_1 = C_2 / τ * (w_1 - w_1eq)
+    return D_1
+end
+
+function vertical_drainage_layer_2(w_2::T, w_fc::T, C_3::T, d_2::T) where {T}
+    K_2 = C_3 / (d_2 * τ) * max(0, w_2 - w_fc)
+    return K_2
+end
+
+function precip_below_canopy(P::T, f_veg::T, D_c::T) where {T}
+    P_s = P * (1 - f_veg) + D_c
+    return P_s
+end
