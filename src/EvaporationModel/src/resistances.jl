@@ -73,7 +73,7 @@ canopy source height (``z_m = z_{0mc} + d_{c}``)
 - η: Extinction coefficient of ``K`` in canopy, default = 3 [-]
 
 # Returns
-- r_as: Soil aerodynamic resistance [s/m]
+- r_as: Aerodynamic resistance between soil and canopy source height [s/m]
 
 # Details
 With `approach = Choudhury1988soil()`, equation (25) of 
@@ -143,6 +143,50 @@ function ustar_from_u(u::T, z_obs::T, d::T, z_0m::T, ψ_m::T=T(0)) where {T}
     return T(BigleafConstants().k) * (u + ψ_m) / log((z_obs - d) / z_0m)
 end
 
+"""
+    soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc)
+    soil_evaporation_efficiency(approach::Martens17, w_1, w_res, w_c)
+
+Calculate soil evaporation efficiency β, a factor between 0 and 1 which scales the 
+potential soil evaporation 
+
+# Arguments
+- `approach`: The approach to use for calculating soil evaporation efficiency, a subtype of
+    `SoilEvaporationEfficiencyMethod`
+- `w_1`: Soil moisture from first layer [m³/m³]
+
+With `approach = Pielke92()`, the following inputs are
+
+- `w_fc`: Soil moisture at field capacity [m³/m³]
+
+With `approach = Martens17()`, the following inputs are
+
+- `w_res`: Residual soil moisture [m³/m³]
+- `w_c`: Critical soil moisture [m³/m³]
+
+# Details
+
+With `approach = Pielke92()`, β is calculated using euqation (7) of 
+[Lee & Pielke (1992)](https://doi.org/10.1175/1520-0450(1992)031%3C0480:ETSSSH%3E2.0.CO;2)
+
+With `approach = Martens17()`, β is calculated using equation (6) of 
+[Martens et al. (2017)](https://doi.org/10.5194/gmd-10-1903-2017).
+
+# Examples
+
+```jldoctest
+using EvaporationModel
+w_fc = 0.35
+w_1 = w_fc / 2
+β_p = soil_evaporation_efficiency(Pielke92(), w_1, w_fc)
+β_p ≈ 0.25
+
+# output
+
+true
+```
+
+"""
 function soil_evaporation_efficiency(approach::Pielke92, w_1::T, w_fc::T) where {T}
     return 1 / 4 * (1 - cos(π * w_1 / w_fc))^2
 end
@@ -153,10 +197,40 @@ function soil_evaporation_efficiency(
     return clamp((w_1 - w_res) / (w_c - w_res), 0, 1)
 end
 
+"""
+    beta_to_r_ss(beta, r_as)
+
+Calculate soil surface resistance ``r_{ss}`` from soil evaporation efficiency β 
+
+# Arguments
+- `beta`: Soil evaporation efficiency [-]
+- `r_as`: Aerodynamic resistance between soil and canopy source height [s/m]
+
+# Details
+
+Equation used derived from equivalency between equation (6) and (7) of
+[Merlin et al. (2016)](https://doi.org/10.1002/2015WR018233)
+
+"""
 function beta_to_r_ss(beta::T, r_as::T) where {T}
     return r_as / beta - r_as
 end
 
+"""
+    r_ss_to_beta(r_ss, r_as)
+
+Calculate soil evaporation efficiency β soil surface resistance ``r_{ss}`` 
+
+# Arguments
+- `r_ss`: Soil surface resistance [s/m]
+- `r_as`: Aerodynamic resistance between soil and canopy source height [s/m]
+
+# Details
+
+Equation used derived from equivalency between equation (6) and (7) of
+[Merlin et al. (2016)](https://doi.org/10.1002/2015WR018233)
+
+"""
 function r_ss_to_beta(r_ss::T, r_as::T) where {T}
     return r_as / (r_as + r_ss)
 end
