@@ -27,7 +27,7 @@ function ground_heat_flux(
     c_g = c_gmax * (1 - Θ) + c_gmin * Θ
     t_g = t_gmax * (1 - Θ) + t_gmin * Θ
     G = c_g * cos(2π * (t_soln  + 10_800) / t_g) * R_ns
-    return G 
+    return G
 end
 
 """
@@ -41,7 +41,7 @@ Compute the ground heat flux [W/m²] from net radiation (and LAI)
 
 # Details
 This implementation follows the approach of the METRIC model.
-See Equation 27 of 
+See Equation 27 of
 [Allen et al., 2007](https://doi.org/10.1061/(ASCE)0733-9437(2007)133:4(380))
 
 """
@@ -56,7 +56,7 @@ function compute_g_from_r_n(R_n, lai)
 end
 
 """
-    compute_harmonic_sum(t::Real, a_bn::AbstractVector, ϕ::AbstractVector, 
+    compute_harmonic_sum(t::Real, a_bn::AbstractVector, ϕ::AbstractVector,
     ω::AbstractVector, Δt::Int)
 
 Compute the sum of harmonic terms `\\Gamma_s` as defined in equation 1 of
@@ -71,10 +71,10 @@ function compute_harmonic_sum(
 end
 
 """
-    compute_harmonic_sum(t::AbstractVector, a_bn::AbstractVector, ϕ::AbstractVector, 
+    compute_harmonic_sum(t::AbstractVector, a_bn::AbstractVector, ϕ::AbstractVector,
     ω::Real, Δt::Real)
 
-Applies broadcasting of the function for when `t::AbstractVector` 
+Applies broadcasting of the function for when `t::AbstractVector`
 """
 function compute_harmonic_sum(
     t::AbstractVector, a_bn::AbstractVector, ϕ::AbstractVector, ω::Real, Δt::Real

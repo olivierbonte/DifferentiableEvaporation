@@ -37,7 +37,7 @@ export penman_monteith,
     compute_bare_soil_evaporation,
     compute_transpiration
 
-include("groundheatflux.jl")
+include("ground_heat_flux.jl")
 export ground_heat_flux,
     compute_harmonic_sum, GroundHeatFluxMethod, Allen07, SantanelloFriedl03
 

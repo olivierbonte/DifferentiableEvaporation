@@ -22,7 +22,7 @@ Pages = ["evaporation.jl"]
 ## Ground heat flux
 ```@autodocs
 Modules = [EvaporationModel]
-Pages = ["groundheatflux.jl"]
+Pages = ["ground_heat_flux.jl"]
 ```
 
 ## Soil
