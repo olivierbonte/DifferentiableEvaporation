@@ -2,6 +2,7 @@ module EvaporationModel
 
 using Bigleaf
 using ComponentArrays
+using Dates
 using LinearSolve
 using Parameters
 
@@ -60,6 +61,7 @@ include("soil.jl")
 export c_1, c_2, c_3, c_1sat, c_2ref, w_geq, compute_a, compute_b, compute_p
 
 include("utils.jl")
-export compute_amplitude_and_phase, fourier_series, fit_fourier_coefficients
+export compute_amplitude_and_phase,
+    fourier_series, fit_fourier_coefficients, local_to_solar_time, seconds_since_solar_noon
 
 end # module EvaporationModel
