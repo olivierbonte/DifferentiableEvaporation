@@ -14,6 +14,7 @@ end
 
 function fraction_wet_vegetation(w_r::T, LAI::T, c::T=T(0.2)) where {T}
     w_rmax = c * LAI
+    w_r = max(w_r, T(0))
     f_wet = min(T(1), (w_r / w_rmax)^(2 / 3))
     return f_wet
 end
