@@ -6,6 +6,13 @@ using Dates
 using LinearSolve
 using Parameters
 
+include("canopy.jl")
+export fractional_vegetation_cover,
+    available_energy_partioning,
+    fraction_wet_vegetation,
+    canopy_drainage,
+    vpd_veg_source_height
+
 include("config.jl")
 export VegetationParameters,
     VegetationType,
