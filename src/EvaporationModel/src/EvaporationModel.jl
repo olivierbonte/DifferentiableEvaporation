@@ -42,7 +42,7 @@ export penman_monteith,
     total_evaporation,
     transpiration,
     interception,
-    bare_soil_evaporation
+    soil_evaporation
 
 include("ground_heat_flux.jl")
 export ground_heat_flux,
