@@ -38,11 +38,7 @@ include("constants.jl")
 export ρ_w, τ
 
 include("evaporation.jl")
-export penman_monteith,
-    total_evaporation,
-    transpiration,
-    interception,
-    soil_evaporation
+export penman_monteith, total_evaporation, transpiration, interception, soil_evaporation
 
 include("ground_heat_flux.jl")
 export ground_heat_flux,
@@ -66,7 +62,18 @@ export jarvis_stewart,
     Pielke92
 
 include("soil.jl")
-export c_1, c_2, c_3, c_1sat, c_2ref, w_geq, compute_a, compute_b, compute_p
+export c_1,
+    c_2,
+    c_3,
+    c_1sat,
+    c_2ref,
+    w_geq,
+    compute_a,
+    compute_b,
+    compute_p,
+    bMethod,
+    Clay,
+    VanGenuchten
 
 include("soil_fluxes.jl")
 export surface_runoff,

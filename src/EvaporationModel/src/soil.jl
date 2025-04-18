@@ -1,3 +1,7 @@
+abstract type bMethod end
+struct Clay <: bMethod end
+struct VanGenuchten <: bMethod end
+
 """
     c_1(w_1, w_sat, b, c_1sat)
 
@@ -34,7 +38,7 @@ end
 """
     w_geq(w_2, w_sat, a, p)
 
-Compute `w_geq`, the equilibrium surface soil moisture (i.e. when capillary and 
+Compute `w_geq`, the equilibrium surface soil moisture (i.e. when capillary and
 gravitational forces are in equilibrium).
 See equation 19 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
@@ -49,35 +53,36 @@ function w_geq(w_2, w_sat, a, p)
 end
 
 """
-    compute_b(::Val{:clay}, x_clay)
-    compute_b(::Val{:van_genuchten}, n)
+    compute_b(approach::Clay, x_clay)
+    compute_b(approach::VanGenuchten, n)
 
 Compute `b`, the Brooks-Corey/Clapp-Hornberger parameter  (see equation 1
-of [Clapp & Hornberger](https://doi.org/10.1029/WR014i004p00601) 
-for its definition), based on percentage clay or the van Genuchten paramter `n`.	
+of [Clapp & Hornberger](https://doi.org/10.1029/WR014i004p00601)
+for its definition), based on percentage clay or the van Genuchten paramter `n`.
 
 # Arguments
-- `approach`: Either `Val(:clay)` or `Val(:van_genuchten)`.
-- `x_clay`: The percentage of clay in the soil [%], only for `approach = Val(:clay)`.
-- `n`: The Van Genuchten parameter `n`, only for `approach = Val(:van_genuchten)`.	
+- `approach`: calculation approach, subtype of `bMethod`.
 
-# Details 
-For the `Val(:clay)` approach, Equation (30) of 
+With `approach = Clay()`:
+- `x_clay`: The percentage of clay in the soil [%]
+
+With `approach = VanGenuchten()`:
+- `n`: The Van Genuchten parameter `n` [-]
+
+# Details
+For `approach = Clay()`, Equation (30) of
 [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7) is used.
 
-For the `Val(:van_genuchten)` approach, the parameter equivalence between the Brooks-Corey
-and van Genuchten, is based on [Morel-Seytoux et al., 1996](https://doi.org/10.1029/96WR00069). 
-Note that in this paper, `M` is equivalent to `b`. 
+For`approach = VanGenuchten()`, the parameter equivalence between the Brooks-Corey
+and van Genuchten, is based on
+[Morel-Seytoux et al., 1996](https://doi.org/10.1029/96WR00069).
+Note that in this paper, `M` is equivalent to `b`.
 """
-function compute_b(approach, x_clay)
-    return compute_b(approach, x_clay)
-end
-
-function compute_b(::Val{:clay}, x_clay::T) where {T}
+function compute_b(approach::Clay, x_clay::T) where {T}
     return T(0.137) * x_clay + T(3.501)
 end
 
-function compute_b(::Val{:van_genuchten}, n)
+function compute_b(approach::VanGenuchten, n::T) where {T}
     return -1 + n / (n - 1)
 end
 
@@ -101,7 +106,7 @@ end
 """
     c_2ref(x_clay)
 
-Compute the value for force-restore coefficient `c_2` when `w_2 = 0.5 w_sat`, 
+Compute the value for force-restore coefficient `c_2` when `w_2 = 0.5 w_sat`,
 `c_2ref`  based on the percentage of clay in the soil.
 See equation 33 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
