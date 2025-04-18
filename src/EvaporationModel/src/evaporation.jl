@@ -1,54 +1,67 @@
 """
-    penman_monteith(T_a, P_a, R_n, VPD, r_a, r_s; g = 0.0, kwargs...)
+    penman_monteith(Temp, p, VPD, A, r_a, r_s; kwargs...)
 
 Compute evaporation (ET) and latent heat flux (LE)  using the Penman-Monteith equation.
 
 # Arguments
-- `T_a`: Air temperature [K].
-- `P_a`: Surface pressure [Pa].
-- `R_n`: Net radiation [W/m²].
-- `VPD`: Vapor pressure deficit [Pa].
-- `r_a`: Aerodynamic resistance [s/m].
-- `r_s`: Surface resistance [s/m].
-- `g`: Soil heat flux [W/m²]. Default is 0.0.
-- `kwargs`: Additional keyword arguments.
+- `Temp`: Temperature [K]
+- `p`: Pressure [Pa]
+- `VPD`: Vapor pressure deficit [Pa]
+- `A`: Available energy (``R_n -G``) [W/m²]
+- `r_a`: Aerodynamic resistance [s/m]
+- `r_s`: Surface resistance [s/m]
+- `kwargs`: Additional keyword arguments passed to the `Bigleaf.potential_ET` function.
 
 # Returns
-- `ET`: Potential evapotranspiration [kg/(m² * s)].
-- `λE`: Latent heat flux [W/m²].
+- `ET`: Potential evapotranspiration [kg/(m² * s)]
+- `λE`: Latent heat flux [W/m²]
 
 # See also
 [`Bigleaf.potential_ET`](https://earthyscience.github.io/Bigleaf.jl/dev/evapotranspiration/#Bigleaf.potential_ET)
  for more details on the Penman-Monteith equation.
+
+# Examples
+```jldoctest
+using EvaporationModel
+Temp = 273.15 + 30 # K
+p = 101325.0 # Pa
+VPD = 30.0 * 100 # Pa
+A = 500.0 # W/m²
+r_a = 100.0 # s/m
+r_s = 150.0 # s/m
+ET, λE = penman_monteith(Temp, p, VPD, A, r_a, r_s)
+round(λE; digits = 2) ≈ 380.68
+
+# output
+
+true
+```
 """
-function penman_monteith(
-    T_a::T, P_a::T, R_n::T, VPD::T, r_a::T, r_s::T; g=0, kwargs...
-) where {T}
+function penman_monteith(Temp::T, p::T, VPD::T, A::T, r_a::T, r_s::T; kwargs...) where {T}
     con = Bigleaf.BigleafConstants()
     ET, λE = Bigleaf.potential_ET(
         PenmanMonteith(),
-        T_a - T(con.Kelvin),
-        P_a * T(con.Pa2kPa),
-        R_n,
+        Temp - T(con.Kelvin),
+        p * T(con.Pa2kPa),
+        A,
         VPD * T(con.Pa2kPa),
         1 / r_a;
-        G=g,
-        Gs_pot=Bigleaf.ms_to_mol(1 / r_s, T_a - T(con.Kelvin), P_a * T(con.Pa2kPa)),
+        Gs_pot=Bigleaf.ms_to_mol(1 / r_s, Temp - T(con.Kelvin), p * T(con.Pa2kPa)),
         kwargs...,
     )
     return ET, λE
 end
 
 """
-    total_evaporation(T_a, P_a, VPD, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet)
+    total_evaporation(T_a, p_a, VPD, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet)
 
 Compute total evaporation (ET) / latent heat flux (λE) using a multi-source model accounting for
 bare soil evaporation, transpiration and interception
 
 # Arguments
-- `T_a`: Air temperature [K]
-- `P_a`: Surface pressure [Pa]
-- `VPD`: Vapor pressure deficit [Pa]
+- `T_a`: Air temperature (at ``z_a``) [K]
+- `p_a`: Air pressure (at ``z_a``)[Pa]
+- `VPD_a`: Vapor pressure deficit (at ``z_a``) [Pa]
 - `A`: Total available energy [W/m²]
 - `A_c`: Available energy for canopy [W/m²]
 - `A_s`: Available energy for soil [W/m²]
@@ -76,7 +89,7 @@ equations (16) and (33)
 """
 function total_evaporation(
     T_a::T,
-    P_a::T,
+    p_a::T,
     VPD_a::T,
     A::T,
     A_c::T,
@@ -91,7 +104,7 @@ function total_evaporation(
     con = Bigleaf.BigleafConstants()
     Δ = Bigleaf.Esat_from_Tair_deriv(T_a - T(con.Kelvin)) * T(con.kPa2Pa) #
     γ =
-        Bigleaf.psychrometric_constant(T_a - T(con.Kelvin), P_a * T(con.Pa2kPa)) *
+        Bigleaf.psychrometric_constant(T_a - T(con.Kelvin), p_a * T(con.Pa2kPa)) *
         T(con.kPa2Pa)
     R_c = r_sc + (1 + Δ / γ) * r_ac
     R_s = r_ss + (1 + Δ / γ) * r_as
@@ -101,7 +114,7 @@ function total_evaporation(
     P_c = r_aa * (1 - f_wet) * R_i * R_s / DE
     P_i = r_aa * f_wet * R_c * R_s / DE
     P_s = r_aa * R_c * R_i / DE
-    ET_p, λE_p = penman_monteith(T_a, P_a, A, VPD_a, r_aa, T(0)) # r_s = 0 -> Penman
+    ET_p, λE_p = penman_monteith(T_a, p_a, VPD_a, A, r_aa, T(0)) # r_s = 0 -> Penman
     λE =
         (Δ + γ) / γ * (P_c + P_i + P_s) * λE_p +
         Δ / (γ * r_aa) * (P_c * A_c * r_ac + P_i * A_c * r_ac + P_s * A_s * r_as)

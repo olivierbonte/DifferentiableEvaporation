@@ -11,7 +11,7 @@ site = "BE-Bra"
 # Use readcubedata to load into memory!
 # See https://juliadatacubes.github.io/YAXArrays.jl/stable/UserGuide/read.html#readcubedata
 ds_ec = readcubedata(open_dataset(datadir("exp_pro", "eddy_covariance", site * ".nc")))
-# Readcubedata fails here (becuase no dims...) -> convert to simple dict 
+# Readcubedata fails here (becuase no dims...) -> convert to simple dict
 ds_soil = open_dataset(datadir("exp_pro", "soil", site * "_total_agg.nc"))
 dict_soil = Dict()
 soil_variables = propertynames(ds_soil)
@@ -20,24 +20,24 @@ for variable in soil_variables
 end
 
 ## Define static parameters
-# In a later stage, we would want to move this to some form of 
-# intialisation function 
+# In a later stage, we would want to move this to some form of
+# intialisation function
 # Vegetation characteristics, using info from https://meta.icos-cp.eu/resources/stations/ES_BE-Bra
 veg_param = VegetationParameters(; vegtype=EvergreenNeedleleafTrees())
 kB⁻¹ = log(10)
 z_obs = FT(ds_ec.reference_height[1]) # m, height of the observations
 h = FT(ds_ec.canopy_height[1]) # m, height of the canopy
-# Static soil parameters based on PFT 
+# Static soil parameters based on PFT
 c1sat = c_1sat(dict_soil[:mean_clay_percentage])
 c2ref = c_2ref(dict_soil[:mean_clay_percentage])
 c3 = c_3(dict_soil[:mean_clay_percentage])
-d1 = 0.01 # m, depth of the first layer 
+d1 = 0.01 # m, depth of the first layer
 d2 = dict_soil[:root_depth] # m, depth of the second layer
 z_0ms = 0.01 # m, roughness length for momentum transfer of soil
 
 ## Test Peman-Monteith equation at one time step at at time
 ## in a for loop over several days
-## Also test the Shuttleworth&Wallace like model 
+## Also test the Shuttleworth&Wallace like model
 start_date = DateTime(2010, 3, 5)
 end_date = DateTime(2010, 3, 15)
 ds_ec_sel = ds_ec[time=start_date .. end_date]
@@ -79,8 +79,8 @@ for i in time_indices
     et_test, le_test = penman_monteith(
         FT(ds_ec_sel.Tair[i]),
         FT(ds_ec_sel.Psurf[i]),
-        FT(ds_ec_sel.Rnet[i]),
         FT(ds_ec_sel.VPD[i]) * 100,
+        FT(ds_ec_sel.Rnet[i]),
         r_aa + r_ac,
         r_sc,
     )
@@ -92,7 +92,7 @@ for i in time_indices
     R_ns = (1 - f_veg) * FT(ds_ec_sel.Rnet[i])
     A_c = R_nc
     A_s = R_ns - G
-    f_wet = FT(0.01) # temp 
+    f_wet = FT(0.01) # temp
     le_total, le_total_p = total_evaporation(
         FT(ds_ec_sel.Tair[i]),
         FT(ds_ec_sel.Psurf[i]),
