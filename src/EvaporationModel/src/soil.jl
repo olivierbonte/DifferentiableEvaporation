@@ -5,7 +5,7 @@ struct VanGenuchten <: bMethod end
 """
     c_1(w_1, w_sat, b, c_1sat)
 
-Compute force coefficient `c_1` of force restore framework for soil mositure.
+Compute force coefficient `c_1` [-] of force restore framework for soil mositure.
 See equation 20 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
 # Arguments
@@ -22,7 +22,7 @@ end
 """
     c_2(w_2, w_sat, c2_ref)
 
-Compute restore coefficient `c_2` of force restore framework for soil moisture
+Compute restore coefficient `c_2` [-] of force restore framework for soil moisture
 See equation 21 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
 # Arguments
@@ -38,7 +38,7 @@ end
 """
     w_geq(w_2, w_sat, a, p)
 
-Compute `w_geq`, the equilibrium surface soil moisture (i.e. when capillary and
+Compute `w_geq` [m³ m⁻³], the equilibrium surface soil moisture (i.e. when capillary and
 gravitational forces are in equilibrium).
 See equation 19 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
@@ -56,7 +56,7 @@ end
     compute_b(approach::Clay, x_clay)
     compute_b(approach::VanGenuchten, n)
 
-Compute `b`, the Brooks-Corey/Clapp-Hornberger parameter  (see equation 1
+Compute `b` [-], the Brooks-Corey/Clapp-Hornberger parameter  (see equation 1
 of [Clapp & Hornberger](https://doi.org/10.1029/WR014i004p00601)
 for its definition), based on percentage clay or the van Genuchten paramter `n`.
 
@@ -93,10 +93,10 @@ Compute the value for force-restore coefficient `c_1` when `w_g =  w_sat`.
 See equation 32 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
 # Arguments
-- `x_clay`: The percentage of clay in the soil.
+- `x_clay`: The percentage of clay in the soil [%]
 
 # Returns
-- `c_1sat`: The computed value of `c_1sat`.
+- `c_1sat`: The computed value of `c_1sat` [-]
 
 """
 function c_1sat(x_clay::T) where {T}
@@ -106,8 +106,8 @@ end
 """
     c_2ref(x_clay)
 
-Compute the value for force-restore coefficient `c_2` when `w_2 = 0.5 w_sat`,
-`c_2ref`  based on the percentage of clay in the soil.
+Compute the value for force-restore coefficient `c_2` [-] when `w_2 = 0.5 w_sat`,
+`c_2ref` based on the percentage of clay in the soil.
 See equation 33 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
 # Arguments
@@ -121,7 +121,8 @@ end
 """
     c_3(x_clay)
 
-Compute the coefficient for graviational drainage `c_3` based on the percentage of clay in the soil.
+Compute the coefficient for graviational drainage `c_3` [m] based on the percentage of clay
+in the soil.
 See equation 34 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
 # Arguments
@@ -135,7 +136,8 @@ end
 """
     compute_a(x_clay)
 
-Compute a, a parameter for for w_geq calculation,  of clay in the soil.
+Compute `a` [-], a parameter for for `w_geq` calculation, based on percentage of
+clay in the soil.
 See equation 35 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
 # Arguments
@@ -149,7 +151,8 @@ end
 """
     compute_p(x_clay)
 
-Compute `p`, a parameter for for w_geq calculation, based on the percentage of clay in the soil.
+Compute `p` [-], a parameter for for `w_geq` calculation, based on the percentage of clay
+in the soil.
 See equation 36 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 
 # Arguments
