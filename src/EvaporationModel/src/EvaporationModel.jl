@@ -40,9 +40,9 @@ export ρ_w, τ
 include("evaporation.jl")
 export penman_monteith,
     total_evaporation,
-    compute_soil_evaporation_stress,
-    compute_bare_soil_evaporation,
-    compute_transpiration
+    transpiration,
+    interception,
+    bare_soil_evaporation
 
 include("ground_heat_flux.jl")
 export ground_heat_flux,

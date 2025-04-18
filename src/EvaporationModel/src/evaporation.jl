@@ -120,15 +120,23 @@ function total_evaporation(
         Δ / (γ * r_aa) * (P_c * A_c * r_ac + P_i * A_c * r_ac + P_s * A_s * r_as)
     return λE, λE_p
 end
-
-function compute_soil_evaporation_stress(w_g, w_crit, w_res)
-    return max(1.0, (w_g - w_res) / (w_crit - w_res))
+function transpiration(
+    T_a::T, p_a::T, VPD_m::T, A_c::T, r_ac::T, r_sc::T, f_wet::T
+) where {T}
+    ET_pmc, λE_pmc = penman_monteith(T_a, p_a, VPD_m, A_c, r_ac, r_sc)
+    ET_t, λE_t = (1 - f_wet) .* (ET_pmc, λE_pmc)
+    return ET_t, λE_t
 end
 
-function compute_bare_soil_evaporation(et_pot, f_veg, stress)
-    return (1.0 - f_veg) * stress * et_pot
+function interception(
+    T_a::T, p_a::T, VPD_m::T, A_c::T, r_ac::T, f_wet::T; r_sc::T=T(0)
+) where {T}
+    ET_pc, λE_pc = penman_monteith(T_a, p_a, VPD_m, A_c, r_ac, r_sc)
+    ET_i, λE_i = f_wet .* (ET_pc, λE_pc)
+    return ET_i, λE_i
 end
 
-function compute_transpiration(et, f_veg, f_wet)
-    return f_veg * (1 - f_wet) * et
+function soil_evaporation(T_a::T, p_a::T, VPD_m::T, A_s::T, r_as::T, r_ss::T) where {T}
+    ET_s, λE_s = penman_monteith(T_a, p_a, VPD_m, A_s, r_as, r_ss)
+    return ET_s, λE_s
 end
