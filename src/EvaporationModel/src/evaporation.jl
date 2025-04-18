@@ -96,7 +96,7 @@ function total_evaporation(
     R_c = r_sc + (1 + Δ / γ) * r_ac
     R_s = r_ss + (1 + Δ / γ) * r_as
     R_a = (1 + Δ / γ) * r_aa
-    R_i = (1 + Δ / γ) * r_acF
+    R_i = (1 + Δ / γ) * r_ac
     DE = R_c * R_i * R_s + R_a * ((1 - f_wet) * R_i * R_s + f_wet * R_c * R_s + R_c * R_i)
     P_c = r_aa * (1 - f_wet) * R_i * R_s / DE
     P_i = r_aa * f_wet * R_c * R_s / DE
