@@ -25,6 +25,11 @@ function canopy_drainage(P::T, w_r::T, f_veg::T, c::T=T(0.2)) where {T}
     return D_c
 end
 
+function precip_below_canopy(P::T, f_veg::T, D_c::T) where {T}
+    P_s = P * (1 - f_veg) + D_c
+    return P_s
+end
+
 function vpd_veg_source_height(VPD_a::T, T_a::T, p_a::T, A::T, λE::T, r_aa::T) where {T}
     con = Bigleaf.BigleafConstants()
     Δ = Bigleaf.Esat_from_Tair_deriv(T_a - T(con.Kelvin)) * T(con.kPa2Pa)

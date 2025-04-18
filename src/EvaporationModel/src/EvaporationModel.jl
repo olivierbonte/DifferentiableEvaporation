@@ -11,6 +11,7 @@ export fractional_vegetation_cover,
     available_energy_partioning,
     fraction_wet_vegetation,
     canopy_drainage,
+    precip_below_canopy,
     vpd_veg_source_height
 
 include("config.jl")
@@ -79,7 +80,6 @@ include("soil_fluxes.jl")
 export surface_runoff,
     diffusion_layer_1,
     vertical_drainage_layer_2,
-    precip_below_canopy,
     InfiltrationMethod,
     StaticInfiltration,
     VegetationInfiltration

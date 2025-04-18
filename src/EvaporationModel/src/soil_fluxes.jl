@@ -26,8 +26,3 @@ function vertical_drainage_layer_2(w_2::T, w_fc::T, C_3::T, d_2::T) where {T}
     K_2 = C_3 / (d_2 * τ) * max(0, w_2 - w_fc)
     return K_2
 end
-
-function precip_below_canopy(P::T, f_veg::T, D_c::T) where {T}
-    P_s = P * (1 - f_veg) + D_c
-    return P_s
-end
