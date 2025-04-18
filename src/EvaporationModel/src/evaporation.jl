@@ -34,7 +34,7 @@ function penman_monteith(
         1 / r_a;
         G=g,
         Gs_pot=Bigleaf.ms_to_mol(1 / r_s, T_a - T(con.Kelvin), P_a * T(con.Pa2kPa)),
-        kwargs...
+        kwargs...,
     )
     return ET, λE
 end
@@ -43,7 +43,7 @@ end
     total_evaporation(T_a, P_a, VPD, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet)
 
 Compute total evaporation (ET) / latent heat flux (λE) using a multi-source model accounting for
-bare soil evaporation, transpiration and interception 
+bare soil evaporation, transpiration and interception
 
 # Arguments
 - `T_a`: Air temperature [K]
@@ -63,13 +63,13 @@ bare soil evaporation, transpiration and interception
 - `λE`: Total latent heat flux [W/m²]
 - `λE_p`: Potential latent heat flux [W/m²]
 
-# Details 
+# Details
 
 For a model description, see TO DO ADD FULL MODEL DESCRIPTION IN DOCS.
 
 The calculation is an extension of the model from
 [Shuttleworth & Wallace (1985)](https://doi.org/10.1002/qj.49711146910) to include
-interception. Equations are written in the notation of 
+interception. Equations are written in the notation of
 [Lhomme et al. (2012)](https://doi.org/10.1007/s10546-012-9713-x), see e.g.
 equations (16) and (33)
 
@@ -77,7 +77,7 @@ equations (16) and (33)
 function total_evaporation(
     T_a::T,
     P_a::T,
-    VPD::T,
+    VPD_a::T,
     A::T,
     A_c::T,
     A_s::T,
@@ -89,17 +89,19 @@ function total_evaporation(
     f_wet::T,
 ) where {T}
     con = Bigleaf.BigleafConstants()
-    Δ = Bigleaf.Esat_from_Tair_deriv(T_a - T(con.Kelvin))
-    γ = Bigleaf.psychrometric_constant(T_a - T(con.Kelvin), P_a * T(con.Pa2kPa))
+    Δ = Bigleaf.Esat_from_Tair_deriv(T_a - T(con.Kelvin)) * T(con.kPa2Pa) #
+    γ =
+        Bigleaf.psychrometric_constant(T_a - T(con.Kelvin), P_a * T(con.Pa2kPa)) *
+        T(con.kPa2Pa)
     R_c = r_sc + (1 + Δ / γ) * r_ac
     R_s = r_ss + (1 + Δ / γ) * r_as
     R_a = (1 + Δ / γ) * r_aa
-    R_i = (1 + Δ / γ) * r_ac
+    R_i = (1 + Δ / γ) * r_acF
     DE = R_c * R_i * R_s + R_a * ((1 - f_wet) * R_i * R_s + f_wet * R_c * R_s + R_c * R_i)
     P_c = r_aa * (1 - f_wet) * R_i * R_s / DE
     P_i = r_aa * f_wet * R_c * R_s / DE
     P_s = r_aa * R_c * R_i / DE
-    ET_p, λE_p = penman_monteith(T_a, P_a, A, VPD, r_aa, T(0)) # r_s = 0 -> Penman
+    ET_p, λE_p = penman_monteith(T_a, P_a, A, VPD_a, r_aa, T(0)) # r_s = 0 -> Penman
     λE =
         (Δ + γ) / γ * (P_c + P_i + P_s) * λE_p +
         Δ / (γ * r_aa) * (P_c * A_c * r_ac + P_i * A_c * r_ac + P_s * A_s * r_as)
