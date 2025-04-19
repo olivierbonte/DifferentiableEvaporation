@@ -209,14 +209,22 @@ dwrdt = f_veg * FT(ds_ec_sel.Precip[i]) - E_i - D_c
 ## Final experiment: constructing a proper ODE system
 # Interpolate the forcings (using constant interpolation for now)
 t_unix = datetime2unix.(ds_ec_sel.time[:])
-R_n = ConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; dir=:left)
-T_a = ConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; dir=:left)
-p_a = ConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; dir=:left)
-u_a = ConstantInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix; dir=:left)
-VPD_a = ConstantInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix; dir=:left) #hPa -> Pa
-P = ConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; dir=:left)
-SW_in = ConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; dir=:left)
-LAI = ConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; dir=:left)
+# R_n = ConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; dir=:left)
+# T_a = ConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; dir=:left)
+# p_a = ConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; dir=:left)
+# u_a = ConstantInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix; dir=:left)
+# VPD_a = ConstantInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix; dir=:left) #hPa -> Pa
+# P = ConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; dir=:left)
+# SW_in = ConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; dir=:left)
+# LAI = ConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; dir=:left)
+R_n = PCHIPInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix)
+T_a = PCHIPInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix)
+p_a = PCHIPInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix)
+u_a = PCHIPInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix)
+VPD_a = PCHIPInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix) #hPa -> Pa
+P = PCHIPInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix)
+SW_in = PCHIPInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix)
+LAI = PCHIPInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix)
 
 # Pack alle the parameters into component array
 param = ComponentArray(;
@@ -337,17 +345,53 @@ conservation_equations(u0, param, test_timestamp_unix)
 # Solve the ODE system
 t_span = (t_unix[1], t_unix[end])
 prob = ODEProblem(conservation_equations, u0, t_span, param)
-dt = Dates.value(Second(Minute(1)))
-sol = solve(prob, ImplicitEuler(; autodiff=AutoFiniteDiff()); adaptive=false, dt=dt)
+dt = Dates.value(Second(Minute(30)))
 
-# sol_2 = solve(prob, Heun(); callback=PositiveDomain(), abstol=1e-6, reltol=1e-5)
+# The default "Hydrology solver"
+sol_explicit_euler = solve(prob, Euler(); dt=dt)
+plot(sol_explicit_euler)
 
-sol_rodas = solve(
-    prob,
-    Rodas5P(; autodiff=AutoFiniteDiff());
-    abstol=1e-6,
-    reltol=1e-7,
+# Classic solver: ImplicitEuler fixed timestep at resolution of data
+sol_implicit_euler = solve(
+    prob, ImplicitEuler(; autodiff=AutoFiniteDiff()); adaptive=false, dt=dt
 )
-plot(sol_rodas)
+# Implicit Euler with adapative timestepping
+sol_implicit_euler_adaptive = solve(
+    prob, ImplicitEuler(; autodiff=AutoFiniteDiff()); adaptive=true, saveat=t_unix
+)
+plot(sol_implicit_euler_adaptive)
 
-# TO DO: CHANGE INTERPOLATION TO MAKE PROBLEM LESS HARD!
+# A recommende solver for stiff problems: Rosenbrock23()
+# sol_2 = solve(prob, Heun(); callback=PositiveDomain(), abstol=1e-6, reltol=1e-5
+# reltol and abstol needed if ConstantInterpolation, not for PCHIPInterpolation,
+# Also for ConstantInterpolation better to work at higerh abstol values
+sol_rosenbrock = solve(prob, Rosenbrock23(;autodiff=AutoFiniteDiff()), saveat=t_unix)
+plot(sol_rosenbrock)
+
+
+# Hinting that stiff
+# Again, give tolerances if using ConstantInterpolation
+sol_alg_hints = solve(prob; alg_hints=:stif)
+plot(sol_alg_hints)
+possible_algs = sol_alg_hints.alg.algs
+choice_stiff = unique(sol_alg_hints.alg_choice)
+for i = choice_stiff
+    println("Stiff algorithm choice: ", possible_algs[i])
+end
+
+# No hints, full auto
+sol_auto = solve(prob)
+plot(sol_auto)
+possible_algs = sol_auto.alg.algs
+choice_auto = unique(sol_auto.alg_choice)
+for i = choice_auto
+    println("Auto algorithm choice: ", possible_algs[i])
+end
+# Note: interpolation DOES have an effect!
+# With PCHIP -> auto solving works
+# With ConstantInterpolation -> auto solving fails
+
+## Key to do: Implement a SavingCallback to save the fluxes!
+# https://docs.sciml.ai/DiffEqCallbacks/stable/output_saving/#DiffEqCallbacks.SavingCallback
+# Tutorial: https://nextjournal.com/sosiris-de/ode-diffeq
+# IDEA: try using saveat, does this make a difference?
