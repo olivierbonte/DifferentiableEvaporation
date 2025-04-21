@@ -4,7 +4,8 @@ using Revise
 using Plots, Dates, Statistics, Parameters
 using BenchmarkTools
 using YAXArrays, NetCDF, DimensionalData
-using ComponentArrays, DataInterpolations, DifferentialEquations, StaticArrays
+using ComponentArrays,
+    DataInterpolations, DifferentialEquations, DiffEqCallbacks, StaticArrays
 using Bigleaf
 using EvaporationModel
 
@@ -44,8 +45,11 @@ z_0ms = 0.01 # m, roughness length for momentum transfer of soil
 ## Test Peman-Monteith equation at one time step at at time
 ## in a for loop over several days
 ## Also test the Shuttleworth&Wallace like model
-start_date = DateTime(2010, 3, 5)
-end_date = DateTime(2010, 3, 15)
+# Goede data voor geen errors: 2009-03-15 - 2009-03-20,
+# bodemvocht = 1/2 aan veldcapaciteit
+
+start_date = DateTime(2010, 3, 15)
+end_date = DateTime(2010, 3, 25)
 ds_ec_sel = ds_ec[time=start_date .. end_date]
 time_indices = 1:length(ds_ec_sel.time)[1]
 le_array = similar(collect(time_indices), FT)
@@ -130,8 +134,8 @@ rough_dict = Bigleaf.roughness_parameters(
 )
 d_c = rough_dict.d
 z_0mc = rough_dict.z0m
-w_1 = dict_soil[:w_fc] * 2 / 3# Both soil layers at 2/3 field capacity as test
-w_2 = dict_soil[:w_fc] * 2 / 3
+w_1 = dict_soil[:w_fc] * 3 / 4# Both soil layers at 2/3 field capacity as test
+w_2 = dict_soil[:w_fc] * 3 / 4
 ustar = ustar_from_u(FT(ds_ec_sel.Wind[i]), z_obs, d_c, z_0mc)
 r_aa = Bigleaf.compute_Ram(ResistanceWindZr(), ustar, FT(ds_ec_sel.Wind[i]))
 r_ac = (Bigleaf.Gb_constant_kB1(ustar, kB⁻¹))^-1
@@ -254,7 +258,7 @@ param = ComponentArray(;
 # end
 
 # Construct the ODE system function
-function conservation_equations(u, p, t)
+function calculate_fluxes(u, p, t)
     ## Unpack the state variables
     w_1, w_2, w_r = u
     ## Unpack the static parameters
@@ -320,8 +324,49 @@ function conservation_equations(u, p, t)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
     I_s = P_s - Q_s
+    return (
+        d_c=d_c,
+        z_0mc=z_0mc,
+        f_veg=f_veg,
+        f_wet=f_wet,
+        w_1eq=w_1eq,
+        C_1=C_1,
+        C_2=C_2,
+        G=G,
+        A=A,
+        A_c=A_c,
+        A_s=A_s,
+        ustar=ustar,
+        r_aa=r_aa,
+        r_ac=r_ac,
+        r_as=r_as,
+        r_sc=r_sc,
+        β=β,
+        r_ss=r_ss,
+        λE_tot=λE_tot,
+        λE_tot_p=λE_tot_p,
+        VPD_m=VPD_m,
+        E_t=E_t,
+        λE_t=λE_t,
+        E_i=E_i,
+        λE_i=λE_i,
+        E_s=E_s,
+        λE_s=λE_s,
+        D_c=D_c,
+        P_s=P_s,
+        Q_s=Q_s,
+        D_1=D_1,
+        K_2=K_2,
+        I_s=I_s,
+    )
+end
 
-    # ODE system
+function conservation_equations(u, p, t)
+    fluxes_out = calculate_fluxes(u, p, t)
+    # Unpack the static parameters needed
+    @unpack d_1 = p
+    # Unpack the fluxes
+    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i = fluxes_out
     dw1dt = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
     dw2dt = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
     dwrdt = f_veg * P(t) - E_i - D_c
@@ -331,8 +376,8 @@ end
 # Test the RHS of the ODE system function
 # Define the initial conditions
 u0 = SA[
-    dict_soil[:w_fc] * 2 / 3, # w_1
-    dict_soil[:w_fc] * 2 / 3, # w_2
+    dict_soil[:w_fc] * 1 / 3, # w_1
+    dict_soil[:w_fc] * 1 / 3, # w_2
     FT(0),#FT(0.2) * FT(ds_ec_sel.LAI[i]) * 1 / 6, # w_r
 ]
 # Definfe test time stamp
@@ -347,6 +392,22 @@ t_span = (t_unix[1], t_unix[end])
 prob = ODEProblem(conservation_equations, u0, t_span, param)
 dt = Dates.value(Second(Minute(30)))
 
+# Hand made explicit euler
+u_euler = zeros(length((t_unix)), length(u0))
+for j in 1:length(t_unix)
+    if j == 1
+        u_euler[j, :] = u0
+    else
+        if t_unix[j] ≥ 1.268106722334931e9
+            println("Problematic time step: ", t_unix[j])
+        end
+        # Get the fluxes at the previous time step
+        fluxes = conservation_equations(u_euler[j - 1, :], param, t_unix[j - 1])
+        # Update the state variables using explicit Euler method
+        u_euler[j, :] = u_euler[j - 1, :] + dt * fluxes
+    end
+end
+
 # The default "Hydrology solver"
 sol_explicit_euler = solve(prob, Euler(); dt=dt)
 plot(sol_explicit_euler)
@@ -357,7 +418,13 @@ sol_implicit_euler = solve(
 )
 # Implicit Euler with adapative timestepping
 sol_implicit_euler_adaptive = solve(
-    prob, ImplicitEuler(; autodiff=AutoFiniteDiff()); adaptive=true, saveat=t_unix
+    prob,
+    ImplicitEuler(; autodiff=AutoFiniteDiff());
+    adaptive=true,
+    saveat=t_unix,
+    #callback=PositiveDomain(),
+    abstol=1e-5,
+    reltol=1e-5,
 )
 plot(sol_implicit_euler_adaptive)
 
@@ -365,33 +432,108 @@ plot(sol_implicit_euler_adaptive)
 # sol_2 = solve(prob, Heun(); callback=PositiveDomain(), abstol=1e-6, reltol=1e-5
 # reltol and abstol needed if ConstantInterpolation, not for PCHIPInterpolation,
 # Also for ConstantInterpolation better to work at higerh abstol values
-sol_rosenbrock = solve(prob, Rosenbrock23(;autodiff=AutoFiniteDiff()), saveat=t_unix)
+sol_rosenbrock = solve(
+    prob, Rosenbrock23(; autodiff=AutoFiniteDiff()); saveat=t_unix, reltol=1e-5
+)
 plot(sol_rosenbrock)
-
 
 # Hinting that stiff
 # Again, give tolerances if using ConstantInterpolation
-sol_alg_hints = solve(prob; alg_hints=:stif)
-plot(sol_alg_hints)
-possible_algs = sol_alg_hints.alg.algs
-choice_stiff = unique(sol_alg_hints.alg_choice)
-for i = choice_stiff
-    println("Stiff algorithm choice: ", possible_algs[i])
-end
+# sol_alg_hints = solve(
+#     prob; alg_hints=:stif, abstol=1e-5, reltol=1e-5
+# )
+# plot(sol_alg_hints)
+# possible_algs = sol_alg_hints.alg.algs
+# choice_stiff = unique(sol_alg_hints.alg_choice)
+# for i in choice_stiff
+#     println("Stiff algorithm choice: ", possible_algs[i])
+# end
 
 # No hints, full auto
-sol_auto = solve(prob)
-plot(sol_auto)
-possible_algs = sol_auto.alg.algs
-choice_auto = unique(sol_auto.alg_choice)
-for i = choice_auto
-    println("Auto algorithm choice: ", possible_algs[i])
-end
+# sol_auto = solve(prob, saveat=t_unix, reltol=1e-5)
+# plot(sol_auto)
+# possible_algs = sol_auto.alg.algs
+# choice_auto = unique(sol_auto.alg_choice)
+# for i in choice_auto
+#     println("Auto algorithm choice: ", possible_algs[i])
+# end
 # Note: interpolation DOES have an effect!
 # With PCHIP -> auto solving works
 # With ConstantInterpolation -> auto solving fails
 
+## Experiment
 ## Key to do: Implement a SavingCallback to save the fluxes!
 # https://docs.sciml.ai/DiffEqCallbacks/stable/output_saving/#DiffEqCallbacks.SavingCallback
 # Tutorial: https://nextjournal.com/sosiris-de/ode-diffeq
 # IDEA: try using saveat, does this make a difference?
+saved_flux_data = SavedValues(FT, NamedTuple)
+function save_flux_data(u, t, integrator)
+    # Reuse the same calculations function
+    fluxes = calculate_fluxes(u, integrator.p, t)
+
+    # Return the specific values you want to save
+    return (
+        λE_t=fluxes.λE_t,
+        λE_i=fluxes.λE_i,
+        λE_s=fluxes.λE_s,
+        λE_tot=fluxes.λE_tot,
+        E_t=fluxes.E_t,
+        E_i=fluxes.E_i,
+        E_s=fluxes.E_s,
+        f_veg=fluxes.f_veg,
+        f_wet=fluxes.f_wet,
+        # Add any other values you'd like to record
+    )
+end
+save_cb = SavingCallback(save_flux_data, saved_flux_data; saveat=t_unix)
+sol_cb_save = solve(
+    prob,
+    ImplicitEuler(; autodiff=AutoFiniteDiff());
+    adaptive=true,
+    saveat=t_unix,
+    #callback=PositiveDomain(),
+    abstol=1e-5,
+    reltol=1e-5,
+    callback=save_cb,
+)
+plot(sol_cb_save)
+λE_tot_saved = [data.λE_tot for data in saved_flux_data.saveval]
+λE_t_saved = [data.λE_t for data in saved_flux_data.saveval]
+
+# Plot the states
+p1 = plot(
+    unix2datetime.(sol_cb_save.t),
+    Array(sol_cb_save)';
+    label=["w₁ [-]" "w₂ [-]" "wᵣ [kg/m²]"],
+    ylabel = "Soil moisture [-]/ vegetation water content[kg/m²]",
+    xlabel="Date",
+)
+p2 = twinx(p1)
+p_plot = collect(P(t_unix)[:])
+plot!(
+    p2,
+    unix2datetime.(t_unix),
+    p_plot;
+    linetype=:bar,
+    yflip=true,
+    ylabel="Precipitation [kg/(m² s)]",
+    legend=:none,
+    alpha = 0.5,
+    ylims=(0, maximum(p_plot) * 2),
+)
+
+# Plot the fluxes
+
+
+λE_obs = collect(ds_ec_sel.Qle_cor[:])
+corr = cor(λE_tot_saved, λE_obs)
+plot(unix2datetime.(saved_flux_data.t), λE_tot_saved; label="λE")
+plot!(unix2datetime.(saved_flux_data.t), λE_t_saved; label="λE_t")
+plot!(collect(ds_ec_sel.time), ds_ec_sel.Qle_cor[:]; label="λE observed")
+
+# Problematic time step: t=1.2681067223349307e9
+# t_error = 1.2681067223349307e9
+# u_error = sol_auto(t_error)
+# conservation_equations(u_error, param, t_error)
+
+# Experiment Two: modellingtoolkit
