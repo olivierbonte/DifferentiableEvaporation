@@ -405,7 +405,9 @@ for j in 1:length(t_unix)
         #     println("Problematic time step: ", t_unix[j])
         # end
         # Correct states below zero to be ≥ 0
-        #u_euler[j - 1, :] = max.(u_euler[j - 1, :], 0)
+        u_euler[j - 1, :] = max.(u_euler[j - 1, :], 0)
+        w_rmax = FT(0.2) * FT(ds_ec_sel.LAI[i])
+        u_euler[j - 1, 3] = min(u_euler[j - 1, 3], w_rmax)
         # Get the fluxes at the previous time step
         fluxes = calculate_fluxes(u_euler[j - 1, :], param, t_unix[j - 1])
         fluxes_euler[j] = fluxes
@@ -517,7 +519,7 @@ default(;
 )
 # Plot the states
 # pythonplot()
-# pgfplotsx()
+#pgfplotsx()
 gr()
 figdir(args...) = projectdir("figures", args...)
 if ~isdir(figdir())
@@ -525,6 +527,10 @@ if ~isdir(figdir())
 end
 cm = 37.8 #1cm = 37.8 px
 mm = cm / 10
+start_date = unix2datetime(t_unix[50])
+end_date = unix2datetime(t_unix[end-50])
+date_ticks = [start_date, end_date]
+
 # Figure 1: states for stable adapative implicit euler
 plot(
     unix2datetime.(sol_cb_save.t),
@@ -533,36 +539,48 @@ plot(
     #ylabel="Soil moisture [-]/ vegetation water content[kg/m²]",
     xlabel="Time",
     ylims=(0, maximum(sol_cb_save[1, :]) * 1.5),
-    title="Adaptive implicit Euler (IEₐ)",
+    title="Adaptive Implicit Euler (IEₐ)",
+    xticks = (date_ticks, Dates.format.(date_ticks, "yyyy-mm-dd")),
 )
 #p2 = twinx(p1)
-precip_plot = collect(P(t_unix)[:])
+precip_plot_mm_h = collect(P(t_unix)[:]) * 3600 #kg/(m²s) -> mm/h
 fig_implicit = plot!(
     twinx(),
     unix2datetime.(t_unix),
-    precip_plot;
+    precip_plot_mm_h;
     # linetype=:bar,
     fill=(0, :gray),
     color=:gray,
     yflip=true,
-    ylabel="Precipitation [kg/(m² s)]",
+    ylabel="Precipitation [mm/h]",
     legend=:none,
-    # alpha = 0.5,
-    ylims=(0, maximum(precip_plot) * 2),
-    framestyle=:box,
+    xticks = (date_ticks, Dates.format.(date_ticks, "yyyy-mm-dd")),
+    ylims=(0, maximum(precip_plot_mm_h) * 2.5),
 )
 savefig(fig_implicit, figdir("IE_a_states.png"))
 
 # Figure 2: states for explicit euler without corrections
-fig_explicit = plot(
+plot(
+    unix2datetime.(t_unix),
+    precip_plot_mm_h;
+    # linetype=:bar,
+    fill=(0, :gray),
+    color=:gray,
+    yflip=true,
+    # ylabel="Precipitation [mm/h]",
+    legend=:none,
+    xticks = (date_ticks, Dates.format.(date_ticks, "yyyy-mm-dd")),
+    ylims=(0, maximum(precip_plot_mm_h) * 2.5),
+)
+fig_explicit = plot!(
+    twinx(),
     unix2datetime.(t_unix),
     u_euler;
     label=["w₁ [-]" "w₂ [-]" "wᵣ [kg/m²]"],
     #ylabel="Soil moisture [-]/ vegetation water content[kg/m²]",
     xlabel="Time",
-    ylims=(-0.15, maximum(sol_cb_save[1, :]) * 1.5),
+    ylims=ylims(fig_implicit),
     title="Explicit Euler (EE)",
-    framestyle=:box,
 )
 savefig(fig_explicit, figdir("EE_states.png"))
 
@@ -574,11 +592,23 @@ fig_implicit_fluxes = plot(
     ds_ec_sel.Qle_cor[:];
     label="Observation",
     color=:black,
+    #ylabel=L"\lambda E \quad [\mathrm{W}/ \mathrm{m}^2]",
     ylabel="λE [W/m²]",
+    xlabel="Time",
+    # title="Nothing",
+    # titlefontcolor=:white,
+    xticks = (date_ticks, Dates.format.(date_ticks, "yyyy-mm-dd")),
     framestyle=:box,
 )
-plot!(unix2datetime.(saved_flux_data.t), λE_tot_saved; label="IEₐ", color=collect(palette(:default))[5])
-plot!(unix2datetime.(t_unix), λE_tot_explicit; label="EE", color=collect(palette(:default))[6])
+plot!(
+    unix2datetime.(saved_flux_data.t),
+    λE_tot_saved;
+    label="IEₐ",
+    color=collect(palette(:default))[5],
+)
+plot!(
+    unix2datetime.(t_unix), λE_tot_explicit; label="EE", color=collect(palette(:default))[6]
+)
 #plot!(unix2datetime.(saved_flux_data.t), λE_t_saved; label="λE_t")
 
 savefig(fig_implicit_fluxes, figdir("IE_a_fluxes.png"))
@@ -589,15 +619,19 @@ fig_fluxes_diff = plot(
     unix2datetime.(saved_flux_data.t),
     λE_tot_diff;
     label=:none,
-    ylabel="λE difference [W/m²]",
+    #ylabel=L"\lambda E_{\mathrm{IE}_\mathrm{a}} - \lambda E_{\mathrm{EE}} \quad [\mathrm{W}/\mathrm{m}^2]",
+    ylabel="λE(IEₐ) - λE(EE) [W/m²]",
     xlabel="Time",
-    title="IEₐ - EE",
+    # title="IEₐ - EE",
+    xticks = (date_ticks, Dates.format.(date_ticks, "yyyy-mm-dd")),
     framestyle=:box,
+    ymirror=true
 )
 savefig(fig_fluxes_diff, figdir("IEa_diff_EE_fluxes.png"))
 
 # Combine the plots in one
-l = @layout [_ a{0.485w} _ b{0.485w} _; _ c{0.485w} _ d{0.485w} _]
+l = @layout [_ a{0.485w} b{0.485w} _; _ c{0.485w} d{0.485w} _]
+# l = @layout [a b; c d]
 title_fontsize = 18
 tick_fontsize = title_fontsize - 4
 fig_implicit_combine = plot(
@@ -607,31 +641,32 @@ fig_implicit_combine = plot(
     xtickfontsize=1,
     ytickfontsize=tick_fontsize,
 )
-fig_explicit_combine = plot(fig_explicit; legend=:none, tickfontsize=tick_fontsize)
-fig_implicit_fluxes_combine = plot(
-    fig_implicit_fluxes;
+fig_explicit_combine = plot(
+    fig_explicit;
     xlabel="",
     xtickfontcolor=:white,
     xtickfontsize=1,
     ytickfontsize=tick_fontsize,
+    legend=false
 )
+fig_implicit_fluxes_combine = plot(fig_implicit_fluxes; tickfontsize=tick_fontsize)
 fig_fluxes_diff_combine = plot(fig_fluxes_diff; tickfontsize=tick_fontsize)
 fig_combined = plot(
     fig_implicit_combine,
-    fig_implicit_fluxes_combine,
     fig_explicit_combine,
+    fig_implicit_fluxes_combine,
     fig_fluxes_diff_combine;
     layout=l,
     size=(30cm, 30cm),
-    plot_title="BE-Bra",
+    # plot_title="BE-Bra",
     link=:x,
     legendfontsize=12,
     titlefontsize=title_fontsize,
-    plottitlefontsize=title_fontsize,
+    # plot_titlefontsize=title_fontsize+10,
     #tickfontsize = title_fontsize - 4,
     guidefontsize=title_fontsize - 4,
     line=2.5,
-    xrotation=30,
+    # xrotation=30,
     # framestyle = :box,
 )
 savefig(fig_combined, figdir("combined.png"))
