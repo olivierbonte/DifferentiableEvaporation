@@ -384,6 +384,7 @@ u0 = SA[
 test_timestamp = ds_ec_sel.time[1] + Hour(12)
 test_timestamp_unix = datetime2unix(test_timestamp)
 # Compute RHS of the ODE system function
+test_fluxes_output = calculate_fluxes(u0, param, test_timestamp_unix)
 conservation_equations(u0, param, test_timestamp_unix)
 #@benchmark conservation_equations($u0, $param, $test_timestamp_unix)
 
@@ -394,19 +395,26 @@ dt = Dates.value(Second(Minute(30)))
 
 # Hand made explicit euler
 u_euler = zeros(length((t_unix)), length(u0))
+fluxes_euler = Vector(undef, length(t_unix))
 for j in 1:length(t_unix)
     if j == 1
         u_euler[j, :] = u0
+        fluxes_euler[j] = calculate_fluxes(u0, param, t_unix[j])
     else
-        if t_unix[j] ≥ 1.268106722334931e9
-            println("Problematic time step: ", t_unix[j])
-        end
+        # if t_unix[j] ≥ 1.268106722334931e9
+        #     println("Problematic time step: ", t_unix[j])
+        # end
+        # Correct states below zero to be ≥ 0
+        #u_euler[j - 1, :] = max.(u_euler[j - 1, :], 0)
         # Get the fluxes at the previous time step
-        fluxes = conservation_equations(u_euler[j - 1, :], param, t_unix[j - 1])
+        fluxes = calculate_fluxes(u_euler[j - 1, :], param, t_unix[j - 1])
+        fluxes_euler[j] = fluxes
         # Update the state variables using explicit Euler method
-        u_euler[j, :] = u_euler[j - 1, :] + dt * fluxes
+        state_derivaties = conservation_equations(u_euler[j - 1, :], param, t_unix[j - 1])
+        u_euler[j, :] = u_euler[j - 1, :] + dt * state_derivaties
     end
 end
+λE_tot_explicit = [fluxes_euler[i].λE_tot for i in 1:length(t_unix)]
 
 # The default "Hydrology solver"
 sol_explicit_euler = solve(prob, Euler(); dt=dt)
@@ -500,40 +508,132 @@ plot(sol_cb_save)
 λE_tot_saved = [data.λE_tot for data in saved_flux_data.saveval]
 λE_t_saved = [data.λE_t for data in saved_flux_data.saveval]
 
+## PLOTS FOR EGU
+default(;
+# ytickfontsize=font_size,
+# xtickfontsize=font_size,
+# ylabelfontsize=font_size,
+# xlabelfontsize=font_size,
+)
 # Plot the states
-p1 = plot(
+# pythonplot()
+# pgfplotsx()
+gr()
+figdir(args...) = projectdir("figures", args...)
+if ~isdir(figdir())
+    mkdir(figdir())
+end
+cm = 37.8 #1cm = 37.8 px
+mm = cm / 10
+# Figure 1: states for stable adapative implicit euler
+plot(
     unix2datetime.(sol_cb_save.t),
     Array(sol_cb_save)';
     label=["w₁ [-]" "w₂ [-]" "wᵣ [kg/m²]"],
-    ylabel = "Soil moisture [-]/ vegetation water content[kg/m²]",
-    xlabel="Date",
+    #ylabel="Soil moisture [-]/ vegetation water content[kg/m²]",
+    xlabel="Time",
+    ylims=(0, maximum(sol_cb_save[1, :]) * 1.5),
+    title="Adaptive implicit Euler (IEₐ)",
 )
-p2 = twinx(p1)
-p_plot = collect(P(t_unix)[:])
-plot!(
-    p2,
+#p2 = twinx(p1)
+precip_plot = collect(P(t_unix)[:])
+fig_implicit = plot!(
+    twinx(),
     unix2datetime.(t_unix),
-    p_plot;
-    linetype=:bar,
+    precip_plot;
+    # linetype=:bar,
+    fill=(0, :gray),
+    color=:gray,
     yflip=true,
     ylabel="Precipitation [kg/(m² s)]",
     legend=:none,
-    alpha = 0.5,
-    ylims=(0, maximum(p_plot) * 2),
+    # alpha = 0.5,
+    ylims=(0, maximum(precip_plot) * 2),
+    framestyle=:box,
 )
+savefig(fig_implicit, figdir("IE_a_states.png"))
 
-# Plot the fluxes
+# Figure 2: states for explicit euler without corrections
+fig_explicit = plot(
+    unix2datetime.(t_unix),
+    u_euler;
+    label=["w₁ [-]" "w₂ [-]" "wᵣ [kg/m²]"],
+    #ylabel="Soil moisture [-]/ vegetation water content[kg/m²]",
+    xlabel="Time",
+    ylims=(-0.15, maximum(sol_cb_save[1, :]) * 1.5),
+    title="Explicit Euler (EE)",
+    framestyle=:box,
+)
+savefig(fig_explicit, figdir("EE_states.png"))
 
-
+# Figure 3: fluxes for both methods
 λE_obs = collect(ds_ec_sel.Qle_cor[:])
 corr = cor(λE_tot_saved, λE_obs)
-plot(unix2datetime.(saved_flux_data.t), λE_tot_saved; label="λE")
-plot!(unix2datetime.(saved_flux_data.t), λE_t_saved; label="λE_t")
-plot!(collect(ds_ec_sel.time), ds_ec_sel.Qle_cor[:]; label="λE observed")
+fig_implicit_fluxes = plot(
+    collect(ds_ec_sel.time),
+    ds_ec_sel.Qle_cor[:];
+    label="Observation",
+    color=:black,
+    ylabel="λE [W/m²]",
+    framestyle=:box,
+)
+plot!(unix2datetime.(saved_flux_data.t), λE_tot_saved; label="IEₐ", color=collect(palette(:default))[5])
+plot!(unix2datetime.(t_unix), λE_tot_explicit; label="EE", color=collect(palette(:default))[6])
+#plot!(unix2datetime.(saved_flux_data.t), λE_t_saved; label="λE_t")
 
-# Problematic time step: t=1.2681067223349307e9
-# t_error = 1.2681067223349307e9
-# u_error = sol_auto(t_error)
-# conservation_equations(u_error, param, t_error)
+savefig(fig_implicit_fluxes, figdir("IE_a_fluxes.png"))
+
+# Figure 4: Compare fluxes for explicit and implicit euler
+λE_tot_diff = λE_tot_saved - λE_tot_explicit
+fig_fluxes_diff = plot(
+    unix2datetime.(saved_flux_data.t),
+    λE_tot_diff;
+    label=:none,
+    ylabel="λE difference [W/m²]",
+    xlabel="Time",
+    title="IEₐ - EE",
+    framestyle=:box,
+)
+savefig(fig_fluxes_diff, figdir("IEa_diff_EE_fluxes.png"))
+
+# Combine the plots in one
+l = @layout [_ a{0.485w} _ b{0.485w} _; _ c{0.485w} _ d{0.485w} _]
+title_fontsize = 18
+tick_fontsize = title_fontsize - 4
+fig_implicit_combine = plot(
+    fig_implicit;
+    xlabel="",
+    xtickfontcolor=:white,
+    xtickfontsize=1,
+    ytickfontsize=tick_fontsize,
+)
+fig_explicit_combine = plot(fig_explicit; legend=:none, tickfontsize=tick_fontsize)
+fig_implicit_fluxes_combine = plot(
+    fig_implicit_fluxes;
+    xlabel="",
+    xtickfontcolor=:white,
+    xtickfontsize=1,
+    ytickfontsize=tick_fontsize,
+)
+fig_fluxes_diff_combine = plot(fig_fluxes_diff; tickfontsize=tick_fontsize)
+fig_combined = plot(
+    fig_implicit_combine,
+    fig_implicit_fluxes_combine,
+    fig_explicit_combine,
+    fig_fluxes_diff_combine;
+    layout=l,
+    size=(30cm, 30cm),
+    plot_title="BE-Bra",
+    link=:x,
+    legendfontsize=12,
+    titlefontsize=title_fontsize,
+    plottitlefontsize=title_fontsize,
+    #tickfontsize = title_fontsize - 4,
+    guidefontsize=title_fontsize - 4,
+    line=2.5,
+    xrotation=30,
+    # framestyle = :box,
+)
+savefig(fig_combined, figdir("combined.png"))
 
 # Experiment Two: modellingtoolkit
