@@ -650,7 +650,7 @@ fig_combined = plot(
     fig_implicit_fluxes_combine,
     fig_fluxes_diff_combine;
     layout=l,
-    size=(29cm, 28cm),
+    size=(30cm, 29cm),
     link=:x,
     legendfontsize=12,
     titlefontsize=title_fontsize,
@@ -659,5 +659,7 @@ fig_combined = plot(
 )
 savefig(fig_combined, figdir("combined.png"))
 savefig(fig_combined, figdir("combined.svg"))
+fig_combined_transparent = plot(fig_combined; background_color=:transparent)
+savefig(fig_combined_transparent, figdir("combined_transparent.svg"))
 
 # Experiment Two: modellingtoolkit
