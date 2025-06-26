@@ -198,7 +198,7 @@ D_c = canopy_drainage(FT(ds_ec_sel.Precip[i]), w_r, f_veg)
 P_s = precip_below_canopy(FT(ds_ec_sel.Precip[i]), f_veg, D_c)
 # Soil fluxes
 Q_s = surface_runoff(
-    StaticInfiltration(), FT(ds_ec_sel.Precip[i]), w_2, FT(dict_soil[:w_fc])
+    StaticInfiltration(), P_s, w_2, FT(dict_soil[:w_fc])
 )
 w_1eq = w_geq(w_2, dict_soil[:w_sat], a, p)
 C_1 = c_1(w_1, dict_soil[:w_sat], b, C_1sat)
@@ -212,7 +212,7 @@ dwrdt = f_veg * FT(ds_ec_sel.Precip[i]) - E_i - D_c
 
 ## Final experiment: constructing a proper ODE system
 # Interpolate the forcings (using constant interpolation for now)
-t_unix = datetime2unix.(ds_ec_sel.time[:])
+t_unix = datetime2unix.(ds_ec_sel.time[:]) # in seconds!
 # R_n = ConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; dir=:left)
 # T_a = ConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; dir=:left)
 # p_a = ConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; dir=:left)
@@ -221,14 +221,27 @@ t_unix = datetime2unix.(ds_ec_sel.time[:])
 # P = ConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; dir=:left)
 # SW_in = ConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; dir=:left)
 # LAI = ConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; dir=:left)
-R_n = PCHIPInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix)
-T_a = PCHIPInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix)
-p_a = PCHIPInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix)
-u_a = PCHIPInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix)
-VPD_a = PCHIPInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix) #hPa -> Pa
-P = PCHIPInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix)
-SW_in = PCHIPInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix)
-LAI = PCHIPInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix)
+
+# R_n = PCHIPInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix)
+# T_a = PCHIPInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix)
+# p_a = PCHIPInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix)
+# u_a = PCHIPInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix)
+# VPD_a = PCHIPInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix) #hPa -> Pa
+# P = PCHIPInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix)
+# SW_in = PCHIPInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix)
+# LAI = PCHIPInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix)
+
+# Alternative: preserver integral by using smoothed constant interpolation
+d_max = diff(t_unix)[1] * 0.2 # The maximum smoothing distance in the t direction from the data
+# points in seconds, here as a fraction of the time interval
+R_n = SmoothedConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; d_max = d_max)
+T_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; d_max = d_max)
+p_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; d_max = d_max)
+u_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix; d_max = d_max)
+VPD_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix; d_max = d_max) #hPa -> Pa
+P = SmoothedConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; d_max = d_max)
+SW_in = SmoothedConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; d_max = d_max)
+LAI = SmoothedConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; d_max = d_max)
 
 # Pack alle the parameters into component array
 param = ComponentArray(;
@@ -378,7 +391,7 @@ end
 u0 = SA[
     dict_soil[:w_fc] * 1 / 3, # w_1
     dict_soil[:w_fc] * 1 / 3, # w_2
-    FT(0),#FT(0.2) * FT(ds_ec_sel.LAI[i]) * 1 / 6, # w_r
+    FT(0.0001),#FT(0.2) * FT(ds_ec_sel.LAI[i]) * 1 / 6, # w_r
 ]
 # Definfe test time stamp
 test_timestamp = ds_ec_sel.time[1] + Hour(12)
@@ -426,6 +439,7 @@ plot(sol_explicit_euler)
 sol_implicit_euler = solve(
     prob, ImplicitEuler(; autodiff=AutoFiniteDiff()); adaptive=false, dt=dt
 )
+
 # Implicit Euler with adapative timestepping
 sol_implicit_euler_adaptive = solve(
     prob,
@@ -443,7 +457,7 @@ plot(sol_implicit_euler_adaptive)
 # reltol and abstol needed if ConstantInterpolation, not for PCHIPInterpolation,
 # Also for ConstantInterpolation better to work at higerh abstol values
 sol_rosenbrock = solve(
-    prob, Rosenbrock23(; autodiff=AutoFiniteDiff()); saveat=t_unix, reltol=1e-5
+    prob, Rosenbrock23(; autodiff=AutoFiniteDiff()); saveat=t_unix, abstol = 1e-5, reltol=1e-5
 )
 plot(sol_rosenbrock)
 
@@ -470,6 +484,38 @@ plot(sol_rosenbrock)
 # Note: interpolation DOES have an effect!
 # With PCHIP -> auto solving works
 # With ConstantInterpolation -> auto solving fails
+
+## do constant interpolation BUT force the solver to STOP at the points where there are discontinuities
+R_n = ConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; dir=:left)
+T_a = ConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; dir=:left)
+p_a = ConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; dir=:left)
+u_a = ConstantInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix; dir=:left)
+VPD_a = ConstantInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix; dir=:left) #hPa -> Pa
+P = ConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; dir=:left)
+SW_in = ConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; dir=:left)
+LAI = ConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; dir=:left)
+
+# e.g. using recommend explicit Heun method from La Follette et al. 2021
+sol_tstops = solve(prob, Heun(), tstops = t_unix)
+plot(sol_tstops)
+
+# The default non-stiff stolver
+sol_tstops_tsit5 = solve(prob, Tsit5(), tstops = t_unix)
+
+# even give explicit euler a shot!
+# condition(u, t, integrator) = any(u .≤ 0) # Positive domain condition
+# affect!(integrator) = integrator.u[integrator.u .≤ 0] .= 0
+u0_bis = [
+    dict_soil[:w_fc] * 1 / 3, # w_1
+    dict_soil[:w_fc] * 1 / 3, # w_2
+    FT(0.0001),#FT(0.2) * FT(ds_ec_sel.LAI[i]) * 1 / 6, # w_r
+]
+prob_bis = ODEProblem(conservation_equations, u0_bis, t_span, param)
+condition(u, t, integrator) = true#(integrator.u[3] ≤ 0.0) | (u[3] ≤ 0.0)
+affect!(integrator) = integrator.u = max.(0, integrator.u) # Set w_r to 0 if it goes below 0
+cb = DiscreteCallback(condition, affect!)
+sol_ee_pos = solve(prob_bis, Euler(); dt = dt, callback = cb)#, tstops = t_unix)
+plot(sol_ee_pos)
 
 ## Experiment
 ## Key to do: Implement a SavingCallback to save the fluxes!
