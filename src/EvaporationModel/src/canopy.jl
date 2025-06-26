@@ -1,4 +1,4 @@
-function fractional_vegetation_cover(LAI::T, k_ext::T=0.5) where {T}
+function fractional_vegetation_cover(LAI::T, k_ext::T=T(0.5)) where {T}
     f_veg = 1 - exp(-k_ext * LAI)
     return f_veg
 end
