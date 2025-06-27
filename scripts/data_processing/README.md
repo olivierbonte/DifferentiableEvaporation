@@ -6,5 +6,6 @@ The same computational environment and way of execution files as explained for t
 2. `02_soil.py`: Combine the information from SoilGrids, HiHydroSoil, the European Soil Database Derived and [Stocker et al. (2023)](https://doi.org/10.1038/s41561-023-01125-2) (root depth) data in one datacube.
 3. `03_vegetation.py`: Derive the fraction of vegetation cover, currently providing 2 options (based on [Zhong et al. (2022)](https://doi.org/10.5194/hess-26-5647-2022) and [van Dijk & Bruijnzeel (2001)](<https://doi.org/10.1016/S0022-1694(01)00392-4>)).
 4. `04_soil_moisture_fluxnet.py`: The soil moisture data in `.csv` format (sources described in [download README](../data_download/README.md)) are converted to `.nc` and combined with metadata describing depth of soil moisture sensor. Data is merged with the data cube created in `eddy_covariance.py`.
+5. `05_land_cover_translation.py`: From the GLCC data, a `.csv` file is created that for every IGBP land cover class provides the corresponding BATS land cover class. If multiple BATS classes are possible, each class is assigned a fractional representativeness (based on global occurrence).
 
 Output can be found in `data/exp_pro`.
