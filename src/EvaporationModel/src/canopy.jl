@@ -3,7 +3,7 @@ function fractional_vegetation_cover(LAI::T, k_ext::T=T(0.5)) where {T}
     return f_veg
 end
 
-function available_energy_partioning(R_n::T, G::T, f_veg::T) where {T}
+function available_energy_partioning(R_n, G, f_veg)
     A = R_n - G
     R_nc = R_n * f_veg
     R_ns = R_n * (1 - f_veg)
@@ -12,10 +12,10 @@ function available_energy_partioning(R_n::T, G::T, f_veg::T) where {T}
     return A, A_c, A_s
 end
 
-function fraction_wet_vegetation(w_r::T, LAI::T, c::T=T(0.2)) where {T}
+function fraction_wet_vegetation(w_r::T1, LAI::T2, c::T2=T2(0.2)) where {T1, T2}
     w_rmax = c * LAI
-    w_r = max(w_r, T(0))
-    f_wet = min(T(1), (w_r / w_rmax)^(2 / 3))
+    w_r = max(w_r, T1(0))
+    f_wet = min(T2(1), (w_r / w_rmax)^(2 / 3))
     return f_wet
 end
 
