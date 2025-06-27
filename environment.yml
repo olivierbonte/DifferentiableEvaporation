@@ -5,17 +5,17 @@ channels:
 dependencies:
   - python=3.12
   - xee=0.0.19
-  - matplotlib
-  - hvplot 
-  - geoviews
-  - jupyterlab 
-  - netcdf4
-  - owslib
-  - rioxarray
+  - matplotlib=3.10.*
+  - hvplot=0.11.*
+  - geoviews=1.14.*
+  - jupyterlab=4.3.*
+  - netcdf4=1.7.*
+  - owslib=0.32.*
+  - rioxarray=0.18.*
   - soilgrids=0.1.4 
   - cubo=2024.8.0
   - pip
   - pip:
-    - zenodo_get
+    - zenodo_get==1.6.*
     - icoscp==0.2.2
-    - timezonefinder
+    - timezonefinder==6.5.*
