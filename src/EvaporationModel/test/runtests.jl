@@ -1,5 +1,9 @@
+# Import Packages to test
+using Bigleaf
 using EvaporationModel
+# Import packages used for testing
 using AllocCheck
+using BenchmarkTools
 using Test
 # Here you include files using `srcdir`
 # include(srcdir("file.jl"))
@@ -22,6 +26,11 @@ T_a = 300.0 # K
 p_a = 101325.0 # Pa
 VPD_a = 2000.0 # Pa
 LAI = 3.0 # m2/m2
+h = 21.0 # m
+z_obs = 39.0 # m
+z_0ms = 0.01 # m
+u_star = 3.0 # m/s
+u = 5.0 # m/s
 
 @testset "Check evaporation sum" begin
     A, A_c, A_s = available_energy_partioning(Rn, G, f_veg)
@@ -37,18 +46,37 @@ end
 
 # Test idea from https://modernjuliaworkflows.org/optimizing/#memory_management
 @testset "Check functions on having no allocations" begin
+    FT = Float64
     # @test (@ballocations fractional_vegetation_cover($LAI)) == 0
     println("Testing functions from canopy.jl")
-    @test isempty(check_allocs(fractional_vegetation_cover, (Float64,)))
-    @test isempty(check_allocs(available_energy_partioning, (Float64, Float64, Float64)))
-    @test isempty(check_allocs(fraction_wet_vegetation, (Float64, Float64)))
-    @test isempty(check_allocs(canopy_drainage, (Float64, Float64, Float64)))
-    @test isempty(check_allocs(precip_below_canopy, (Float64, Float64, Float64)))
+    @test isempty(check_allocs(fractional_vegetation_cover, (FT,)))
+    @test isempty(check_allocs(available_energy_partioning, (FT, FT, FT)))
+    @test isempty(check_allocs(fraction_wet_vegetation, (FT, FT)))
+    @test isempty(check_allocs(canopy_drainage, (FT, FT, FT)))
+    @test isempty(check_allocs(precip_below_canopy, (FT, FT, FT)))
+    @test isempty(check_allocs(vpd_veg_source_height, (FT, FT, FT, FT, FT, FT)))
+
+    println("Testing function from evaporation.jl")
+    @test isempty(check_allocs(penman_monteith, (FT, FT, FT, FT, FT, FT)))
     @test isempty(
-        check_allocs(
-            vpd_veg_source_height, (Float64, Float64, Float64, Float64, Float64, Float64)
-        ),
+        check_allocs(total_evaporation, (FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT))
     )
+    @test isempty(check_allocs(transpiration, (FT, FT, FT, FT, FT, FT, FT)))
+    @test isempty(check_allocs(interception, (FT, FT, FT, FT, FT, FT)))
+    @test isempty(check_allocs(soil_evaporation, (FT, FT, FT, FT, FT, FT)))
+
+    println("Testing functions from resistances.jl")
+    @test isempty(check_allocs(ustar_from_u, (FT, FT, FT, FT)))
+
+    println("Testing Bigleaf functions")
+    @test (@ballocations Bigleaf.roughness_parameters(
+        RoughnessCanopyHeightLAI(), $h, $LAI; hs=$z_0ms
+    )) == 0
+    rough_dict = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms)
+    d_c = rough_dict.d
+    z_0mc = rough_dict.z0m
+    @test (@ballocations Bigleaf.compute_Ram(ResistanceWindZr(), $u_star, $u)) == 0
+    @test isempty(check_allocs(Bigleaf.Gb_constant_kB1, (FT, FT)))
 end
 ti = time() - ti
 println("\nTest took total time of:")
