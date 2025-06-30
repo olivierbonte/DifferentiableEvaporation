@@ -31,7 +31,8 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
       - uses: julia-actions/julia-buildpkg@v1
-
+      - name: Instantiate package
+        run: julia --project=src/EvaporationModel/ -e 'using Pkg; Pkg.instantiate()'
       - name: Run tests
         run: >
           julia --project=src/EvaporationModel/test/. src/EvaporationModel/test/runtests.jl
