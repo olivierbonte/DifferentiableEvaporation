@@ -1,6 +1,5 @@
-function fractional_vegetation_cover(LAI::T, k_ext::T=T(0.5)) where {T}
-    f_veg = 1 - exp(-k_ext * LAI)
-    return f_veg
+function fractional_vegetation_cover(LAI, k_ext=oftype(LAI,0.5))
+    return 1 - exp(-k_ext * LAI)
 end
 
 function available_energy_partioning(R_n, G, f_veg)
@@ -12,26 +11,26 @@ function available_energy_partioning(R_n, G, f_veg)
     return A, A_c, A_s
 end
 
-function fraction_wet_vegetation(w_r::T1, LAI::T2, c::T2=T2(0.2)) where {T1, T2}
+function fraction_wet_vegetation(w_r, LAI, c=oftype(LAI, 0.2))
     w_rmax = c * LAI
-    w_r = max(w_r, T1(0))
-    f_wet = min(T2(1), (w_r / w_rmax)^(2 / 3))
-    return f_wet
+    w_r = max(w_r, zero(0))
+    return min(one(1), (w_r / w_rmax)^(2 / 3))
 end
 
-function canopy_drainage(P::T, w_r::T, f_veg::T, c::T=T(0.2)) where {T}
+function canopy_drainage(P, w_r, f_veg, c=oftype(f_veg, 0.2))
     k = (1 - f_veg) * P
     b = 1 / (2 * c)
     D_c = k * (exp(b * w_r) - 1)
     return D_c
 end
 
-function precip_below_canopy(P::T, f_veg::T, D_c::T) where {T}
+function precip_below_canopy(P, f_veg, D_c)
     P_s = P * (1 - f_veg) + D_c
     return P_s
 end
 
-function vpd_veg_source_height(VPD_a::T, T_a::T, p_a::T, A::T, λE::T, r_aa::T) where {T}
+function vpd_veg_source_height(VPD_a, T_a, p_a, A, λE, r_aa)
+    T = typeof(r_aa)
     con = Bigleaf.BigleafConstants()
     Δ = Bigleaf.Esat_from_Tair_deriv(T_a - T(con.Kelvin)) * T(con.kPa2Pa)
     γ =

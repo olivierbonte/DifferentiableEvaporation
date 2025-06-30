@@ -2,6 +2,7 @@ name = "DifferentiableEvaporation"
 authors = ["Olivier Bonte"]
 
 [deps]
+AllocCheck = "9b6a8646-10ed-4001-bbdc-1d2f46dfbb1a"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Bigleaf = "e2ae9153-b66f-47c5-85f1-c6d65380123f"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
