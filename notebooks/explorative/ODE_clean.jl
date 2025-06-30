@@ -197,9 +197,7 @@ E_s, λE_s = soil_evaporation(
 D_c = canopy_drainage(FT(ds_ec_sel.Precip[i]), w_r, f_veg)
 P_s = precip_below_canopy(FT(ds_ec_sel.Precip[i]), f_veg, D_c)
 # Soil fluxes
-Q_s = surface_runoff(
-    StaticInfiltration(), P_s, w_2, FT(dict_soil[:w_fc])
-)
+Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, FT(dict_soil[:w_fc]))
 w_1eq = w_geq(w_2, dict_soil[:w_sat], a, p)
 C_1 = c_1(w_1, dict_soil[:w_sat], b, C_1sat)
 C_2 = c_2(w_2, dict_soil[:w_sat], C_2ref)
@@ -234,14 +232,14 @@ t_unix = datetime2unix.(ds_ec_sel.time[:]) # in seconds!
 # Alternative: preserver integral by using smoothed constant interpolation
 d_max = diff(t_unix)[1] * 0.2 # The maximum smoothing distance in the t direction from the data
 # points in seconds, here as a fraction of the time interval
-R_n = SmoothedConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; d_max = d_max)
-T_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; d_max = d_max)
-p_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; d_max = d_max)
-u_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix; d_max = d_max)
-VPD_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix; d_max = d_max) #hPa -> Pa
-P = SmoothedConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; d_max = d_max)
-SW_in = SmoothedConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; d_max = d_max)
-LAI = SmoothedConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; d_max = d_max)
+R_n = SmoothedConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; d_max=d_max)
+T_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; d_max=d_max)
+p_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; d_max=d_max)
+u_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix; d_max=d_max)
+VPD_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix; d_max=d_max) #hPa -> Pa
+P = SmoothedConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; d_max=d_max)
+SW_in = SmoothedConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; d_max=d_max)
+LAI = SmoothedConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; d_max=d_max)
 
 # Pack alle the parameters into component array
 param = ComponentArray(;
@@ -386,6 +384,16 @@ function conservation_equations(u, p, t)
     return SA[dw1dt, dw2dt, dwrdt]
 end
 
+function conservation_equations!(du, u, p, t)
+    fluxes_out = calculate_fluxes(u, p, t)
+    @unpack d_1 = p
+    # Unpack the fluxes
+    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i = fluxes_out
+    du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
+    du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
+    return du[3] = f_veg * P(t) - E_i - D_c
+end
+
 # Test the RHS of the ODE system function
 # Define the initial conditions
 u0 = SA[
@@ -452,12 +460,38 @@ sol_implicit_euler_adaptive = solve(
 )
 plot(sol_implicit_euler_adaptive)
 
+# Compare static array versions with in-place versions
+@benchmark solve(
+    prob,
+    ImplicitEuler(; autodiff=AutoFiniteDiff());
+    adaptive=true,
+    saveat=t_unix,
+    #callback=PositiveDomain(),
+    abstol=1e-5,
+    reltol=1e-5,
+) # gives around 150 ms
+u0_inplace = [
+    dict_soil[:w_fc] * 1 / 3, # w_1
+    dict_soil[:w_fc] * 1 / 3, # w_2
+    FT(0.0001),
+]
+prob_inplace = ODEProblem(conservation_equations!, u0_inplace, t_span, param)
+@benchmark solve(
+    prob_inplace,
+    ImplicitEuler(; autodiff=AutoFiniteDiff());
+    adaptive=true,
+    saveat=t_unix,
+    #callback=PositiveDomain(),
+    abstol=1e-5,
+    reltol=1e-5,
+) # gives around 60 ms -> faster option!
+
 # A recommende solver for stiff problems: Rosenbrock23()
 # sol_2 = solve(prob, Heun(); callback=PositiveDomain(), abstol=1e-6, reltol=1e-5
 # reltol and abstol needed if ConstantInterpolation, not for PCHIPInterpolation,
 # Also for ConstantInterpolation better to work at higerh abstol values
 sol_rosenbrock = solve(
-    prob, Rosenbrock23(; autodiff=AutoFiniteDiff()); saveat=t_unix, abstol = 1e-5, reltol=1e-5
+    prob, Rosenbrock23(; autodiff=AutoFiniteDiff()); saveat=t_unix, abstol=1e-5, reltol=1e-5
 )
 plot(sol_rosenbrock)
 
@@ -496,11 +530,11 @@ SW_in = ConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; dir=:left)
 LAI = ConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; dir=:left)
 
 # e.g. using recommend explicit Heun method from La Follette et al. 2021
-sol_tstops = solve(prob, Heun(), tstops = t_unix)
+sol_tstops = solve(prob, Heun(); tstops=t_unix)
 plot(sol_tstops)
 
 # The default non-stiff stolver
-sol_tstops_tsit5 = solve(prob, Tsit5(), tstops = t_unix)
+sol_tstops_tsit5 = solve(prob, Tsit5(); tstops=t_unix)
 
 # even give explicit euler a shot!
 # condition(u, t, integrator) = any(u .≤ 0) # Positive domain condition
@@ -514,7 +548,7 @@ prob_bis = ODEProblem(conservation_equations, u0_bis, t_span, param)
 condition(u, t, integrator) = true#(integrator.u[3] ≤ 0.0) | (u[3] ≤ 0.0)
 affect!(integrator) = integrator.u = max.(0, integrator.u) # Set w_r to 0 if it goes below 0
 cb = DiscreteCallback(condition, affect!)
-sol_ee_pos = solve(prob_bis, Euler(); dt = dt, callback = cb)#, tstops = t_unix)
+sol_ee_pos = solve(prob_bis, Euler(); dt=dt, callback=cb)#, tstops = t_unix)
 plot(sol_ee_pos)
 
 ## Experiment
@@ -582,7 +616,7 @@ plot(
 )
 #p2 = twinx(p1)
 precip_plot_mm_h = collect(P(t_unix)[:]) * 3600 #kg/(m²s) -> mm/h
-y_ticks_precip = ([0,10, 20], ["0","10", "20"])
+y_ticks_precip = ([0, 10, 20], ["0", "10", "20"])
 fig_implicit = plot!(
     twinx(),
     unix2datetime.(t_unix),
@@ -643,13 +677,16 @@ fig_implicit_fluxes = plot(
     framestyle=:box,
 )
 plot!(
-    unix2datetime.(t_unix), λE_tot_explicit; label="EE", color=collect(palette(:default))[1]#[6]
+    unix2datetime.(t_unix),
+    λE_tot_explicit;
+    label="EE",
+    color=collect(palette(:default))[1],#[6]
 )
 plot!(
     unix2datetime.(saved_flux_data.t),
     λE_tot_saved;
     label="IEₐ",
-    color=collect(palette(:default))[2]#[5],
+    color=collect(palette(:default))[2],#[5],
 )
 #plot!(unix2datetime.(saved_flux_data.t), λE_t_saved; label="λE_t")
 
@@ -665,7 +702,7 @@ fig_fluxes_diff = plot(
     xlabel="Time",
     xticks=(date_ticks, Dates.format.(date_ticks, "yyyy-mm-dd")),
     framestyle=:box,
-    color = palette(:default)[3]
+    color=palette(:default)[3],
 )
 savefig(fig_fluxes_diff, figdir("IEa_diff_EE_fluxes.png"))
 
