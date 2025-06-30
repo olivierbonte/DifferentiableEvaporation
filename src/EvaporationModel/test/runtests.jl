@@ -1,7 +1,6 @@
-using DrWatson, Test
-@quickactivate "DifferentiableEvaporation"
 using EvaporationModel
 using AllocCheck
+using Test
 # Here you include files using `srcdir`
 # include(srcdir("file.jl"))
 
