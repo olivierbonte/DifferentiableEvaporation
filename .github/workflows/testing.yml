@@ -34,4 +34,4 @@ jobs:
 
       - name: Run tests
         run: >
-          julia --project=. --color=yes test/runtests.jl
+          julia --project=src/EvaporationModel/test/. src/EvaporationModel/test/runtests.jl
