@@ -53,7 +53,9 @@ function surface_resistance(
     T_opt::T=T(298.0),
     r_smax::T=T(500_000),
 ) where {T}
-    f_1 = clamp((T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))), 0, 1)
+    f_1 = clamp(
+        (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))), 0, 1
+    )
     f_2 = clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1)
     f_3 = clamp(exp(-g_d * VPD), 0, 1)
     f_4 = clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1)
@@ -97,7 +99,7 @@ function jarvis_stewart(forcing::ComponentArray, parameters::ComponentArray)
 end
 
 function jarvis_stewart(SW_in, w_2, VPD, T_a, LAI, w_fc, w_wilt, gd, r_smin)
-    f_1 = min(1.0, (0.004 * SW_in + 0.05) / 0.81(0.004 *  SW_in + 1.0))
+    f_1 = min(1.0, (0.004 * SW_in + 0.05) / 0.81(0.004 * SW_in + 1.0))
     f_2 = max(0.0, min((w_2 - w_wilt) / (w_fc - w_wilt), 1.0))
     f_3 = exp(-gd * VPD)
     #f_4 = @. max(1.0 - 0.0016*(298.0 - T_a)^2, 0.0)
@@ -142,7 +144,8 @@ The friction velocity is calculated using the logarithmic wind profile equation,
 For more info on how to calculate ``\psi_m``, see the
 [Bigleaf package documentation](https://earthyscience.github.io/Bigleaf.jl/dev/stability_correction/#Bigleaf.stability_parameter)
 """
-function ustar_from_u(u::T, z_obs::T, d::T, z_0m::T, ψ_m::T=T(0)) where {T}
+function ustar_from_u(u, z_obs, d, z_0m, ψ_m=oftype(z_0m, 0))
+    T = typeof(z_0m)
     return T(BigleafConstants().k) * (u + ψ_m) / log((z_obs - d) / z_0m)
 end
 
