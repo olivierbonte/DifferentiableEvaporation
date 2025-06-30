@@ -71,7 +71,7 @@ T_a_test = (t) -> 275.0 + 5.0 * sin(2.0 * π * t / 86400 - π / 2);
 u_a_test = (t) -> 3.0 # m /s
 p_a_test = (t) -> 101325.0 # Pa
 VPD_a_test = (t) -> 200.0 # Pa
-SW_in_test = (t) -> @. max(1361.0 * sin(2π * t / 86400 - π / 2), 0);
+SW_in_test = (t) -> max(1361.0 * sin(2π * t / 86400 - π / 2), 0);
 R_n_test = (t) -> SW_in_test(t) * 0.3 # W/m²
 LAI_test = (t) -> 3.0
 
@@ -81,7 +81,7 @@ param_test = ComponentArray(;
     z_0ms=0.01, # [m] roughness length for soil
     w_sat=0.5, # [-]  saturation water content
     a=0.15,
-    p=6.0,
+    p_soil=6.0,
     b=6.1,
     C_1sat=1.9,
     C_2ref=0.83,
@@ -94,7 +94,7 @@ struct ModelParamsTest{T<:AbstractFloat}
     z_0ms::T # [m] roughness length for soil
     w_sat::T # [-] saturation water content
     a::T
-    p::T
+    p_soil::T
     b::T
     C_1sat::T
     C_2ref::T
@@ -107,7 +107,7 @@ model_params_test = ModelParamsTest(
     param_test.z_0ms,
     param_test.w_sat,
     param_test.a,
-    param_test.p,
+    param_test.p_soil,
     param_test.b,
     param_test.C_1sat,
     param_test.C_2ref,
@@ -126,22 +126,24 @@ end
 fractional_vegetation_cover!(test_dyn_param_model, LAI_test(0.0))
 # In-place form f!(du, u, p, t) should be fastest
 u0_test = [0.2, 0.2, 0.001]
-t_span_test = (0.0, 6 * 86400.0) # 1 day in seconds
+t_end = 6 * 86400.0 # 1 day in seconds
+t_span_test = (0.0, t_end) # 1 day in seconds
+# GOAL: get code below optimised!
 function calculate_fluxes_test!(du, u, p, t)
     w_1, w_2, w_r = u
     # This adds 11 allocations, not wanted...
-    @unpack h, LAI, z_0ms, w_sat, a, p, b, C_1sat, C_2ref, d_1, z_obs = p
+    @unpack h, LAI, z_0ms, w_sat, a, p_soil, b, C_1sat, C_2ref, d_1, z_obs = p
     d_c, z_0mc = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms)
     f_veg = fractional_vegetation_cover(LAI)
     f_wet = fraction_wet_vegetation(w_r, LAI)
-    w_1eq = w_geq(w_2, w_sat, a, p) #no allocs
+    w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
     C_1 = c_1(w_1, w_sat, b, C_1sat) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
     G = ground_heat_flux(Allen07(), R_n_test(t), T_a_test(t))
     A, A_c, A_s = available_energy_partioning(R_n_test(t), G, f_veg)
 
-    #ustar = ustar_from_u(u_a_test(t), z_obs, d_c, z_0mc)
+    ustar = ustar_from_u(u_a_test(t), z_obs, d_c, z_0mc)
     # To avoid issues with types in autodiff...
     T = eltype(u)
     du[1] = C_1 / (ρ_w * d_1) * P_test(t)
@@ -150,6 +152,11 @@ function calculate_fluxes_test!(du, u, p, t)
     return nothing
 end
 # Alternative: make a mutating function
+# Some benchmarking on this function. Goal to get this close to zero allocations!
+du0_test = similar(u0_test)
+@benchmark calculate_fluxes_test!($du0_test, $u0_test, $param_test, $t_span_test[1])
+@code_warntype calculate_fluxes_test!(du0_test, u0_test, param_test, t_span_test[1])
+# Test if AD works with this function
 prob_test = ODEProblem(calculate_fluxes_test!, u0_test, t_span_test, param_test)
 # Test if AD works within solver
 sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
@@ -174,6 +181,7 @@ function loss_function_test(p; sensealg=AutoForwardDiff())
 end
 @benchmark loss_function_test(param_test)
 loss_function_test(param_test)
+gradient(loss_function_test, AutoForwardDiff(), param_test)
 @benchmark gradient(loss_function_test, AutoForwardDiff(), param_test)
 @benchmark gradient(loss_function_test, AutoFiniteDiff(), param_test)
 
