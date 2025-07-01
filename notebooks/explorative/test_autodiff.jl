@@ -1,10 +1,11 @@
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using Bigleaf, EvaporationModel
-using DifferentialEquations
+using OrdinaryDiffEq
 using DifferentiationInterface
 import Enzyme, ForwardDiff
 using BenchmarkTools
+# Note that DifferentiatioIterface exports ADTypes
 
 # %% Test potential_et from Bigleaf with ForwardDiff
 Tair = 30.0 # [°C]

@@ -4,8 +4,8 @@ using Revise
 using Plots, Dates, Statistics, Parameters
 using BenchmarkTools
 using YAXArrays, NetCDF, DimensionalData
-using ComponentArrays,
-    DataInterpolations, DifferentialEquations, DiffEqCallbacks, StaticArrays
+using ADTypes, ComponentArrays,
+    DataInterpolations, OrdinaryDiffEq, DiffEqCallbacks, StaticArrays
 using Bigleaf
 using EvaporationModel
 
