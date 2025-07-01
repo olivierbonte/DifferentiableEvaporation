@@ -186,10 +186,10 @@ sol = solve(
 @benchmark solve($prob_test, $Rosenbrock23(; autodiff=AutoForwardDiff()))
 @benchmark solve($prob_test, $Heun())
 # See the effect of saving at every time step
-t_obs_test = collect(t_span_test[1]:1:t_span_test[2])
-@benchmark solve($prob_test, $Heun(), save_everystep = false)
-@benchmark solve($prob_test, $Heun(), saveat=$t_obs_test)
-
+t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
+@benchmark solve($prob_test, $Heun(), save_everystep=false) # faster of the 3
+@benchmark solve($prob_test, $Heun(), tstops=$t_obs_test) #slowest of the 3
+@benchmark solve($prob_test, $Heun(), saveat=$t_obs_test) # middle
 
 # %% Test if AD works for parameter optimisation purpose (i.e. take derivaties)
 observed_data = rand(3, length(t_obs_test)) # Simulated observed data for testing
