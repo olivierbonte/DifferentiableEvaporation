@@ -2,7 +2,7 @@ using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using Bigleaf, EvaporationModel
 using ComponentArrays
-using DifferentialEquations
+using OrdinaryDiffEq
 using DifferentiationInterface
 using Enzyme: Enzyme
 using ForwardDiff: ForwardDiff
@@ -10,6 +10,7 @@ using Zygote: Zygote
 using SciMLSensitivity
 using BenchmarkTools
 using Revise
+# Note that DifferentiatioIterface exports ADTypes
 
 # %% Test potential_et from Bigleaf with ForwardDiff
 Tair = 30.0 # [°C]
