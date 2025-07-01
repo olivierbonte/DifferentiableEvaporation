@@ -3,11 +3,12 @@ using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using Revise
 using Plots, Dates, Statistics, Parameters
-using EvaporationModel, Bigleaf, DifferentialEquations
+using EvaporationModel, Bigleaf, OrdinaryDiffEq
 using YAXArrays, NetCDF, ComponentArrays, DimensionalData
 gr()
 
-
+# NOTE 01/07/2025: DEPRECATED FIlE, PLEASE SEE ODE_clean.jl for more up to date experiments
+# TO BE REMOVED LATER!
 
 # Test data for this example
 # PLUMBER2 dataset: https://dx.doi.org/10.25914/5fdb0902607e1,
@@ -15,12 +16,12 @@ gr()
 # Be-Bra = example site! mixed forest, for simplicity now take Needle leaf trees
 
 # Download via OpenDAP
-# Soil is loamy-sand here -> take sandy-loam as most similar... 
+# Soil is loamy-sand here -> take sandy-loam as most similar...
 #flux_data_url = "https://thredds.nci.org.au/thredds/dodsC/ks32/CLEX_Data/PLUMBER2/v1-0/Flux/BE-Bra_2004-2014_FLUXNET2015_Flux.nc"
 #meteo_data_url = "https://thredds.nci.org.au/thredds/dodsC/ks32/CLEX_Data/PLUMBER2/v1-0/Met/BE-Bra_2004-2014_FLUXNET2015_Met.nc"
 #flux_data = NCDataset(flux_data_url)
 #meteo_data = NCDataset(meteo_data_url)
-#Swith from NCDataset to NetCDF and YAXArray for convenience -> donwload of the data 
+#Swith from NCDataset to NetCDF and YAXArray for convenience -> donwload of the data
 #Download the data to a folder
 ds_meteo = open_dataset(datadir("exp_raw", "eddy_covariance", "BE-Bra_2004-2014_FLUXNET2015_Met.nc"));
 ds_flux = open_dataset(datadir("exp_raw", "eddy_covariance", "BE-Bra_2004-2014_FLUXNET2015_Flux.nc"));
@@ -35,7 +36,7 @@ ds_flux_sub = ds_flux[time=DimensionalData.Between(start_date, end_date)]
 plot(collect(ds_meteo_sub.Ti), ds_meteo_sub["Precip"][:])
 
 # Define parameters for initial experiment
-# All defined in Float64 for type stability 
+# All defined in Float64 for type stability
 # Inspired by CLASS: short grass, sandy loam (p.129-131)
 # Table 10.6: Needle leaf trees
 # z0m = 0.02 # m
@@ -74,11 +75,11 @@ z_measur = Float64(ds_flux_sub.reference_height.data[:, :][1])
 h_veg = Float64(ds_flux_sub.canopy_height.data[:, :][1])
 z0m = 0.1 * h_veg
 z0h = Bigleaf.roughness_z0h(z0m, 2) #8 according to Ridgen & Salvucci, 2015
-#this is quite high though... no difference for 
+#this is quite high though... no difference for
 d = 2 / 3 * h_veg
 
 
-#Test Penman-Monteith 
+#Test Penman-Monteith
 # aerodynamic_resistance
 param_ra = ComponentArray(
     d=d,
@@ -122,10 +123,10 @@ plot(time_sub, g_s_mol)
 #     Val(:PenmanMonteith),
 #     ds_meteo_sub.Tair[:] .- 273.15, #K to °C
 #     ds_meteo_sub.Psurf[:]/1000, #kPa
-#     ds_flux_sub.Rnet[:], 
+#     ds_flux_sub.Rnet[:],
 #     ds_meteo_sub.VPD[:], #hPa -> kPa
 #     1.0 ./r_a;
-#     Gs_pot = 1.0 ./10, #eenheden aanpassen! mol m-2 s-1 moet het zijn 
+#     Gs_pot = 1.0 ./10, #eenheden aanpassen! mol m-2 s-1 moet het zijn
 # )
 #Custom function to wrap Bigleaf function
 function calculate_evaporation(Tair, Psurf, Rnet, VPD, r_a, r_s; kwargs...)
@@ -138,7 +139,7 @@ function calculate_evaporation(Tair, Psurf, Rnet, VPD, r_a, r_s; kwargs...)
             Rnet[i], VPD[i],
             1.0 ./ r_a[i],
             G=0.05 * Rnet[i];
-            Gs_pot=ms_to_mol(1.0 ./ r_s[i], Tair[i] + 273.15, Psurf[i] * 1000), #eenheden aanpassen! mol m-2 s-1 moet het zijn 
+            Gs_pot=ms_to_mol(1.0 ./ r_s[i], Tair[i] + 273.15, Psurf[i] * 1000), #eenheden aanpassen! mol m-2 s-1 moet het zijn
             kwargs...
         )
     end
@@ -168,7 +169,7 @@ plot!(ds_flux_sub.Qle_cor[:], ds_flux_sub.Qle_cor[:])
 
 ## Experiment with ODE for w_g
 using DataInterpolations, Dates
-#convert to numeric ms for interpolation 
+#convert to numeric ms for interpolation
 interp_Rnet = ConstantInterpolation(
     ds_flux_sub["Rnet"][:],
     Dates.datetime2epochms.(collect(ds_flux_sub.Ti)),
@@ -191,7 +192,7 @@ t_interp = Dates.value.(Dates.convert.(Second, ds_flux_sub.Ti .- ds_flux_sub.Ti[
     s_in::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["SWdown"][:], t_interp, dir=:left)
     lai::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["LAI"][:], t_interp, dir=:left)
 end
-#ALTERNATIVE: JUST DEFINE THESE FUNCTIONS OUTSIDE OF THE 
+#ALTERNATIVE: JUST DEFINE THESE FUNCTIONS OUTSIDE OF THE
 # @with_kw struct struct_test
 #     test::DataInterpolations.AbstractInterpolation
 # end
@@ -226,7 +227,7 @@ end
 function compute_penman(Tair, Psurf, Rnet, VPD, r_a, r_s; kwargs...)
     et, le = Bigleaf.potential_ET(
         Val(:PenmanMonteith), Tair, Psurf, Rnet, VPD, 1.0 / r_a,
-        G=0.05 * Rnet; Gs_pot=ms_to_mol(1.0 ./ r_s, Tair + 273.15, Psurf * 1000), #eenheden aanpassen! mol m-2 s-1 moet het zijn 
+        G=0.05 * Rnet; Gs_pot=ms_to_mol(1.0 ./ r_s, Tair + 273.15, Psurf * 1000), #eenheden aanpassen! mol m-2 s-1 moet het zijn
         kwargs...
     )
     return et, le
@@ -239,7 +240,7 @@ function wg_conservation(u, p, t)
     @unpack d_1, d_2, τ, w_sat, c1_sat, c2_ref, c_3, a, b, p, d, z0m, z0h, z_measur,
     w_res, w_crit, w_fc, w_wilt, gd, r_smin = p
     #@unpack r_net, vpd, t_air, p_surf, precip, wind, s_in, lai = forcings
-    # DO NOT UNPACK FUNCTION HERE, THIS IS SUPER SLOW! 
+    # DO NOT UNPACK FUNCTION HERE, THIS IS SUPER SLOW!
     #w_2 = 0.25 #temporarily
     r_a = EvaporationModel.aerodynamic_resistance(wind(t), d, z0m, z0h, z_measur)
     r_s = EvaporationModel.jarvis_stewart(s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin)
@@ -247,7 +248,7 @@ function wg_conservation(u, p, t)
     c_2 = compute_c_2(u[2], w_sat, c2_ref)
     w_geq = compute_w_geq(u[2], w_sat, a, p) #0.25 is temporarily
     f_veg = 0.95 #temp value
-    f_wet = 0.0 #temp value  
+    f_wet = 0.0 #temp value
     e_tr = EvaporationModel.compute_transpiration(
         compute_penman(
             t_air(t) - 273.15, p_surf(t) / 1000, r_net(t), vpd(t) / 10, r_a, r_s
@@ -286,9 +287,9 @@ function save_func(u, t , integrator)
     @unpack d, z0m, z0h, z_measur,
     w_res, w_crit, w_fc, w_wilt, gd, r_smin = integrator.p
     r_a = EvaporationModel.aerodynamic_resistance(wind(t), d, z0m, z0h, z_measur)
-    r_s = EvaporationModel.jarvis_stewart(s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin) 
+    r_s = EvaporationModel.jarvis_stewart(s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin)
     f_veg = 0.95 #temp value
-    f_wet = 0.0 #temp value  
+    f_wet = 0.0 #temp value
     e_tr = EvaporationModel.compute_transpiration(
         compute_penman(
             t_air(t) - 273.15, p_surf(t) / 1000, r_net(t), vpd(t) / 10, r_a, r_s
@@ -310,7 +311,7 @@ function save_func(u, t , integrator)
     w_min = min(u[1], u[2])
     e_g = max(w_min - w_res, 0.0) * e_g
     e_tr = max(u[2] - w_wilt, 0.0) * e_tr
-    return (e_g, e_tr)   
+    return (e_g, e_tr)
 end
 cb = SavingCallback(save_func, saved_values, saveat = t_interp)
 
@@ -331,7 +332,7 @@ plot!(
     linestyle=:dot, ylabel="precipitation [kg/(m² s)]", label=""
 )
 savefig(projectdir("plots","test_picture.png"))
-# plot 
+# plot
 
 #plot saved values
 E_total = map(x -> x[1], saved_values.saveval) + map(x -> x[2], saved_values.saveval)
@@ -348,9 +349,9 @@ sol_stiff = solve(prob, KenCarp4(), saveat=t_interp)
 
 #benchmark
 # using LineSearches
-# display(@benchmark solve(prob, ImplicitEuler(nlsolve = NLNewton(relax=BackTracking())), saveat=t_interp, 
+# display(@benchmark solve(prob, ImplicitEuler(nlsolve = NLNewton(relax=BackTracking())), saveat=t_interp,
 #     dt=(Second(Minute(30))).value, adaptive=false))
-display(@benchmark solve(prob, ImplicitEuler(), saveat=t_interp, 
+display(@benchmark solve(prob, ImplicitEuler(), saveat=t_interp,
     dt=(Second(Minute(30))).value, adaptive=false))
 display(@benchmark solve(prob, Euler(), saveat=t_interp, dt=(Second(Minute(30))).value))
 # display(@benchmark solve(prob, QNDF(), saveat=t_interp))
@@ -367,7 +368,7 @@ plot(sol_Heun)
 # https://docs.sciml.ai/DiffEqDocs/stable/basics/common_solver_opts/
 # The stiff solver Rodas5P with reltol set to 1e-4
 # This mean accurate op to 0.0001 for soil moisture
-# so max 0.0001 difference between the two orders used 
+# so max 0.0001 difference between the two orders used
 
 sol = solve(prob, alg_hints = [:stiff])
 plot(sol)
