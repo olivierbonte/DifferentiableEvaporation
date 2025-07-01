@@ -7,6 +7,8 @@ using OrdinaryDiffEq
 using DifferentiationInterface
 using Enzyme: Enzyme
 using ForwardDiff: ForwardDiff
+using ReverseDiff: ReverseDiff
+using Mooncake: Mooncake
 using Zygote: Zygote
 using SciMLSensitivity
 using BenchmarkTools
@@ -193,7 +195,7 @@ t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
 
 # %% Test if AD works for parameter optimisation purpose (i.e. take derivaties)
 observed_data = rand(3, length(t_obs_test)) # Simulated observed data for testing
-function loss_function_test(p; sensealg=AutoForwardDiff())
+function loss_function_test(p; t_obs_test=t_obs_test, sensealg=ForwardDiffSensitivity())
     simul = Array(
         solve(
             prob_test,
@@ -205,21 +207,66 @@ function loss_function_test(p; sensealg=AutoForwardDiff())
     )
     return mean(abs2, simul .- observed_data)
 end
-@benchmark loss_function_test(param_test)
 loss_function_test(param_test)
+@benchmark loss_function_test(param_test)
+# function loss_function_interpol_test(p; sensealg=AutoForwardDiff())
+#     sol = solve(
+#         prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()); sensealg=sensealg, p=p
+#     )
+#     simul = Array(sol(t_obs_test))
+#     return mean(abs2, simul .- observed_data)
+# end
+# @benchmark loss_function_interpol_test(param_test)
 gradient(loss_function_test, AutoForwardDiff(), param_test)
-@benchmark gradient(loss_function_test, AutoForwardDiff(), param_test)
-@benchmark gradient(loss_function_test, AutoFiniteDiff(), param_test)
+@benchmark gradient($loss_function_test, $AutoForwardDiff(), $param_test)
+@benchmark gradient($loss_function_test, $AutoFiniteDiff(), $param_test)
 
 # Test adjoint equations with Zygote for reverse mode AD
 function loss_function_adjoint(p)
     return loss_function_test(p; sensealg=BacksolveAdjoint(; autojacvec=EnzymeVJP()))
 end
+gradient(loss_function_adjoint, AutoZygote(), param_test)
 @benchmark gradient(loss_function_adjoint, AutoZygote(), param_test)
 # Much slower...
-# BenchmarkTools.Trial: 1 sample with 1 evaluation per sample.
-#   Single result which took 128.607 s (5.03% GC) to evaluate,
-#   with a memory estimate of 31.54 GiB, over 1116636507 allocations.
+# BenchmarkTools.Trial: 3471 samples with 1 evaluation per sample.
+#  Range (min … max):  1.023 ms … 12.045 ms  ┊ GC (min … max): 0.00% … 86.09%
+#  Time  (median):     1.169 ms              ┊ GC (median):    0.00%
+#  Time  (mean ± σ):   1.434 ms ±  1.125 ms  ┊ GC (mean ± σ):  9.66% ± 10.92%
+# This seems to be related to Zygote!! Becuase when you use AutoForwardDiff
+@benchmark gradient($loss_function_adjoint, $AutoForwardDiff(), $param_test)
+# BenchmarkTools.Trial: 10000 samples with 1 evaluation per sample.
+#  Range (min … max):  35.590 μs …  22.459 ms  ┊ GC (min … max):  0.00% … 98.28%
+#  Time  (median):     48.117 μs               ┊ GC (median):     0.00%
+#  Time  (mean ± σ):   58.433 μs ± 382.118 μs  ┊ GC (mean ± σ):  11.10% ±  1.70%
+gradient(loss_function_adjoint, AutoReverseDiff(), param_test)
+@benchmark gradient($loss_function_adjoint, $AutoReverseDiff(), $param_test)
+# ReverseDiff also quite slow...
+# BenchmarkTools.Trial: 3673 samples with 1 evaluation per sample.
+#  Range (min … max):  886.238 μs … 36.449 ms  ┊ GC (min … max):  0.00% … 95.39%
+#  Time  (median):       1.089 ms              ┊ GC (median):     0.00%
+#  Time  (mean ± σ):     1.356 ms ±  2.481 ms  ┊ GC (mean ± σ):  14.48% ±  7.63%
+# @benchmark gradient($loss_function_adjoint, $AutoMooncake(), $param_test)
+# Fails as of now, not trivial to get reverse mode AD working fast...
 
-#gradient(loss_function_test, AutoEnzyme(), param_test)
-ForwardDiff.gradient(loss_function_test, param_test)
+# %% Experimenting with Enzyme
+function loss_function_enzyme(p, t_obs_test, observed_data, sensealg=BacksolveAdjoint())
+    simul = Array(
+        solve(
+            prob_test,
+            Rosenbrock23(; autodiff=AutoForwardDiff());#AutoForwardDiff());
+            saveat=t_obs_test,
+            sensealg=sensealg,
+            p=p,
+        ),
+    )
+    return mean(abs2, simul .- observed_data)
+end
+loss_function_enzyme(param_test, t_obs_test, observed_data)
+# gradient(
+#     loss_function_enzyme,
+#     AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Forward)),
+#     param_test,
+#     Constant(t_obs_test),
+#     Constant(observed_data),
+# )
+# Craches as of now
