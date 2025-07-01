@@ -1,3 +1,4 @@
+# %% Imports
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using Bigleaf, EvaporationModel
@@ -33,6 +34,7 @@ f(x_trial)
 gradient(f, AutoForwardDiff(), x_trial)
 gradient(f, AutoEnzyme(), x_trial)
 
+# %% Gradient benchmarking
 @benchmark gradient($f, $AutoForwardDiff(), $x_trial)
 @benchmark gradient($f, $AutoEnzyme(), $x_trial)
 
@@ -67,14 +69,30 @@ prob = ODEProblem(f_ode, u0, tspan, x_trial_bis)
 
 ## Try to fix AD for full set of conservation equations
 # Fixed/synthetic forcings as an easy start
-P_test = (t) -> 5e-6 #kg/(m² s)
-T_a_test = (t) -> 275.0 + 5.0 * sin(2.0 * π * t / 86400 - π / 2);
-u_a_test = (t) -> 3.0 # m /s
-p_a_test = (t) -> 101325.0 # Pa
-VPD_a_test = (t) -> 200.0 # Pa
-SW_in_test = (t) -> max(1361.0 * sin(2π * t / 86400 - π / 2), 0);
-R_n_test = (t) -> SW_in_test(t) * 0.3 # W/m²
-LAI_test = (t) -> 3.0
+function P_test(t::T) where {T}
+    return T(5e-6)
+end
+function T_a_test(t::T) where {T}
+    return T(275.0) + T(5.0) * sin(T(2) * π * t / T(86400) - T(π / 2))
+end
+function u_a_test(t::T) where {T}
+    return T(3.0)
+end
+function p_a_test(t::T) where {T}
+    return T(101325.0)
+end
+function VPD_a_test(t::T) where {T}
+    return T(200.0)
+end
+function SW_in_test(t::T) where {T}
+    return max(T(1361.0) * sin(T(2) * π * t / T(86400) - π / T(2)), zero(t))
+end
+function R_n_test(t::T) where {T}
+    return T(SW_in_test(t)) * T(0.3)
+end
+function LAI_test(t::T) where {T}
+    return T(3.0)
+end
 
 param_test = ComponentArray(;
     h=21.0, # [m] height of the canopy
@@ -122,12 +140,12 @@ end
 test_dyn_param_model = TestDynParamModel(0.4)
 function fractional_vegetation_cover!(dyn_ar::TestDynParamModel, LAI)
     # This is a dummy function to test if AD works with dynamic parameters
-    dyn_ar.f_veg = fractional_vegetation_cover(LAI)
+    return dyn_ar.f_veg = fractional_vegetation_cover(LAI)
 end
 fractional_vegetation_cover!(test_dyn_param_model, LAI_test(0.0))
 # In-place form f!(du, u, p, t) should be fastest
 u0_test = [0.2, 0.2, 0.001]
-t_end = 6 * 86400.0 # 1 day in seconds
+t_end = 1 * 86400.0 # 1 day in seconds
 t_span_test = (0.0, t_end) # 1 day in seconds
 # GOAL: get code below optimised!
 function calculate_fluxes_test!(du, u, p, t)
@@ -164,9 +182,16 @@ sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
 sol = solve(
     prob_test, Rosenbrock23(; autodiff=AutoEnzyme(; function_annotation=Enzyme.Duplicated))
 )
-
-# Test if AD works for parameter optimisation purpose (i.e. take derivaties)
+# %% Benchmarking ODE solving code
+@benchmark solve($prob_test, $Rosenbrock23(; autodiff=AutoForwardDiff()))
+@benchmark solve($prob_test, $Heun())
+# See the effect of saving at every time step
 t_obs_test = collect(t_span_test[1]:1:t_span_test[2])
+@benchmark solve($prob_test, $Heun(), save_everystep = false)
+@benchmark solve($prob_test, $Heun(), saveat=$t_obs_test)
+
+
+# %% Test if AD works for parameter optimisation purpose (i.e. take derivaties)
 observed_data = rand(3, length(t_obs_test)) # Simulated observed data for testing
 function loss_function_test(p; sensealg=AutoForwardDiff())
     simul = Array(
@@ -187,7 +212,9 @@ gradient(loss_function_test, AutoForwardDiff(), param_test)
 @benchmark gradient(loss_function_test, AutoFiniteDiff(), param_test)
 
 # Test adjoint equations with Zygote for reverse mode AD
-loss_function_adjoint(p) = loss_function_test(p; sensealg=BacksolveAdjoint(;autojacvec=EnzymeVJP()))
+function loss_function_adjoint(p)
+    return loss_function_test(p; sensealg=BacksolveAdjoint(; autojacvec=EnzymeVJP()))
+end
 @benchmark gradient(loss_function_adjoint, AutoZygote(), param_test)
 # Much slower...
 # BenchmarkTools.Trial: 1 sample with 1 evaluation per sample.
