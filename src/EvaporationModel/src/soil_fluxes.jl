@@ -22,7 +22,7 @@ function diffusion_layer_1(w_1::T, w_1eq::T, C_2::T) where {T}
     return D_1
 end
 
-function vertical_drainage_layer_2(w_2::T, w_fc::T, C_3::T, d_2::T) where {T}
-    K_2 = C_3 / (d_2 * τ) * max(0, w_2 - w_fc)
+function vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
+    K_2 = C_3 / (d_2 * τ) * max(zero(w_2), w_2 - w_fc)
     return K_2
 end
