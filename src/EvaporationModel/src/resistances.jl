@@ -41,18 +41,19 @@ equation (37), with the default value of ``T_{opt}`` set to 298.0 K
 """
 function surface_resistance(
     approach::JarvisStewart,
-    SW_in::T,
-    VPD::T,
-    T_a::T,
-    w_2::T,
-    w_fc::T,
-    w_wilt::T,
-    LAI::T,
-    g_d::T,
-    r_smin::T;
-    T_opt::T=T(298.0),
-    r_smax::T=T(500_000),
-) where {T}
+    SW_in,
+    VPD,
+    T_a,
+    w_2,
+    w_fc,
+    w_wilt,
+    LAI,
+    g_d,
+    r_smin;
+    T_opt=oftype(T_a, 298.0),
+    r_smax=oftype(r_smin, 500_000),
+)
+    T = typeof(r_smax)
     f_1 = clamp(
         (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))), 0, 1
     )
@@ -85,8 +86,9 @@ With `approach = Choudhury1988soil()`, equation (25) of
 [Choudhury and Monteith (1988)](https://doi.org/10.1002/qj.49711448006) is used.
 """
 function soil_aerodynamic_resistance(
-    approach::Choudhury1988soil, ustar::T, h::T, d_c::T, z_0mc::T, z_0ms::T, η::T=T(3)
-) where {T}
+    approach::Choudhury1988soil, ustar, h, d_c, z_0mc, z_0ms, η=oftype(z_0ms, 3)
+)
+    T = typeof(η)
     Kh = T(BigleafConstants().k) * ustar * (h - d_c)
     r_as = (h * exp(η) / (η * Kh)) * (exp(-η * z_0ms / h) - exp(-η * (z_0mc + d_c) / h))
     return r_as
@@ -193,13 +195,11 @@ true
 ```
 
 """
-function soil_evaporation_efficiency(approach::Pielke92, w_1::T, w_fc::T) where {T}
+function soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc)
     return 1 / 4 * (1 - cos(π * w_1 / w_fc))^2
 end
 
-function soil_evaporation_efficiency(
-    approach::Martens17, w_1::T, w_res::T, w_c::T
-) where {T}
+function soil_evaporation_efficiency(approach::Martens17, w_1, w_res, w_c)
     return clamp((w_1 - w_res) / (w_c - w_res), 0, 1)
 end
 
@@ -218,7 +218,7 @@ Equation used derived from equivalency between equation (6) and (7) of
 [Merlin et al. (2016)](https://doi.org/10.1002/2015WR018233)
 
 """
-function beta_to_r_ss(beta::T, r_as::T) where {T}
+function beta_to_r_ss(beta, r_as)
     return r_as / beta - r_as
 end
 
