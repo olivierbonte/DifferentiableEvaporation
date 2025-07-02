@@ -20,6 +20,12 @@ r_sc = 1000.0 # s/m
 r_ss = 100.0 # s/m
 f_wet = 0.1
 f_veg = 0.5
+SW_in = 1000.0 # W/m2
+w_2 = 0.2
+w_fc = 0.3
+w_wp = 0.1
+g_d = 0.003
+r_smin = 200.0 # s/m
 Rn = 400.0 # W/m2
 G = 50.0 # W/m2
 T_a = 300.0 # K
@@ -27,10 +33,13 @@ p_a = 101325.0 # Pa
 VPD_a = 2000.0 # Pa
 LAI = 3.0 # m2/m2
 h = 21.0 # m
+d_c = 2 / 3 * h # m
+z_0mc = 0.1 * h # m
 z_obs = 39.0 # m
 z_0ms = 0.01 # m
 u_star = 3.0 # m/s
 u = 5.0 # m/s
+P_s = 1.5e-5 # kg / (m2 * s)
 
 @testset "Check evaporation sum" begin
     A, A_c, A_s = available_energy_partioning(Rn, G, f_veg)
@@ -67,14 +76,26 @@ end
 
     println("Testing functions from resistances.jl")
     @test isempty(check_allocs(ustar_from_u, (FT, FT, FT, FT)))
+    @test (@ballocations soil_aerodynamic_resistance(
+        Choudhury1988soil(), $u_star, $h, $d_c, $z_0mc, $z_0ms
+    )) == 0
+    @test (@ballocations surface_resistance(
+        JarvisStewart(), $SW_in, $VPD_a, $T_a, $w_2, $w_fc, $w_wp, $LAI, $g_d, $r_smin
+    )) == 0
+
+    println("Testing functions from soil_fluxes.jl")
+    @test (@ballocations surface_runoff(StaticInfiltration(), $P_s, $w_2, $w_fc)) == 0
+    @test (@ballocations surface_runoff(
+        VegetationInfiltration(), $P_s, $w_2, $w_fc, $f_veg
+    )) == 0
+    @test isempty(check_allocs(diffusion_layer_1, (FT, FT, FT)))
+    @test isempty(check_allocs(vertical_drainage_layer_2, (FT, FT, FT, FT)))
 
     println("Testing Bigleaf functions")
     @test (@ballocations Bigleaf.roughness_parameters(
         RoughnessCanopyHeightLAI(), $h, $LAI; hs=$z_0ms
     )) == 0
     rough_dict = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms)
-    d_c = rough_dict.d
-    z_0mc = rough_dict.z0m
     @test (@ballocations Bigleaf.compute_Ram(ResistanceWindZr(), $u_star, $u)) == 0
     @test isempty(check_allocs(Bigleaf.Gb_constant_kB1, (FT, FT)))
 end
