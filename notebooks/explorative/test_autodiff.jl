@@ -253,15 +253,22 @@ prob_test = ODEProblem{true,SciMLBase.FullSpecialize}(
     calculate_fluxes_test!, u0_test, t_span_test, param_test
 )
 # Test if AD works within solver
-sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
+sol = solve(prob_test, Rosenbrock23(; autodiff=AutoFiniteDiff())) #Works
+sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff())) #Broken :(
+# IMPORTANT NOTE: The full model is broken for AD, can be related to AD discontinuities!!
+# CONSEQUENCE: code below does not work anymore, only Finite Differencing still gives gradients
+# Tips on how to fix maybe:
+# https://discourse.julialang.org/t/handling-instability-when-solving-ode-problems/9019/5
 sol = solve(
     prob_test, Rosenbrock23(; autodiff=AutoEnzyme(; function_annotation=Enzyme.Duplicated))
 )
 t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
 
 # %% Benchmarking ODE solving code
-@benchmark solve($prob_test, $Rosenbrock23(; autodiff=AutoForwardDiff()))
-@benchmark solve($prob_test, $Heun())
+@benchmark solve($prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
+@benchmark solve(prob_test, Heun())
+@benchmark solve(prob_test, Tsit5())
+@benchmark solve(prob_test, Rodas5P(; autodiff = AutoFiniteDiff()))
 # See the effect of saving at every time step
 @benchmark solve($prob_test, $Heun(), save_everystep=false) # faster of the 3
 @benchmark solve($prob_test, $Heun(), tstops=$t_obs_test) #slowest of the 3
@@ -273,7 +280,7 @@ function loss_function_test(p; t_obs_test=t_obs_test, sensealg=ForwardDiffSensit
     simul = Array(
         solve(
             prob_test,
-            Rosenbrock23(; autodiff=AutoForwardDiff());#AutoForwardDiff());
+            Tsit5(),
             saveat=t_obs_test,
             sensealg=sensealg,
             p=p,
@@ -292,6 +299,7 @@ loss_function_test(param_test)
 # end
 # @benchmark loss_function_interpol_test(param_test)
 gradient(loss_function_test, AutoForwardDiff(), param_test)
+gradient(loss_function_test, AutoFiniteDiff(), param_test)
 @benchmark gradient($loss_function_test, $AutoForwardDiff(), $param_test)
 @benchmark gradient($loss_function_test, $AutoFiniteDiff(), $param_test)
 # # %% Test direct reverse AD trhough the solver
