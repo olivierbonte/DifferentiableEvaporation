@@ -270,3 +270,44 @@ loss_function_enzyme(param_test, t_obs_test, observed_data)
 #     Constant(observed_data),
 # )
 # Craches as of now
+
+# %% A simpler Enzyme experiment
+# Only works with explicit solvers!
+# https://sciml.ai/news/2024/08/25/rootfinding_enzyme/#direct_ode_support_with_enzyme
+using StaticArrays
+function lorenz!(du, u, p, t)
+    du[1] = 10.0(u[2] - u[1])
+    du[2] = u[1] * (28.0 - u[3]) - u[2]
+    return du[3] = u[1] * u[2] - (8 / 3) * u[3]
+end
+
+const _saveat = SA[0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0]
+
+function f(u0::Array{Float64})
+    tspan = (0.0, 3.0)
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(lorenz!, u0, tspan)
+    sol = DiffEqBase.solve(
+        prob, Tsit5(); saveat=_saveat, sensealg=DiffEqBase.SensitivityADPassThrough()
+    )
+    return sum(sol)
+end;
+u0 = [1.0; 0.0; 0.0]
+d_u0 = zeros(3)
+y = zeros(13)
+dy = zeros(13)
+f(u0)
+
+grad_enzyme = gradient(f, AutoEnzyme(), u0)
+
+# Make a "normal" version for use regular functioanality
+function f_normal(u0)
+    tspan = (0.0, 3.0)
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(lorenz!, u0, tspan)
+    sol = DiffEqBase.solve(prob, Tsit5(); saveat=_saveat, sensealg=ForwardDiffSensitivity())
+    return sum(sol)
+end
+grad_forward = gradient(f_normal, AutoForwardDiff(), u0)
+grad_forward ≈ grad_enzyme #NOT THE SAME! Enzyme wrong I think...
+# Benchmark the difference
+@benchmark gradient(f, AutoEnzyme(), u0) # 282 µs
+@benchmark gradient(f_normal, AutoForwardDiff(), u0) # 8.5 µs
