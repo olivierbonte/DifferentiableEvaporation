@@ -106,8 +106,16 @@ param_test = ComponentArray(;
     b=6.1,
     C_1sat=1.9,
     C_2ref=0.83,
+    C_3 = 0.25,
     d_1=0.01,
+    d_2 = 1.3,
+    w_res=0.04,
+    w_wp=0.08,
+    w_fc=0.3,
     z_obs=39.0, # [m]
+    kB⁻¹=log(10),
+    g_d=0.0003,
+    r_smin=395.0,
 )
 struct ModelParamsTest{T<:AbstractFloat}
     h::T # [m] height of the canopy
@@ -153,10 +161,29 @@ t_span_test = (0.0, t_end) # 1 day in seconds
 function calculate_fluxes_test!(du, u, p, t)
     w_1, w_2, w_r = u
     # This adds 11 allocations, not wanted...
-    @unpack h, LAI, z_0ms, w_sat, a, p_soil, b, C_1sat, C_2ref, d_1, z_obs = p
+    @unpack h,
+    LAI,
+    z_0ms,
+    w_sat,
+    a,
+    p_soil,
+    b,
+    w_res,
+    w_wp,
+    w_fc,
+    C_1sat,
+    C_2ref,
+    C_3,
+    d_1,
+    d_2,
+    z_obs,
+    kB⁻¹,
+    g_d,
+    r_smin = p
     d_c, z_0mc = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms)
     f_veg = fractional_vegetation_cover(LAI)
     f_wet = fraction_wet_vegetation(w_r, LAI)
+
     w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
     C_1 = c_1(w_1, w_sat, b, C_1sat) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
@@ -164,12 +191,56 @@ function calculate_fluxes_test!(du, u, p, t)
     G = ground_heat_flux(Allen07(), R_n_test(t), T_a_test(t))
     A, A_c, A_s = available_energy_partioning(R_n_test(t), G, f_veg)
 
+    # Resistances
     ustar = ustar_from_u(u_a_test(t), z_obs, d_c, z_0mc)
-    # To avoid issues with types in autodiff...
-    T = eltype(u)
-    du[1] = C_1 / (ρ_w * d_1) * P_test(t)
-    du[2] = zero(T)
-    du[3] = zero(T)
+    r_aa = Bigleaf.compute_Ram(ResistanceWindZr(), ustar, u_a_test(t))
+    r_ac = (Bigleaf.Gb_constant_kB1(ustar, kB⁻¹))^-1
+    r_as = soil_aerodynamic_resistance(Choudhury1988soil(), ustar, h, d_c, z_0mc, z_0ms)
+    r_sc = surface_resistance(
+        JarvisStewart(),
+        SW_in_test(t),
+        VPD_a_test(t),
+        T_a_test(t),
+        w_2,
+        w_fc,
+        w_wp,
+        LAI_test(t),
+        g_d,
+        r_smin,
+    )
+    β = soil_evaporation_efficiency(Pielke92(), w_1, w_fc)
+    r_ss = beta_to_r_ss(β, r_as)
+
+    # Turbulent fluxes calculations
+    λE_tot, λE_tot_p = total_evaporation(
+        T_a_test(t),
+        p_a_test(t),
+        VPD_a_test(t),
+        A,
+        A_c,
+        A_s,
+        r_aa,
+        r_ac,
+        r_as,
+        r_sc,
+        r_ss,
+        f_wet,
+    )
+    VPD_m = vpd_veg_source_height(VPD_a_test(t), T_a_test(t), p_a_test(t), A, λE_tot, r_aa)
+    E_t, λE_t = transpiration(T_a_test(t), p_a_test(t), VPD_m, A_c, r_ac, r_sc, f_wet)
+    E_i, λE_i = interception(T_a_test(t), p_a_test(t), VPD_m, A_c, r_ac, f_wet)
+    E_s, λE_s = soil_evaporation(T_a_test(t), p_a_test(t), VPD_m, A_s, r_as, r_ss)
+
+    D_c = canopy_drainage(P_test(t), w_r, f_veg)
+    P_s = precip_below_canopy(P_test(t), f_veg, D_c)
+    Q_s = surface_runoff(StaticInfiltration(), P_test(t), w_2, w_fc)
+    D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
+    K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
+    I_s = P_s - Q_s
+    # ALLOC FREE UP UNITL HERE
+    du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
+    du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
+    du[3] = f_veg * P_test(t) - E_i - D_c
     return nothing
 end
 # Alternative: make a mutating function
