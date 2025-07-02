@@ -178,7 +178,9 @@ du0_test = similar(u0_test)
 @benchmark calculate_fluxes_test!($du0_test, $u0_test, $param_test, $t_span_test[1])
 @code_warntype calculate_fluxes_test!(du0_test, u0_test, param_test, t_span_test[1])
 # Test if AD works with this function
-prob_test = ODEProblem(calculate_fluxes_test!, u0_test, t_span_test, param_test)
+prob_test = ODEProblem{true,SciMLBase.FullSpecialize}(
+    calculate_fluxes_test!, u0_test, t_span_test, param_test
+)
 # Test if AD works within solver
 sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
 sol = solve(
