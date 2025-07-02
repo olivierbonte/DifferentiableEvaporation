@@ -184,11 +184,12 @@ sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
 sol = solve(
     prob_test, Rosenbrock23(; autodiff=AutoEnzyme(; function_annotation=Enzyme.Duplicated))
 )
+t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
+
 # %% Benchmarking ODE solving code
 @benchmark solve($prob_test, $Rosenbrock23(; autodiff=AutoForwardDiff()))
 @benchmark solve($prob_test, $Heun())
 # See the effect of saving at every time step
-t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
 @benchmark solve($prob_test, $Heun(), save_everystep=false) # faster of the 3
 @benchmark solve($prob_test, $Heun(), tstops=$t_obs_test) #slowest of the 3
 @benchmark solve($prob_test, $Heun(), saveat=$t_obs_test) # middle
@@ -220,8 +221,13 @@ loss_function_test(param_test)
 gradient(loss_function_test, AutoForwardDiff(), param_test)
 @benchmark gradient($loss_function_test, $AutoForwardDiff(), $param_test)
 @benchmark gradient($loss_function_test, $AutoFiniteDiff(), $param_test)
+# # %% Test direct reverse AD trhough the solver
+# function loss_function_zygote_AD(p)
+#     return loss_function_test(p; sensealg=ZygoteAdjoint())
+# end
+# gradient(loss_function_zygote_AD, AutoZygote(), param_test)
 
-# Test adjoint equations with Zygote for reverse mode AD
+# %% Test adjoint equations with Zygote for reverse mode AD
 function loss_function_adjoint(p)
     return loss_function_test(p; sensealg=BacksolveAdjoint(; autojacvec=EnzymeVJP()))
 end
@@ -234,11 +240,18 @@ gradient(loss_function_adjoint, AutoZygote(), param_test)
 #  Time  (mean ± σ):   1.434 ms ±  1.125 ms  ┊ GC (mean ± σ):  9.66% ± 10.92%
 # This seems to be related to Zygote!! Becuase when you use AutoForwardDiff
 @benchmark gradient($loss_function_adjoint, $AutoForwardDiff(), $param_test)
+# NOTE: AutoForwardDif IGNOGRES the adjoint and just does forwarddiff I think...?
+# The benchmark is too similar the one with ForwardDiffSensitivity
 # BenchmarkTools.Trial: 10000 samples with 1 evaluation per sample.
-#  Range (min … max):  35.590 μs …  22.459 ms  ┊ GC (min … max):  0.00% … 98.28%
-#  Time  (median):     48.117 μs               ┊ GC (median):     0.00%
-#  Time  (mean ± σ):   58.433 μs ± 382.118 μs  ┊ GC (mean ± σ):  11.10% ±  1.70%
-gradient(loss_function_adjoint, AutoReverseDiff(), param_test)
+#  Range (min … max):  24.000 μs …  2.533 ms  ┊ GC (min … max): 0.00% … 95.47%
+#  Time  (median):     26.100 μs              ┊ GC (median):    0.00%
+#  Time  (mean ± σ):   29.928 μs ± 60.409 μs  ┊ GC (mean ± σ):  5.39% ±  2.71%
+# With Debug below, I tested that Indeed it does not use the adjoint! It overloads the
+# Dual numbers on just solves, no adjoint is called!
+# @enter gradient(loss_function_adjoint, AutoForwardDiff(), param_test)
+# Very different from using AutoZygote, which does call the adjoint (debugger crashes)
+# @enter gradient(loss_function_adjoint, AutoZygote(), param_test)
+
 @benchmark gradient($loss_function_adjoint, $AutoReverseDiff(), $param_test)
 # ReverseDiff also quite slow...
 # BenchmarkTools.Trial: 3673 samples with 1 evaluation per sample.
@@ -248,6 +261,29 @@ gradient(loss_function_adjoint, AutoReverseDiff(), param_test)
 # @benchmark gradient($loss_function_adjoint, $AutoMooncake(), $param_test)
 # Fails as of now, not trivial to get reverse mode AD working fast...
 
+# %% Easier loss function + solver
+function loss_easy_choice(p, sensealg)
+    return sum(solve(prob_test, Heun(); p=p, sensealg=sensealg))
+end
+loss_easy_forwardiff(p) = loss_easy_choice(p, ForwardDiffSensitivity())
+loss_easy_gauss_adjoint(p) = loss_easy_choice(p, GaussAdjoint())
+loss_easy_backsolve_adjoint(p) = loss_easy_choice(p, BacksolveAdjoint())
+@benchmark gradient($loss_easy_forwardiff, $AutoForwardDiff(), $param_test)
+# BenchmarkTools.Trial: 10000 samples with 1 evaluation per sample.
+#  Range (min … max):  19.300 μs …   8.577 ms  ┊ GC (min … max): 0.00% … 98.72%
+#  Time  (median):     21.000 μs               ┊ GC (median):    0.00%
+#  Time  (mean ± σ):   26.399 μs ± 143.777 μs  ┊ GC (mean ± σ):  9.33% ±  1.71%
+@benchmark gradient($loss_easy_gauss_adjoint, $AutoZygote(), $param_test)
+# BenchmarkTools.Trial: 5310 samples with 1 evaluation per sample.
+#  Range (min … max):  804.304 μs …  12.673 ms  ┊ GC (min … max): 0.00% … 87.86%
+#  Time  (median):     874.905 μs               ┊ GC (median):    0.00%
+#  Time  (mean ± σ):   937.636 μs ± 697.328 μs  ┊ GC (mean ± σ):  4.79% ±  5.94%
+@benchmark gradient($loss_easy_backsolve_adjoint, $AutoZygote(), $param_test)
+# BenchmarkTools.Trial: 5246 samples with 1 evaluation per sample.
+#  Range (min … max):  803.305 μs …  12.753 ms  ┊ GC (min … max): 0.00% … 86.09%
+#  Time  (median):     875.256 μs               ┊ GC (median):    0.00%
+#  Time  (mean ± σ):   949.442 μs ± 738.863 μs  ┊ GC (mean ± σ):  5.41% ±  6.42%
+Enzyme.gradient(Reverse, loss_easy_gauss_adjoint, param_test)
 # %% Experimenting with Enzyme
 function loss_function_enzyme(p, t_obs_test, observed_data, sensealg=BacksolveAdjoint())
     simul = Array(
