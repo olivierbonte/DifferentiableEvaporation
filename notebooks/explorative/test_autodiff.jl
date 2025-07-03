@@ -342,6 +342,15 @@ gradient(loss_function_adjoint, AutoZygote(), param_test)
 # @benchmark gradient($loss_function_adjoint, $AutoMooncake(), $param_test)
 # Fails as of now, not trivial to get reverse mode AD working fast...
 
+# Add finite diff based sensitivity equations with reverse mode AD as working option
+loss_function_sensitivity_equations(p) = loss_function_test(
+    p; sensealg=ForwardSensitivity(; autodiff=false)
+)
+gradient(loss_function_sensitivity_equations, AutoZygote(), param_test)
+@benchmark gradient(
+    $loss_function_sensitivity_equations, $AutoZygote(), $param_test
+)
+
 # %% Easier loss function + solver
 function loss_easy_choice(p, sensealg)
     return sum(solve(prob_test, Heun(); p=p, sensealg=sensealg))
@@ -364,7 +373,8 @@ loss_easy_backsolve_adjoint(p) = loss_easy_choice(p, BacksolveAdjoint())
 #  Range (min … max):  803.305 μs …  12.753 ms  ┊ GC (min … max): 0.00% … 86.09%
 #  Time  (median):     875.256 μs               ┊ GC (median):    0.00%
 #  Time  (mean ± σ):   949.442 μs ± 738.863 μs  ┊ GC (mean ± σ):  5.41% ±  6.42%
-Enzyme.gradient(Reverse, loss_easy_gauss_adjoint, param_test)
+# Enzyme.gradient(Reverse, loss_easy_gauss_adjoint, param_test)
+
 # %% Experimenting with Enzyme
 function loss_function_enzyme(p, t_obs_test, observed_data, sensealg=BacksolveAdjoint())
     simul = Array(
