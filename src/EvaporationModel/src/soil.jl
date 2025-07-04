@@ -31,8 +31,8 @@ See equation 21 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `c_2ref`: See [`c_2ref`](@ref c_2ref)
 
 """
-function c_2(w_2::T1, w_sat::T2, c_2ref::T2) where {T1, T2}
-    return c_2ref * (w_2 / (w_sat - w_2 + T1(0.01)))
+function c_2(w_2, w_sat, c_2ref)
+    return c_2ref * (w_2 / (w_sat - w_2 + oftype(c2_ref, 0.01)))
 end
 
 """
