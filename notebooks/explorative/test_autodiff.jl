@@ -117,42 +117,6 @@ param_test = ComponentArray(;
     g_d=0.0003,
     r_smin=395.0,
 )
-struct ModelParamsTest{T<:AbstractFloat}
-    h::T # [m] height of the canopy
-    LAI::T # [-] leaf area index
-    z_0ms::T # [m] roughness length for soil
-    w_sat::T # [-] saturation water content
-    a::T
-    p_soil::T
-    b::T
-    C_1sat::T
-    C_2ref::T
-    d_1::T
-    z_obs::T # [m]
-end
-model_params_test = ModelParamsTest(
-    param_test.h,
-    param_test.LAI,
-    param_test.z_0ms,
-    param_test.w_sat,
-    param_test.a,
-    param_test.p_soil,
-    param_test.b,
-    param_test.C_1sat,
-    param_test.C_2ref,
-    param_test.d_1,
-    param_test.z_obs,
-)
-# Test to reduce allocations
-mutable struct TestDynParamModel
-    f_veg
-end
-test_dyn_param_model = TestDynParamModel(0.4)
-function fractional_vegetation_cover!(dyn_ar::TestDynParamModel, LAI)
-    # This is a dummy function to test if AD works with dynamic parameters
-    return dyn_ar.f_veg = fractional_vegetation_cover(LAI)
-end
-fractional_vegetation_cover!(test_dyn_param_model, LAI_test(0.0))
 # In-place form f!(du, u, p, t) should be fastest
 u0_test = [0.2, 0.2, 0.001]
 t_end = 1 * 86400.0 # 1 day in seconds
