@@ -13,8 +13,7 @@ end
 
 function fraction_wet_vegetation(w_r, LAI, c=oftype(LAI, 0.2))
     w_rmax = c * LAI
-    w_r = max(w_r, zero(0))
-    return min(one(1), (w_r / w_rmax)^(2 / 3))
+    return min(one(w_r), (w_r / w_rmax)^(2 / 3))
 end
 
 function canopy_drainage(P, w_r, f_veg, c=oftype(f_veg, 0.2))
