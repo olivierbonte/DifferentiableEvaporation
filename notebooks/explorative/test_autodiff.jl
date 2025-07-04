@@ -98,7 +98,6 @@ end
 
 param_test = ComponentArray(;
     h=21.0, # [m] height of the canopy
-    LAI=4.0, # [-] leaf area index
     z_0ms=0.01, # [m] roughness length for soil
     w_sat=0.5, # [-]  saturation water content
     a=0.15,
@@ -126,7 +125,6 @@ function calculate_fluxes_test!(du, u, p, t)
     w_1, w_2, w_r = u
     # This adds 11 allocations, not wanted...
     @unpack h,
-    LAI,
     z_0ms,
     w_sat,
     a,
@@ -144,9 +142,9 @@ function calculate_fluxes_test!(du, u, p, t)
     kB⁻¹,
     g_d,
     r_smin = p
-    d_c, z_0mc = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms)
-    f_veg = fractional_vegetation_cover(LAI)
-    f_wet = fraction_wet_vegetation(w_r, LAI)
+    d_c, z_0mc = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI_test(t); hs=z_0ms)
+    f_veg = fractional_vegetation_cover(LAI_test(t))
+    f_wet = fraction_wet_vegetation(w_r, LAI_test(t))
 
     w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
     C_1 = c_1(w_1, w_sat, b, C_1sat) # no allocs
@@ -218,7 +216,7 @@ prob_test = ODEProblem{true,SciMLBase.FullSpecialize}(
 )
 # Test if AD works within solver
 sol = solve(prob_test, Rosenbrock23(; autodiff=AutoFiniteDiff())) #Works
-sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff())) #Broken :(
+@enter sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff())) #Broken :(
 # IMPORTANT NOTE: The full model is broken for AD, can be related to AD discontinuities!!
 # CONSEQUENCE: code below does not work anymore, only Finite Differencing still gives gradients
 # Tips on how to fix maybe:
