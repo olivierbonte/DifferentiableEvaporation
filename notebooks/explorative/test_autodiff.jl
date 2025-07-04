@@ -188,7 +188,7 @@ function calculate_fluxes_test!(du, u, p, t)
     C_1 = c_1(w_1, w_sat, b, C_1sat) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
-    G = ground_heat_flux(Allen07(), R_n_test(t), T_a_test(t))
+    G = ground_heat_flux(Allen07(), R_n_test(t), LAI_test(t))
     A, A_c, A_s = available_energy_partioning(R_n_test(t), G, f_veg)
 
     # Resistances

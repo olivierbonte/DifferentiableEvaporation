@@ -305,7 +305,7 @@ function calculate_fluxes(u, p, t)
     C_2 = c_2(w_2, w_sat, C_2ref)
 
     # Energy partitioning
-    G = ground_heat_flux(Allen07(), R_n(t), T_a(t))
+    G = ground_heat_flux(Allen07(), R_n(t), LAI(t))
     A, A_c, A_s = available_energy_partioning(R_n(t), G, f_veg)
 
     # Resistances
