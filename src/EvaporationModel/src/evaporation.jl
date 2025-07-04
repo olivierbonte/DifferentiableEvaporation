@@ -37,7 +37,8 @@ round(λE; digits = 2) ≈ 380.68
 true
 ```
 """
-function penman_monteith(Temp::T, p::T, VPD::T, A::T, r_a::T, r_s::T; kwargs...) where {T}
+function penman_monteith(Temp, p, VPD, A, r_a, r_s; kwargs...)
+    T = typeof(r_s)
     con = Bigleaf.BigleafConstants()
     ET, λE = Bigleaf.potential_ET(
         PenmanMonteith(),
@@ -88,19 +89,9 @@ equations (16) and (33)
 
 """
 function total_evaporation(
-    T_a::T,
-    p_a::T,
-    VPD_a::T,
-    A::T,
-    A_c::T,
-    A_s::T,
-    r_aa::T,
-    r_ac::T,
-    r_as::T,
-    r_sc::T,
-    r_ss::T,
-    f_wet::T,
-) where {T}
+    T_a, p_a, VPD_a, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet
+)
+    T = typeof(f_wet)
     con = Bigleaf.BigleafConstants()
     Δ = Bigleaf.Esat_from_Tair_deriv(T_a - T(con.Kelvin)) * T(con.kPa2Pa) #
     γ =
@@ -120,23 +111,20 @@ function total_evaporation(
         Δ / (γ * r_aa) * (P_c * A_c * r_ac + P_i * A_c * r_ac + P_s * A_s * r_as)
     return λE, λE_p
 end
-function transpiration(
-    T_a::T, p_a::T, VPD_m::T, A_c::T, r_ac::T, r_sc::T, f_wet::T
-) where {T}
+
+function transpiration(T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet)
     ET_pmc, λE_pmc = penman_monteith(T_a, p_a, VPD_m, A_c, r_ac, r_sc)
     ET_t, λE_t = (1 - f_wet) .* (ET_pmc, λE_pmc)
     return ET_t, λE_t
 end
 
-function interception(
-    T_a::T, p_a::T, VPD_m::T, A_c::T, r_ac::T, f_wet::T; r_sc::T=T(0)
-) where {T}
+function interception(T_a, p_a, VPD_m, A_c, r_ac, f_wet; r_sc=oftype(f_wet, 0))
     ET_pc, λE_pc = penman_monteith(T_a, p_a, VPD_m, A_c, r_ac, r_sc)
     ET_i, λE_i = f_wet .* (ET_pc, λE_pc)
     return ET_i, λE_i
 end
 
-function soil_evaporation(T_a::T, p_a::T, VPD_m::T, A_s::T, r_as::T, r_ss::T) where {T}
+function soil_evaporation(T_a, p_a, VPD_m, A_s, r_as, r_ss)
     ET_s, λE_s = penman_monteith(T_a, p_a, VPD_m, A_s, r_as, r_ss)
     return ET_s, λE_s
 end
