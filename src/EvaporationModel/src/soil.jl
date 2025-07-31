@@ -32,7 +32,7 @@ See equation 21 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 
 """
 function c_2(w_2, w_sat, c_2ref)
-    return c_2ref * (w_2 / (w_sat - w_2 + oftype(c2_ref, 0.01)))
+    return c_2ref * (w_2 / (w_sat - w_2 + oftype(c_2ref, 0.01)))
 end
 
 """
