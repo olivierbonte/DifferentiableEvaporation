@@ -18,7 +18,7 @@ var_list_vcf = [
     "Percent_NonTree_Vegetation",
     "Percent_NonVegetated",
 ]
-collection_vcf = "MODIS/006/MOD44B"
+collection_vcf = "MODIS/061/MOD44B"
 
 
 # %% Extract data for 1250m x 1250m grid
