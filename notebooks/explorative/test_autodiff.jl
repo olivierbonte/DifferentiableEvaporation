@@ -105,9 +105,9 @@ param_test = ComponentArray(;
     b=6.1,
     C_1sat=1.9,
     C_2ref=0.83,
-    C_3 = 0.25,
+    C_3=0.25,
     d_1=0.01,
-    d_2 = 1.3,
+    d_2=1.3,
     w_res=0.04,
     w_wp=0.08,
     w_fc=0.3,
@@ -142,9 +142,12 @@ function calculate_fluxes_test!(du, u, p, t)
     kB⁻¹,
     g_d,
     r_smin = p
-    d_c, z_0mc = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI_test(t); hs=z_0ms)
+    d_c, z_0mc = Bigleaf.roughness_parameters(
+        RoughnessCanopyHeightLAI(), h, LAI_test(t); hs=z_0ms
+    )
     f_veg = fractional_vegetation_cover(LAI_test(t))
-    f_wet = fraction_wet_vegetation(w_r, LAI_test(t))
+    w_rmax = max_canopy_capacity(LAI_test(t))
+    f_wet = fraction_wet_vegetation(w_r, w_rmax)
 
     w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
     C_1 = c_1(w_1, w_sat, b, C_1sat) # no allocs
@@ -199,10 +202,14 @@ function calculate_fluxes_test!(du, u, p, t)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
     I_s = P_s - Q_s
+    # Define smoothing parameter for canopy water content
+    m_can = w_rmax / 100
     # ALLOC FREE UP UNITL HERE
     du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
     du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
-    du[3] = f_veg * P_test(t) - E_i - D_c
+    du[3] =
+        f_veg * P_test(t) * smoothing_kernel(UpperBound(), w_r, w_rmax, m_can) -
+        E_i * smoothing_kernel(LowerBound(), w_r, zero(w_r), m_can) - D_c
     return nothing
 end
 # Alternative: make a mutating function
@@ -230,7 +237,7 @@ t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
 @benchmark solve($prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
 @benchmark solve(prob_test, Heun())
 @benchmark solve(prob_test, Tsit5())
-@benchmark solve(prob_test, Rodas5P(; autodiff = AutoFiniteDiff()))
+@benchmark solve(prob_test, Rodas5P(; autodiff=AutoFiniteDiff()))
 # See the effect of saving at every time step
 @benchmark solve($prob_test, $Heun(), save_everystep=false) # faster of the 3
 @benchmark solve($prob_test, $Heun(), tstops=$t_obs_test) #slowest of the 3
@@ -239,15 +246,7 @@ t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
 # %% Test if AD works for parameter optimisation purpose (i.e. take derivaties)
 observed_data = rand(3, length(t_obs_test)) # Simulated observed data for testing
 function loss_function_test(p; t_obs_test=t_obs_test, sensealg=ForwardDiffSensitivity())
-    simul = Array(
-        solve(
-            prob_test,
-            Tsit5(),
-            saveat=t_obs_test,
-            sensealg=sensealg,
-            p=p,
-        ),
-    )
+    simul = Array(solve(prob_test, Tsit5(); saveat=t_obs_test, sensealg=sensealg, p=p))
     return mean(abs2, simul .- observed_data)
 end
 loss_function_test(param_test)
@@ -305,13 +304,11 @@ gradient(loss_function_adjoint, AutoZygote(), param_test)
 # Fails as of now, not trivial to get reverse mode AD working fast...
 
 # Add finite diff based sensitivity equations with reverse mode AD as working option
-loss_function_sensitivity_equations(p) = loss_function_test(
-    p; sensealg=ForwardSensitivity(; autodiff=false)
-)
+function loss_function_sensitivity_equations(p)
+    return loss_function_test(p; sensealg=ForwardSensitivity(; autodiff=false))
+end
 gradient(loss_function_sensitivity_equations, AutoZygote(), param_test)
-@benchmark gradient(
-    $loss_function_sensitivity_equations, $AutoZygote(), $param_test
-)
+@benchmark gradient($loss_function_sensitivity_equations, $AutoZygote(), $param_test)
 
 # %% Easier loss function + solver
 function loss_easy_choice(p, sensealg)

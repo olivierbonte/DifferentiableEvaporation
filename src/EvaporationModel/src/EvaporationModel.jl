@@ -9,6 +9,7 @@ using Parameters
 include("canopy.jl")
 export fractional_vegetation_cover,
     available_energy_partioning,
+    max_canopy_capacity,
     fraction_wet_vegetation,
     canopy_drainage,
     precip_below_canopy,

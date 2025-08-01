@@ -11,10 +11,13 @@ function available_energy_partioning(R_n, G, f_veg)
     return A, A_c, A_s
 end
 
-function fraction_wet_vegetation(w_r, LAI, c=oftype(LAI, 0.2))
-    w_rmax = c * LAI
-    w_r = max(w_r, zero(w_r))
-    return min(one(w_r), (w_r / w_rmax)^(2 / 3))
+function max_canopy_capacity(LAI, c=oftype(LAI, 0.2))
+    return c * LAI
+end
+
+function fraction_wet_vegetation(w_r, w_rmax)
+    w_r = smooth_max(w_r, zero(w_r), w_rmax / 1000)
+    return (w_r / w_rmax)^oftype(w_r, 2 / 3)
 end
 
 function canopy_drainage(P, w_r, f_veg, c=oftype(f_veg, 0.2))
