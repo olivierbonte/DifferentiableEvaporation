@@ -1,6 +1,7 @@
 # %% Imports
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
+using Revise
 using Bigleaf, EvaporationModel
 using ComponentArrays
 using OrdinaryDiffEq
@@ -12,7 +13,6 @@ using Mooncake: Mooncake
 using Zygote: Zygote
 using SciMLSensitivity
 using BenchmarkTools
-using Revise
 # Note that DifferentiatioIterface exports ADTypes
 
 # %% Test potential_et from Bigleaf with ForwardDiff
