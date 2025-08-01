@@ -86,6 +86,15 @@ export surface_runoff,
 
 include("utils.jl")
 export compute_amplitude_and_phase,
-    fourier_series, fit_fourier_coefficients, local_to_solar_time, seconds_since_solar_noon
+    fourier_series,
+    fit_fourier_coefficients,
+    local_to_solar_time,
+    seconds_since_solar_noon,
+    smooth_min,
+    smooth_max,
+    smoothing_kernel,
+    KernelMethod,
+    LowerBound,
+    UpperBound
 
 end # module EvaporationModel
