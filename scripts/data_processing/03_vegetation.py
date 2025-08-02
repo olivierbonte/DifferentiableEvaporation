@@ -21,7 +21,7 @@ for site in conf_module.sites:
     ).to_dataframe()
     total_veg_cover["year"] = total_veg_cover.index.year
 
-    df_fpar = ds_met["FPAR"].isel(x=0, y=0).to_dataframe()
+    df_fpar = ds_ec["FPAR"].isel(x=0, y=0).to_dataframe()
     # df_fpar_climatology = df_fpar.groupby(df_fpar.index.dayofyear).mean()
     df_fpar["FPAR_mean"] = df_fpar.groupby(df_fpar.index.year).transform(
         lambda x: x.mean()
@@ -35,7 +35,7 @@ for site in conf_module.sites:
     df_join = df_fpar[["FPAR", "FPAR_mean", "year"]].merge(
         total_veg_cover[["year", "MODIS_VCF"]], how="left", on="year"
     )
-    df_join = df_join.set_index(ds_met.isel(x=0, y=0).to_dataframe().index)
+    df_join = df_join.set_index(ds_ec.isel(x=0, y=0).to_dataframe().index)
     df_join["f_veg"] = df_join["MODIS_VCF"] * df_join["FPAR"] / df_join["FPAR_mean"]
     # Correction 1: limit to max 1
     # Analogous to Trautman et al. (2022): https://doi.org/10.5194/hess-26-1089-2022
@@ -46,7 +46,7 @@ for site in conf_module.sites:
     ## k_ext from PML, see https://github.com/gee-hydro/gee_PML/blob/stable/src/pkg_PMLV2_v0.1.5.js#L422C32-L422C134
     k_ext = 0.7
     df_join["f_veg_vdb"] = (
-        1 - np.exp(-k_ext * ds_met["LAI"].isel(x=0, y=0).to_dataframe()["LAI"].values)
+        1 - np.exp(-k_ext * ds_ec["LAI"].isel(x=0, y=0).to_dataframe()["LAI"].values)
     ) * 100
 
     ## To xarray and add metadata
