@@ -1,6 +1,7 @@
 # %% Imports
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
+using Revise
 using Bigleaf, EvaporationModel
 using ComponentArrays
 using OrdinaryDiffEq
@@ -12,7 +13,6 @@ using Mooncake: Mooncake
 using Zygote: Zygote
 using SciMLSensitivity
 using BenchmarkTools
-using Revise
 # Note that DifferentiatioIterface exports ADTypes
 
 # %% Test potential_et from Bigleaf with ForwardDiff
@@ -217,6 +217,19 @@ end
 du0_test = similar(u0_test)
 @benchmark calculate_fluxes_test!($du0_test, $u0_test, $param_test, $t_span_test[1])
 @code_warntype calculate_fluxes_test!(du0_test, u0_test, param_test, t_span_test[1])
+
+# Test AD on the RHS of the ODE
+function rhs_diff_test(u)
+    du = similar(u)
+    calculate_fluxes_test!(du, u, param_test, t_span_test[1])
+    return du
+end
+rhs_diff_test(u0_test)
+jac_adf = jacobian(rhs_diff_test, AutoForwardDiff(), u0_test)
+jac_fd = jacobian(rhs_diff_test, AutoFiniteDiff(), u0_test)
+jac_enz = jacobian(rhs_diff_test, AutoEnzyme(), u0_test)
+isapprox.(jac_adf, jac_fd; rtol=1e-6, atol=1e-6) # Check if the jacobians are approximately equal
+
 # Test if AD works with this function
 prob_test = ODEProblem{true,SciMLBase.FullSpecialize}(
     calculate_fluxes_test!, u0_test, t_span_test, param_test
