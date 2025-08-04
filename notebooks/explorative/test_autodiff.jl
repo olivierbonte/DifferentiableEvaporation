@@ -75,7 +75,7 @@ function P_test(t::T) where {T}
     return T(5e-6)
 end
 function T_a_test(t::T) where {T}
-    return T(275.0) + T(5.0) * sin(T(2) * π * t / T(86400) - T(π / 2))
+    return T(275.0) #+ T(5.0) * sin(T(2) * π * t / T(86400) - T(π / 2))
 end
 function u_a_test(t::T) where {T}
     return T(3.0)
@@ -87,7 +87,7 @@ function VPD_a_test(t::T) where {T}
     return T(200.0)
 end
 function SW_in_test(t::T) where {T}
-    return max(T(1361.0) * sin(T(2) * π * t / T(86400) - π / T(2)), zero(t))
+    return T(1000) #max(T(1361.0) * sin(T(2) * π * t / T(86400) - π / T(2)), zero(t))
 end
 function R_n_test(t::T) where {T}
     return T(SW_in_test(t)) * T(0.3)
