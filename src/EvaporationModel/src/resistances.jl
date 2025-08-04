@@ -54,13 +54,18 @@ function surface_resistance(
     r_smax=of_value_type(r_smin, 500_000),
 )
     T = value_type(r_smax)
-    f_1 = clamp(
-        (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))), 0, 1
+    m_smooth = 1 / 200 # smoothing factor for 0 to 1 clamping
+    f_1 = smooth_clamp(
+        (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))),
+        0,
+        1,
+        m_smooth,
     )
-    f_2 = clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1)
-    f_3 = clamp(exp(-g_d * VPD), 0, 1)
-    f_4 = clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1)
-    r_s = min(r_smin / LAI * (f_1 * f_2 * f_3 * f_4)^(-1), r_smax)
+    f_2 = smooth_clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1, m_smooth)
+    f_3 = smooth_clamp(exp(-g_d * VPD), 0, 1, m_smooth)
+    f_4 = smooth_clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1, m_smooth)
+    m_smooth_rs = r_smax
+    r_s = smooth_min(r_smin / LAI * (f_1 * f_2 * f_3 * f_4)^(-1), r_smax, m_smooth_rs)
     return r_s
 end
 """
