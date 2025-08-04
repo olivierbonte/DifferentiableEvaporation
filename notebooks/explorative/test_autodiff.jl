@@ -13,6 +13,8 @@ using Mooncake: Mooncake
 using Zygote: Zygote
 using SciMLSensitivity
 using BenchmarkTools
+using Preferences
+set_preferences!(ForwardDiff, "nansafe_mode" => true)
 # Note that DifferentiatioIterface exports ADTypes
 
 # %% Test potential_et from Bigleaf with ForwardDiff
@@ -236,11 +238,7 @@ prob_test = ODEProblem{true,SciMLBase.FullSpecialize}(
 )
 # Test if AD works within solver
 sol = solve(prob_test, Rosenbrock23(; autodiff=AutoFiniteDiff())) #Works
-@enter sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff())) #Broken :(
-# IMPORTANT NOTE: The full model is broken for AD, can be related to AD discontinuities!!
-# CONSEQUENCE: code below does not work anymore, only Finite Differencing still gives gradients
-# Tips on how to fix maybe:
-# https://discourse.julialang.org/t/handling-instability-when-solving-ode-problems/9019/5
+sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
 sol = solve(
     prob_test, Rosenbrock23(; autodiff=AutoEnzyme(; function_annotation=Enzyme.Duplicated))
 )
@@ -250,7 +248,7 @@ t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
 @benchmark solve($prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
 @benchmark solve(prob_test, Heun())
 @benchmark solve(prob_test, Tsit5())
-@benchmark solve(prob_test, Rodas5P(; autodiff=AutoFiniteDiff()))
+@benchmark solve(prob_test, Rodas5P(; autodiff=AutoForwardDiff()))
 # See the effect of saving at every time step
 @benchmark solve($prob_test, $Heun(), save_everystep=false) # faster of the 3
 @benchmark solve($prob_test, $Heun(), tstops=$t_obs_test) #slowest of the 3
