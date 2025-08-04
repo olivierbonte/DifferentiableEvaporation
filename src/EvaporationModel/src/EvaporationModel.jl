@@ -3,6 +3,7 @@ module EvaporationModel
 using Bigleaf
 using ComponentArrays
 using Dates
+using ForwardDiff
 using LinearSolve
 using Parameters
 
@@ -94,6 +95,8 @@ export compute_amplitude_and_phase,
     smooth_min,
     smooth_max,
     smoothing_kernel,
+    value_type,
+    of_value_type,
     KernelMethod,
     LowerBound,
     UpperBound

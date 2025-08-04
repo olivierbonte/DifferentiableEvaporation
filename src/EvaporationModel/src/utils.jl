@@ -139,10 +139,26 @@ function smooth_max(a::FT, b, m) where {FT}
     return convert(FT, 1 / 2) * (a + b + √((a - b)^2 + m))
 end
 
+function smooth_clamp(x::FT, lower, upper, m) where {FT}
+    return smooth_min(smooth_max(x, lower, m), upper, m)
+end
+
 function smoothing_kernel(approach::LowerBound, x, treshold, m)
     return 1 - exp(-(x - treshold) / m)
 end
 
 function smoothing_kernel(approach::UpperBound, x, treshold, m)
     return 1 - exp((x - treshold) / m)
+end
+
+@inline function value_type(x::T) where {T}
+    if T <: ForwardDiff.Dual
+        return typeof(ForwardDiff.value(x))
+    else
+        return T
+    end
+end
+
+@inline function of_value_type(x, y)
+    return convert(value_type(x), y)
 end
