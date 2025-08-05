@@ -3,12 +3,14 @@ module EvaporationModel
 using Bigleaf
 using ComponentArrays
 using Dates
+using ForwardDiff
 using LinearSolve
 using Parameters
 
 include("canopy.jl")
 export fractional_vegetation_cover,
     available_energy_partioning,
+    max_canopy_capacity,
     fraction_wet_vegetation,
     canopy_drainage,
     precip_below_canopy,
@@ -86,6 +88,17 @@ export surface_runoff,
 
 include("utils.jl")
 export compute_amplitude_and_phase,
-    fourier_series, fit_fourier_coefficients, local_to_solar_time, seconds_since_solar_noon
+    fourier_series,
+    fit_fourier_coefficients,
+    local_to_solar_time,
+    seconds_since_solar_noon,
+    smooth_min,
+    smooth_max,
+    smoothing_kernel,
+    value_type,
+    of_value_type,
+    KernelMethod,
+    LowerBound,
+    UpperBound
 
 end # module EvaporationModel

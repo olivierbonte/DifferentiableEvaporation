@@ -38,7 +38,7 @@ true
 ```
 """
 function penman_monteith(Temp, p, VPD, A, r_a, r_s; kwargs...)
-    T = typeof(r_s)
+    T = value_type(r_s)
     con = Bigleaf.BigleafConstants()
     ET, λE = Bigleaf.potential_ET(
         PenmanMonteith(),
@@ -91,7 +91,7 @@ equations (16) and (33)
 function total_evaporation(
     T_a, p_a, VPD_a, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet
 )
-    T = typeof(f_wet)
+    T = value_type(f_wet)
     con = Bigleaf.BigleafConstants()
     Δ = Bigleaf.Esat_from_Tair_deriv(T_a - T(con.Kelvin)) * T(con.kPa2Pa) #
     γ =
@@ -118,7 +118,7 @@ function transpiration(T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet)
     return ET_t, λE_t
 end
 
-function interception(T_a, p_a, VPD_m, A_c, r_ac, f_wet; r_sc=oftype(f_wet, 0))
+function interception(T_a, p_a, VPD_m, A_c, r_ac, f_wet; r_sc=of_value_type(f_wet, 0))
     ET_pc, λE_pc = penman_monteith(T_a, p_a, VPD_m, A_c, r_ac, r_sc)
     ET_i, λE_i = f_wet .* (ET_pc, λE_pc)
     return ET_i, λE_i

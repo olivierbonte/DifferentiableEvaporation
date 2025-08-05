@@ -50,17 +50,22 @@ function surface_resistance(
     LAI,
     g_d,
     r_smin;
-    T_opt=oftype(T_a, 298.0),
-    r_smax=oftype(r_smin, 500_000),
+    T_opt=of_value_type(T_a, 298.0),
+    r_smax=of_value_type(r_smin, 500_000),
 )
-    T = typeof(r_smax)
-    f_1 = clamp(
-        (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))), 0, 1
+    T = value_type(r_smax)
+    m_smooth = 1 / 200 # smoothing factor for 0 to 1 clamping
+    f_1 = smooth_clamp(
+        (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))),
+        0,
+        1,
+        m_smooth,
     )
-    f_2 = clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1)
-    f_3 = clamp(exp(-g_d * VPD), 0, 1)
-    f_4 = clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1)
-    r_s = min(r_smin / LAI * (f_1 * f_2 * f_3 * f_4)^(-1), r_smax)
+    f_2 = smooth_clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1, m_smooth)
+    f_3 = smooth_clamp(exp(-g_d * VPD), 0, 1, m_smooth)
+    f_4 = smooth_clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1, m_smooth)
+    m_smooth_rs = r_smax
+    r_s = smooth_min(r_smin / LAI * (f_1 * f_2 * f_3 * f_4)^(-1), r_smax, m_smooth_rs)
     return r_s
 end
 """
@@ -86,9 +91,9 @@ With `approach = Choudhury1988soil()`, equation (25) of
 [Choudhury and Monteith (1988)](https://doi.org/10.1002/qj.49711448006) is used.
 """
 function soil_aerodynamic_resistance(
-    approach::Choudhury1988soil, ustar, h, d_c, z_0mc, z_0ms, η=oftype(z_0ms, 3)
+    approach::Choudhury1988soil, ustar, h, d_c, z_0mc, z_0ms, η=of_value_type(z_0ms, 3)
 )
-    T = typeof(η)
+    T = value_type(η)
     Kh = T(BigleafConstants().k) * ustar * (h - d_c)
     r_as = (h * exp(η) / (η * Kh)) * (exp(-η * z_0ms / h) - exp(-η * (z_0mc + d_c) / h))
     return r_as
@@ -146,8 +151,8 @@ The friction velocity is calculated using the logarithmic wind profile equation,
 For more info on how to calculate ``\psi_m``, see the
 [Bigleaf package documentation](https://earthyscience.github.io/Bigleaf.jl/dev/stability_correction/#Bigleaf.stability_parameter)
 """
-function ustar_from_u(u, z_obs, d, z_0m, ψ_m=oftype(z_0m, 0))
-    T = typeof(z_0m)
+function ustar_from_u(u, z_obs, d, z_0m, ψ_m=of_value_type(z_0m, 0))
+    T = value_type(z_0m)
     return T(BigleafConstants().k) * (u + ψ_m) / log((z_obs - d) / z_0m)
 end
 

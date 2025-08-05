@@ -1,6 +1,7 @@
 # %% Imports
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
+
 using Revise
 using Bigleaf, EvaporationModel
 using ComponentArrays
@@ -13,6 +14,8 @@ using Mooncake: Mooncake
 using Zygote: Zygote
 using SciMLSensitivity
 using BenchmarkTools
+using Preferences
+set_preferences!(ForwardDiff, "nansafe_mode" => true)
 # Note that DifferentiatioIterface exports ADTypes
 
 # %% Test potential_et from Bigleaf with ForwardDiff
@@ -75,7 +78,7 @@ function P_test(t::T) where {T}
     return T(5e-6)
 end
 function T_a_test(t::T) where {T}
-    return T(275.0) + T(5.0) * sin(T(2) * π * t / T(86400) - T(π / 2))
+    return T(275.0) #+ T(5.0) * sin(T(2) * π * t / T(86400) - T(π / 2))
 end
 function u_a_test(t::T) where {T}
     return T(3.0)
@@ -87,7 +90,7 @@ function VPD_a_test(t::T) where {T}
     return T(200.0)
 end
 function SW_in_test(t::T) where {T}
-    return max(T(1361.0) * sin(T(2) * π * t / T(86400) - π / T(2)), zero(t))
+    return T(1000) #max(T(1361.0) * sin(T(2) * π * t / T(86400) - π / T(2)), zero(t))
 end
 function R_n_test(t::T) where {T}
     return T(SW_in_test(t)) * T(0.3)
@@ -105,9 +108,9 @@ param_test = ComponentArray(;
     b=6.1,
     C_1sat=1.9,
     C_2ref=0.83,
-    C_3 = 0.25,
+    C_3=0.25,
     d_1=0.01,
-    d_2 = 1.3,
+    d_2=1.3,
     w_res=0.04,
     w_wp=0.08,
     w_fc=0.3,
@@ -142,9 +145,12 @@ function calculate_fluxes_test!(du, u, p, t)
     kB⁻¹,
     g_d,
     r_smin = p
-    d_c, z_0mc = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI_test(t); hs=z_0ms)
+    d_c, z_0mc = Bigleaf.roughness_parameters(
+        RoughnessCanopyHeightLAI(), h, LAI_test(t); hs=z_0ms
+    )
     f_veg = fractional_vegetation_cover(LAI_test(t))
-    f_wet = fraction_wet_vegetation(w_r, LAI_test(t))
+    w_rmax = max_canopy_capacity(LAI_test(t))
+    f_wet = fraction_wet_vegetation(w_r, w_rmax)
 
     w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
     C_1 = c_1(w_1, w_sat, b, C_1sat) # no allocs
@@ -199,10 +205,14 @@ function calculate_fluxes_test!(du, u, p, t)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
     I_s = P_s - Q_s
+    # Define smoothing parameter for canopy water content
+    m_can = w_rmax / 100
     # ALLOC FREE UP UNITL HERE
     du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
     du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
-    du[3] = f_veg * P_test(t) - E_i - D_c
+    du[3] =
+        f_veg * P_test(t) * smoothing_kernel(UpperBound(), w_r, w_rmax, m_can) -
+        E_i * smoothing_kernel(LowerBound(), w_r, zero(w_r), m_can) - D_c
     return nothing
 end
 # Alternative: make a mutating function
@@ -210,17 +220,26 @@ end
 du0_test = similar(u0_test)
 @benchmark calculate_fluxes_test!($du0_test, $u0_test, $param_test, $t_span_test[1])
 @code_warntype calculate_fluxes_test!(du0_test, u0_test, param_test, t_span_test[1])
+
+# Test AD on the RHS of the ODE
+function rhs_diff_test(u)
+    du = similar(u)
+    calculate_fluxes_test!(du, u, param_test, t_span_test[1])
+    return du
+end
+rhs_diff_test(u0_test)
+jac_adf = jacobian(rhs_diff_test, AutoForwardDiff(), u0_test)
+jac_fd = jacobian(rhs_diff_test, AutoFiniteDiff(), u0_test)
+jac_enz = jacobian(rhs_diff_test, AutoEnzyme(), u0_test)
+isapprox.(jac_adf, jac_fd; rtol=1e-6, atol=1e-6) # Check if the jacobians are approximately equal
+
 # Test if AD works with this function
 prob_test = ODEProblem{true,SciMLBase.FullSpecialize}(
     calculate_fluxes_test!, u0_test, t_span_test, param_test
 )
 # Test if AD works within solver
 sol = solve(prob_test, Rosenbrock23(; autodiff=AutoFiniteDiff())) #Works
-@enter sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff())) #Broken :(
-# IMPORTANT NOTE: The full model is broken for AD, can be related to AD discontinuities!!
-# CONSEQUENCE: code below does not work anymore, only Finite Differencing still gives gradients
-# Tips on how to fix maybe:
-# https://discourse.julialang.org/t/handling-instability-when-solving-ode-problems/9019/5
+sol = solve(prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
 sol = solve(
     prob_test, Rosenbrock23(; autodiff=AutoEnzyme(; function_annotation=Enzyme.Duplicated))
 )
@@ -230,7 +249,7 @@ t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
 @benchmark solve($prob_test, Rosenbrock23(; autodiff=AutoForwardDiff()))
 @benchmark solve(prob_test, Heun())
 @benchmark solve(prob_test, Tsit5())
-@benchmark solve(prob_test, Rodas5P(; autodiff = AutoFiniteDiff()))
+@benchmark solve(prob_test, Rodas5P(; autodiff=AutoForwardDiff()))
 # See the effect of saving at every time step
 @benchmark solve($prob_test, $Heun(), save_everystep=false) # faster of the 3
 @benchmark solve($prob_test, $Heun(), tstops=$t_obs_test) #slowest of the 3
@@ -239,15 +258,7 @@ t_obs_test = collect(t_span_test[1]:1800:t_span_test[2]) # Save every 30 minutes
 # %% Test if AD works for parameter optimisation purpose (i.e. take derivaties)
 observed_data = rand(3, length(t_obs_test)) # Simulated observed data for testing
 function loss_function_test(p; t_obs_test=t_obs_test, sensealg=ForwardDiffSensitivity())
-    simul = Array(
-        solve(
-            prob_test,
-            Tsit5(),
-            saveat=t_obs_test,
-            sensealg=sensealg,
-            p=p,
-        ),
-    )
+    simul = Array(solve(prob_test, Tsit5(); saveat=t_obs_test, sensealg=sensealg, p=p))
     return mean(abs2, simul .- observed_data)
 end
 loss_function_test(param_test)
@@ -305,13 +316,11 @@ gradient(loss_function_adjoint, AutoZygote(), param_test)
 # Fails as of now, not trivial to get reverse mode AD working fast...
 
 # Add finite diff based sensitivity equations with reverse mode AD as working option
-loss_function_sensitivity_equations(p) = loss_function_test(
-    p; sensealg=ForwardSensitivity(; autodiff=false)
-)
+function loss_function_sensitivity_equations(p)
+    return loss_function_test(p; sensealg=ForwardSensitivity(; autodiff=false))
+end
 gradient(loss_function_sensitivity_equations, AutoZygote(), param_test)
-@benchmark gradient(
-    $loss_function_sensitivity_equations, $AutoZygote(), $param_test
-)
+@benchmark gradient($loss_function_sensitivity_equations, $AutoZygote(), $param_test)
 
 # %% Easier loss function + solver
 function loss_easy_choice(p, sensealg)

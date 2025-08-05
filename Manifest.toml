@@ -2,7 +2,7 @@
 
 julia_version = "1.10.9"
 manifest_format = "2.0"
-project_hash = "9acf38d35c6eb09c4a1945057daa1aeabb73325a"
+project_hash = "b4e632fe7cdabd71868cf5fd967b3a06b9d42ee7"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "be7ae030256b8ef14a441726c4c37766b90b93a3"
@@ -789,7 +789,7 @@ uuid = "2702e6a9-849d-5ed8-8c21-79e8b8f9ee43"
 version = "0.0.20230411+1"
 
 [[deps.EvaporationModel]]
-deps = ["Bigleaf", "ComponentArrays", "Dates", "LinearSolve", "Parameters"]
+deps = ["Bigleaf", "ComponentArrays", "Dates", "ForwardDiff", "LinearSolve", "Parameters"]
 path = "src/EvaporationModel"
 uuid = "49da8130-70c8-449e-9091-2395ad2fb07e"
 version = "0.1.0"
