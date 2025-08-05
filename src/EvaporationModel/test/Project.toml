@@ -1,4 +1,6 @@
 [deps]
 AllocCheck = "9b6a8646-10ed-4001-bbdc-1d2f46dfbb1a"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Bigleaf = "e2ae9153-b66f-47c5-85f1-c6d65380123f"
 EvaporationModel = "49da8130-70c8-449e-9091-2395ad2fb07e"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

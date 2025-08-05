@@ -1,15 +1,19 @@
+abstract type KernelMethod end
+struct LowerBound <: KernelMethod end
+struct UpperBound <: KernelMethod end
+
 """
     fourier_series(t, coeffs, ω)
 
 Function that gives the Fourier series, as presented in equation
-5 of [Murray & Verhoef](https://doi.org/10.1016/j.agrformet.2003.11.005) 
+5 of [Murray & Verhoef](https://doi.org/10.1016/j.agrformet.2003.11.005)
 
-``f(t) = a_0 + \\sum_{n=1}^M \\left( a_n \\cos(n \\omega t) + 
+``f(t) = a_0 + \\sum_{n=1}^M \\left( a_n \\cos(n \\omega t) +
 b_n \\sin(n \\omega t) \\right)``
 
 # Arguments
 
-- `t`: Timestamp in seconds 
+- `t`: Timestamp in seconds
 - `coeffs::ComponentArray`: array holding the coefficients
     - `a0`: Mean component
     - `an`: Cosine coefficients
@@ -42,7 +46,7 @@ end
 """
     compute_amplitude_and_phase(an::AbstractVector, bn::AbstractVector)
 
-Translate the fourier coefficients from sin-cos form (see 
+Translate the fourier coefficients from sin-cos form (see
 [fourier_series](@ref fourier_series)) to amplitude phase form:
 
 ``f(t) = a_0 + \\sum_{n=1}^M \\left( a_{bn} \\sin(n \\omega t + \\phi) \\right)``
@@ -69,16 +73,16 @@ end
 - `t_sol`: DateTime object of the local solar time
 
 # Details
-Caluculations based on equations from 
+Caluculations based on equations from
 [NOAA](https://gml.noaa.gov/grad/solcalc/solareqns.PDF) and
 [pveducation](https://www.pveducation.org/pvcdrom/properties-of-sunlight/solar-time).
-For the equation ot time, the equation from NOAA is used. 
+For the equation ot time, the equation from NOAA is used.
 
 # Examples
 Below an example to check if calculation matches calculator provided
 [here](https://www.pveducation.org/pvcdrom/properties-of-sunlight/solar-time)
 
-```jldoctest	
+```jldoctest
 using Dates
 using EvaporationModel
 lon = 150 # °
@@ -100,7 +104,7 @@ function local_to_solar_time(time::DateTime, timezone::Integer, lon)
     # B = 350/365 * (doy - 81)
     # EoT = 9.87 * sin(2B) - 7.53 * cos(B) - 1.5 * sin(B) # Equation of Time, in minutes
     days_in_year = daysinyear(year(time))
-    γ = 2 * π / days_in_year * (doy - 1 + (hour(time) - 12) / 24) #fractional year 
+    γ = 2 * π / days_in_year * (doy - 1 + (hour(time) - 12) / 24) #fractional year
     EoT =
         229.18 * (
             0.000075 + 0.001868 * cos(γ) - 0.032077 * sin(γ) - 0.014615cos(2γ) -
@@ -108,7 +112,7 @@ function local_to_solar_time(time::DateTime, timezone::Integer, lon)
         ) #NOAA
     LSTM = 4 * (lon - 15 * timezone) + EoT # Local Standard Time Meridian , in minutes
     LSTM_ms = round(LSTM * 60 * 1000) # Local Standard Time Meridian, in milliseconds
-    t_sol = time + Millisecond(LSTM_ms) # Local solar time 
+    t_sol = time + Millisecond(LSTM_ms) # Local solar time
     return t_sol
 end
 
@@ -116,7 +120,7 @@ end
     seconds_since_solar_noon(t_sol)
 
 Given the local solar time `t_sol`, this function returns `t_diff`, which is the number
-of seconds since solar noon, which takes places at 12:00:00 of that day (in local solar time). 
+of seconds since solar noon, which takes places at 12:00:00 of that day (in local solar time).
 """
 function seconds_since_solar_noon(t_sol::DateTime)
     date = Date(t_sol)
@@ -125,4 +129,36 @@ function seconds_since_solar_noon(t_sol::DateTime)
     # Calculate the difference in seconds between t_sol and solar noon
     t_diff = round(t_sol - solar_noon, Dates.Second)
     return t_diff
+end
+
+function smooth_min(a::FT, b, m) where {FT}
+    return convert(FT, 1 / 2) * (a + b - √((a - b)^2 + m))
+end
+
+function smooth_max(a::FT, b, m) where {FT}
+    return convert(FT, 1 / 2) * (a + b + √((a - b)^2 + m))
+end
+
+function smooth_clamp(x::FT, lower, upper, m) where {FT}
+    return smooth_min(smooth_max(x, lower, m), upper, m)
+end
+
+function smoothing_kernel(approach::LowerBound, x, treshold, m)
+    return 1 - exp(-(x - treshold) / m)
+end
+
+function smoothing_kernel(approach::UpperBound, x, treshold, m)
+    return 1 - exp((x - treshold) / m)
+end
+
+@inline function value_type(x::T) where {T}
+    if T <: ForwardDiff.Dual
+        return typeof(ForwardDiff.value(x))
+    else
+        return T
+    end
+end
+
+@inline function of_value_type(x, y)
+    return convert(value_type(x), y)
 end

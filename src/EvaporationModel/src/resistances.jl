@@ -41,23 +41,31 @@ equation (37), with the default value of ``T_{opt}`` set to 298.0 K
 """
 function surface_resistance(
     approach::JarvisStewart,
-    SW_in::T,
-    VPD::T,
-    T_a::T,
-    w_2::T,
-    w_fc::T,
-    w_wilt::T,
-    LAI::T,
-    g_d::T,
-    r_smin::T;
-    T_opt::T=T(298.0),
-    r_smax::T=T(500_000),
-) where {T}
-    f_1 = clamp((T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))), 0, 1)
-    f_2 = clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1)
-    f_3 = clamp(exp(-g_d * VPD), 0, 1)
-    f_4 = clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1)
-    r_s = min(r_smin / LAI * (f_1 * f_2 * f_3 * f_4)^(-1), r_smax)
+    SW_in,
+    VPD,
+    T_a,
+    w_2,
+    w_fc,
+    w_wilt,
+    LAI,
+    g_d,
+    r_smin;
+    T_opt=of_value_type(T_a, 298.0),
+    r_smax=of_value_type(r_smin, 500_000),
+)
+    T = value_type(r_smax)
+    m_smooth = 1 / 200 # smoothing factor for 0 to 1 clamping
+    f_1 = smooth_clamp(
+        (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))),
+        0,
+        1,
+        m_smooth,
+    )
+    f_2 = smooth_clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1, m_smooth)
+    f_3 = smooth_clamp(exp(-g_d * VPD), 0, 1, m_smooth)
+    f_4 = smooth_clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1, m_smooth)
+    m_smooth_rs = r_smax
+    r_s = smooth_min(r_smin / LAI * (f_1 * f_2 * f_3 * f_4)^(-1), r_smax, m_smooth_rs)
     return r_s
 end
 """
@@ -83,8 +91,9 @@ With `approach = Choudhury1988soil()`, equation (25) of
 [Choudhury and Monteith (1988)](https://doi.org/10.1002/qj.49711448006) is used.
 """
 function soil_aerodynamic_resistance(
-    approach::Choudhury1988soil, ustar::T, h::T, d_c::T, z_0mc::T, z_0ms::T, η::T=T(3)
-) where {T}
+    approach::Choudhury1988soil, ustar, h, d_c, z_0mc, z_0ms, η=of_value_type(z_0ms, 3)
+)
+    T = value_type(η)
     Kh = T(BigleafConstants().k) * ustar * (h - d_c)
     r_as = (h * exp(η) / (η * Kh)) * (exp(-η * z_0ms / h) - exp(-η * (z_0mc + d_c) / h))
     return r_as
@@ -97,7 +106,7 @@ function jarvis_stewart(forcing::ComponentArray, parameters::ComponentArray)
 end
 
 function jarvis_stewart(SW_in, w_2, VPD, T_a, LAI, w_fc, w_wilt, gd, r_smin)
-    f_1 = min(1.0, (0.004 * SW_in + 0.05) / 0.81(0.004 *  SW_in + 1.0))
+    f_1 = min(1.0, (0.004 * SW_in + 0.05) / 0.81(0.004 * SW_in + 1.0))
     f_2 = max(0.0, min((w_2 - w_wilt) / (w_fc - w_wilt), 1.0))
     f_3 = exp(-gd * VPD)
     #f_4 = @. max(1.0 - 0.0016*(298.0 - T_a)^2, 0.0)
@@ -142,7 +151,8 @@ The friction velocity is calculated using the logarithmic wind profile equation,
 For more info on how to calculate ``\psi_m``, see the
 [Bigleaf package documentation](https://earthyscience.github.io/Bigleaf.jl/dev/stability_correction/#Bigleaf.stability_parameter)
 """
-function ustar_from_u(u::T, z_obs::T, d::T, z_0m::T, ψ_m::T=T(0)) where {T}
+function ustar_from_u(u, z_obs, d, z_0m, ψ_m=of_value_type(z_0m, 0))
+    T = value_type(z_0m)
     return T(BigleafConstants().k) * (u + ψ_m) / log((z_obs - d) / z_0m)
 end
 
@@ -190,13 +200,11 @@ true
 ```
 
 """
-function soil_evaporation_efficiency(approach::Pielke92, w_1::T, w_fc::T) where {T}
+function soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc)
     return 1 / 4 * (1 - cos(π * w_1 / w_fc))^2
 end
 
-function soil_evaporation_efficiency(
-    approach::Martens17, w_1::T, w_res::T, w_c::T
-) where {T}
+function soil_evaporation_efficiency(approach::Martens17, w_1, w_res, w_c)
     return clamp((w_1 - w_res) / (w_c - w_res), 0, 1)
 end
 
@@ -215,7 +223,7 @@ Equation used derived from equivalency between equation (6) and (7) of
 [Merlin et al. (2016)](https://doi.org/10.1002/2015WR018233)
 
 """
-function beta_to_r_ss(beta::T, r_as::T) where {T}
+function beta_to_r_ss(beta, r_as)
     return r_as / beta - r_as
 end
 
