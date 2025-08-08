@@ -39,7 +39,7 @@ a = compute_a(dict_soil[:mean_clay_percentage])
 p = compute_p(dict_soil[:mean_clay_percentage])
 b = compute_b(Clay(), dict_soil[:mean_clay_percentage])
 d_1 = 0.01 # m, depth of the first layer
-d_2 = dict_soil[:root_depth] / 100 # m, depth of the second layer
+d_2 = dict_soil[:root_depth] # m, depth of the second layer
 z_0ms = 0.01 # m, roughness length for momentum transfer of soil
 
 ## Test Peman-Monteith equation at one time step at at time
