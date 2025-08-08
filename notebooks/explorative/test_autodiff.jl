@@ -296,11 +296,10 @@ gradient(loss_function_adjoint, AutoZygote(), param_test)
 @benchmark gradient($loss_function_adjoint, $AutoForwardDiff(), $param_test)
 # NOTE: AutoForwardDif IGNOGRES the adjoint and just does forwarddiff I think...?
 # The benchmark is too similar the one with ForwardDiffSensitivity
-# BenchmarkTools.Trial: 10000 samples with 1 evaluation per sample.
-#  Range (min … max):  24.000 μs …  2.533 ms  ┊ GC (min … max): 0.00% … 95.47%
-#  Time  (median):     26.100 μs              ┊ GC (median):    0.00%
-#  Time  (mean ± σ):   29.928 μs ± 60.409 μs  ┊ GC (mean ± σ):  5.39% ±  2.71%
-# With Debug below, I tested that Indeed it does not use the adjoint! It overloads the
+# BenchmarkTools.Trial: 9178 samples with 1 evaluation per sample.
+# Range (min … max):  500.522 μs …  16.718 ms  ┊ GC (min … max): 0.00% … 94.20%
+# Time  (median):     522.883 μs               ┊ GC (median):    0.00%
+# Time  (mean ± σ):   542.809 μs ± 286.628 μs  ┊ GC (mean ± σ):  0.90% ±  1.70%
 # Dual numbers on just solves, no adjoint is called!
 # @enter gradient(loss_function_adjoint, AutoForwardDiff(), param_test)
 # Very different from using AutoZygote, which does call the adjoint (debugger crashes)
@@ -309,18 +308,33 @@ gradient(loss_function_adjoint, AutoZygote(), param_test)
 @benchmark gradient($loss_function_adjoint, $AutoReverseDiff(), $param_test)
 # ReverseDiff also quite slow...
 # BenchmarkTools.Trial: 3673 samples with 1 evaluation per sample.
-#  Range (min … max):  886.238 μs … 36.449 ms  ┊ GC (min … max):  0.00% … 95.39%
-#  Time  (median):       1.089 ms              ┊ GC (median):     0.00%
-#  Time  (mean ± σ):     1.356 ms ±  2.481 ms  ┊ GC (mean ± σ):  14.48% ±  7.63%
+# BenchmarkTools.Trial: 3767 samples with 1 evaluation per sample.
+#  Range (min … max):  992.173 μs … 32.616 ms  ┊ GC (min … max):  0.00% … 94.00%
+#  Time  (median):       1.170 ms              ┊ GC (median):     0.00%
+#  Time  (mean ± σ):     1.324 ms ±  2.041 ms  ┊ GC (mean ± σ):  10.50% ±  6.54%
 # @benchmark gradient($loss_function_adjoint, $AutoMooncake(), $param_test)
 # Fails as of now, not trivial to get reverse mode AD working fast...
 
-# Add finite diff based sensitivity equations with reverse mode AD as working option
+# Add sensitivity equations with reverse mode AD as a working option
 function loss_function_sensitivity_equations(p)
-    return loss_function_test(p; sensealg=ForwardSensitivity(; autodiff=false))
+    return loss_function_test(p; sensealg=ForwardSensitivity(; autodiff=true))
 end
 gradient(loss_function_sensitivity_equations, AutoZygote(), param_test)
 @benchmark gradient($loss_function_sensitivity_equations, $AutoZygote(), $param_test)
+# Direct sensitivities
+# https://docs.sciml.ai/SciMLSensitivity/stable/tutorials/direct_sensitivity/
+prob_sens = ODEForwardSensitivityProblem(
+    calculate_fluxes_test!, u0_test, t_span_test, param_test
+)
+sol_sens = solve(prob_sens, Tsit5())
+@benchmark solve($prob_sens, $Tsit5()) # quite slow
+x, jac_sol = extract_local_sensitivities(sol_sens)
+sens_rsmin = jac_sol[end]
+plot(sol_sens.t, sens_rsmin'; ylabel="∂y/∂rₛₘᵢₙ", xlabel="t")
+
+# Direct reverse mode AD
+loss_function_discrete(p) = loss_function_test(p; sensealg=ReverseDiffAdjoint())
+@benchmark gradient($loss_function_discrete, $AutoReverseDiff(), $param_test)
 
 # %% Easier loss function + solver
 function loss_easy_choice(p, sensealg)
@@ -405,6 +419,7 @@ function f_normal(u0)
     return sum(sol)
 end
 grad_forward = gradient(f_normal, AutoForwardDiff(), u0)
+grad_finite_diff = gradient(f_normal, AutoFiniteDiff(), u0)
 grad_forward ≈ grad_enzyme #NOT THE SAME! Enzyme wrong I think...
 # Benchmark the difference
 @benchmark gradient(f, AutoEnzyme(), u0) # 282 µs
