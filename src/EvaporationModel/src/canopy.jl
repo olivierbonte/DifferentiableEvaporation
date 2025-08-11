@@ -16,7 +16,7 @@ function max_canopy_capacity(LAI, c=of_value_type(LAI, 0.2))
 end
 
 function fraction_wet_vegetation(w_r, w_rmax)
-    w_r = smooth_max(w_r, zero(w_r), w_rmax / 1000)
+    w_r = max(w_r, zero(w_r)) #smooth_max(w_r, zero(w_r), w_rmax / 1000)
     return (w_r / w_rmax)^of_value_type(w_r, 2 / 3)
 end
 
