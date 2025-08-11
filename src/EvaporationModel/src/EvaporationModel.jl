@@ -4,7 +4,6 @@ using Bigleaf
 using ComponentArrays
 using Dates
 using ForwardDiff
-using LinearSolve
 using Parameters
 
 include("canopy.jl")
