@@ -4,8 +4,8 @@ using Revise
 using Plots, Dates, Statistics, Parameters
 using BenchmarkTools
 using YAXArrays, NetCDF, DimensionalData
-using ADTypes, ComponentArrays,
-    DataInterpolations, OrdinaryDiffEq, DiffEqCallbacks, StaticArrays
+using ADTypes,
+    ComponentArrays, DataInterpolations, OrdinaryDiffEq, DiffEqCallbacks, StaticArrays
 using Bigleaf
 using EvaporationModel
 
@@ -197,9 +197,7 @@ E_s, λE_s = soil_evaporation(
 D_c = canopy_drainage(FT(ds_ec_sel.Precip[i]), w_r, f_veg)
 P_s = precip_below_canopy(FT(ds_ec_sel.Precip[i]), f_veg, D_c)
 # Soil fluxes
-Q_s = surface_runoff(
-    StaticInfiltration(), P_s, w_2, FT(dict_soil[:w_fc])
-)
+Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, FT(dict_soil[:w_fc]))
 w_1eq = w_geq(w_2, dict_soil[:w_sat], a, p)
 C_1 = c_1(w_1, dict_soil[:w_sat], b, C_1sat)
 C_2 = c_2(w_2, dict_soil[:w_sat], C_2ref)
@@ -234,14 +232,14 @@ t_unix = datetime2unix.(ds_ec_sel.time[:]) # in seconds!
 # Alternative: preserver integral by using smoothed constant interpolation
 d_max = diff(t_unix)[1] * 0.2 # The maximum smoothing distance in the t direction from the data
 # points in seconds, here as a fraction of the time interval
-R_n = SmoothedConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; d_max = d_max)
-T_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; d_max = d_max)
-p_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; d_max = d_max)
-u_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix; d_max = d_max)
-VPD_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix; d_max = d_max) #hPa -> Pa
-P = SmoothedConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; d_max = d_max)
-SW_in = SmoothedConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; d_max = d_max)
-LAI = SmoothedConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; d_max = d_max)
+R_n = SmoothedConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; d_max=d_max)
+T_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Tair[:]), t_unix; d_max=d_max)
+p_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Psurf[:]), t_unix; d_max=d_max)
+u_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.Wind[:]), t_unix; d_max=d_max)
+VPD_a = SmoothedConstantInterpolation(FT.(ds_ec_sel.VPD[:]) .* 100, t_unix; d_max=d_max) #hPa -> Pa
+P = SmoothedConstantInterpolation(FT.(ds_ec_sel.Precip[:]), t_unix; d_max=d_max)
+SW_in = SmoothedConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; d_max=d_max)
+LAI = SmoothedConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; d_max=d_max)
 
 # Pack alle the parameters into component array
 param = ComponentArray(;
@@ -296,10 +294,11 @@ function calculate_fluxes(u, p, t)
     ## Compute the dynamic parameters
     # Vegtation characteristics
     d_c, z_0mc = Bigleaf.roughness_parameters(
-        RoughnessCanopyHeightLAI(), h, ds_ec_sel.LAI[i]; hs=z_0ms
+        RoughnessCanopyHeightLAI(), h, LAI(t); hs=z_0ms
     )
     f_veg = fractional_vegetation_cover(LAI(t))
-    f_wet = fraction_wet_vegetation(w_r, LAI(t))
+    w_rmax = max_canopy_capacity(LAI(t))
+    f_wet = fraction_wet_vegetation(w_r, w_rmax)
 
     # Soil characteristics
     w_1eq = w_geq(w_2, w_sat, a, p)
@@ -307,7 +306,7 @@ function calculate_fluxes(u, p, t)
     C_2 = c_2(w_2, w_sat, C_2ref)
 
     # Energy partitioning
-    G = ground_heat_flux(Allen07(), R_n(t), T_a(t))
+    G = ground_heat_flux(Allen07(), R_n(t), LAI(t))
     A, A_c, A_s = available_energy_partioning(R_n(t), G, f_veg)
 
     # Resistances
@@ -340,6 +339,7 @@ function calculate_fluxes(u, p, t)
     return (
         d_c=d_c,
         z_0mc=z_0mc,
+        w_rmax=w_rmax,
         f_veg=f_veg,
         f_wet=f_wet,
         w_1eq=w_1eq,
@@ -379,11 +379,26 @@ function conservation_equations(u, p, t)
     # Unpack the static parameters needed
     @unpack d_1 = p
     # Unpack the fluxes
-    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i = fluxes_out
+    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i, w_rmax = fluxes_out
     dw1dt = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
     dw2dt = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
     dwrdt = f_veg * P(t) - E_i - D_c
     return SA[dw1dt, dw2dt, dwrdt]
+end
+
+function conservation_equations!(du, u, p, t)
+    fluxes_out = calculate_fluxes(u, p, t)
+    @unpack d_1 = p
+    # Unpack the fluxes
+    # Define smoothing parameter for canopy water content
+    m_can = w_rmax / 100
+    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i, w_rmax = fluxes_out
+    du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
+    du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
+    du[3] =
+        f_veg * P(t) * smoothing_kernel(UpperBound(), w_r, w_rmax, m_can) -
+        E_i * smoothing_kernel(LowerBound(), w_r, zero(w_r), m_can) - D_c
+    return nothing
 end
 
 # Test the RHS of the ODE system function
@@ -432,32 +447,63 @@ end
 λE_tot_explicit = [fluxes_euler[i].λE_tot for i in 1:length(t_unix)]
 
 # The default "Hydrology solver"
-sol_explicit_euler = solve(prob, Euler(); dt=dt)
+sol_explicit_euler = solve(prob, Euler(); dt=dt / 10)
 plot(sol_explicit_euler)
+
+# integrator interface
+integrator = init(prob, Euler(); dt=dt / 10)
+step!(integrator)
 
 # Classic solver: ImplicitEuler fixed timestep at resolution of data
 sol_implicit_euler = solve(
-    prob, ImplicitEuler(; autodiff=AutoFiniteDiff()); adaptive=false, dt=dt
+    prob, ImplicitEuler(; autodiff=AutoForwardDiff()); adaptive=false, dt=dt / 100
 )
 
 # Implicit Euler with adapative timestepping
 sol_implicit_euler_adaptive = solve(
     prob,
+    ImplicitEuler(; autodiff=AutoForwardDiff());
+    adaptive=true,
+    saveat=t_unix,
+    #callback=PositiveDomain(),
+    abstol=1e-5,
+    reltol=1e-5,
+    #isoutofdomain=(u, p, t) -> any(x -> x < 0, u),
+)
+plot(sol_implicit_euler_adaptive)
+
+# Compare static array versions with in-place versions
+@benchmark solve(
+    prob,
+    ImplicitEuler(; autodiff=AutoForwardDiff());
+    adaptive=true,
+    saveat=t_unix,
+    #callback=PositiveDomain(),
+    abstol=1e-5,
+    reltol=1e-5,
+) # gives around 150 ms
+u0_inplace = [
+    dict_soil[:w_fc] * 1 / 3, # w_1
+    dict_soil[:w_fc] * 1 / 3, # w_2
+    FT(0.0001),
+]
+prob_inplace = ODEProblem(conservation_equations!, u0_inplace, t_span, param)
+solve(
+    prob_inplace,
     ImplicitEuler(; autodiff=AutoFiniteDiff());
     adaptive=true,
     saveat=t_unix,
     #callback=PositiveDomain(),
     abstol=1e-5,
     reltol=1e-5,
-)
-plot(sol_implicit_euler_adaptive)
+) # gives around 60 ms -> faster option!
 
 # A recommende solver for stiff problems: Rosenbrock23()
 # sol_2 = solve(prob, Heun(); callback=PositiveDomain(), abstol=1e-6, reltol=1e-5
 # reltol and abstol needed if ConstantInterpolation, not for PCHIPInterpolation,
 # Also for ConstantInterpolation better to work at higerh abstol values
 sol_rosenbrock = solve(
-    prob, Rosenbrock23(; autodiff=AutoFiniteDiff()); saveat=t_unix, abstol = 1e-5, reltol=1e-5
+    prob, Rosenbrock23(; autodiff=AutoFiniteDiff()); saveat=t_unix, abstol=1e-5, reltol=1e-5
 )
 plot(sol_rosenbrock)
 
@@ -496,11 +542,11 @@ SW_in = ConstantInterpolation(FT.(ds_ec_sel.SWdown[:]), t_unix; dir=:left)
 LAI = ConstantInterpolation(FT.(ds_ec_sel.LAI[:]), t_unix; dir=:left)
 
 # e.g. using recommend explicit Heun method from La Follette et al. 2021
-sol_tstops = solve(prob, Heun(), tstops = t_unix)
+sol_tstops = solve(prob, Heun(); tstops=t_unix)
 plot(sol_tstops)
 
 # The default non-stiff stolver
-sol_tstops_tsit5 = solve(prob, Tsit5(), tstops = t_unix)
+sol_tstops_tsit5 = solve(prob, Tsit5(); tstops=t_unix)
 
 # even give explicit euler a shot!
 # condition(u, t, integrator) = any(u .≤ 0) # Positive domain condition
@@ -514,7 +560,7 @@ prob_bis = ODEProblem(conservation_equations, u0_bis, t_span, param)
 condition(u, t, integrator) = true#(integrator.u[3] ≤ 0.0) | (u[3] ≤ 0.0)
 affect!(integrator) = integrator.u = max.(0, integrator.u) # Set w_r to 0 if it goes below 0
 cb = DiscreteCallback(condition, affect!)
-sol_ee_pos = solve(prob_bis, Euler(); dt = dt, callback = cb)#, tstops = t_unix)
+sol_ee_pos = solve(prob_bis, Euler(); dt=dt / 10, callback=cb)#, tstops = t_unix)
 plot(sol_ee_pos)
 
 ## Experiment
@@ -522,7 +568,6 @@ plot(sol_ee_pos)
 # https://docs.sciml.ai/DiffEqCallbacks/stable/output_saving/#DiffEqCallbacks.SavingCallback
 # Tutorial: https://nextjournal.com/sosiris-de/ode-diffeq
 # IDEA: try using saveat, does this make a difference?
-saved_flux_data = SavedValues(FT, NamedTuple)
 function save_flux_data(u, t, integrator)
     # Reuse the same calculations function
     fluxes = calculate_fluxes(u, integrator.p, t)
@@ -552,7 +597,8 @@ sol_cb_save = solve(
     reltol=1e-5,
     callback=save_cb,
 )
-plot(sol_cb_save)
+plosaved_flux_data = SavedValues(FT, NamedTuple)
+t(sol_cb_save)
 λE_tot_saved = [data.λE_tot for data in saved_flux_data.saveval]
 λE_t_saved = [data.λE_t for data in saved_flux_data.saveval]
 
@@ -582,7 +628,7 @@ plot(
 )
 #p2 = twinx(p1)
 precip_plot_mm_h = collect(P(t_unix)[:]) * 3600 #kg/(m²s) -> mm/h
-y_ticks_precip = ([0,10, 20], ["0","10", "20"])
+y_ticks_precip = ([0, 10, 20], ["0", "10", "20"])
 fig_implicit = plot!(
     twinx(),
     unix2datetime.(t_unix),
@@ -643,13 +689,16 @@ fig_implicit_fluxes = plot(
     framestyle=:box,
 )
 plot!(
-    unix2datetime.(t_unix), λE_tot_explicit; label="EE", color=collect(palette(:default))[1]#[6]
+    unix2datetime.(t_unix),
+    λE_tot_explicit;
+    label="EE",
+    color=collect(palette(:default))[1],#[6]
 )
 plot!(
     unix2datetime.(saved_flux_data.t),
     λE_tot_saved;
     label="IEₐ",
-    color=collect(palette(:default))[2]#[5],
+    color=collect(palette(:default))[2],#[5],
 )
 #plot!(unix2datetime.(saved_flux_data.t), λE_t_saved; label="λE_t")
 
@@ -665,7 +714,7 @@ fig_fluxes_diff = plot(
     xlabel="Time",
     xticks=(date_ticks, Dates.format.(date_ticks, "yyyy-mm-dd")),
     framestyle=:box,
-    color = palette(:default)[3]
+    color=palette(:default)[3],
 )
 savefig(fig_fluxes_diff, figdir("IEa_diff_EE_fluxes.png"))
 

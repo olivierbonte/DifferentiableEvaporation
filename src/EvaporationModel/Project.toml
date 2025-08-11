@@ -7,6 +7,7 @@ version = "0.1.0"
 Bigleaf = "e2ae9153-b66f-47c5-85f1-c6d65380123f"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 

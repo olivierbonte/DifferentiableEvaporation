@@ -3,26 +3,26 @@ struct StaticInfiltration <: InfiltrationMethod end
 struct VegetationInfiltration <: InfiltrationMethod end
 
 function surface_runoff(
-    approach::StaticInfiltration, P_s::T, w_2::T, w_fc::T, p_inf::T=T(2)
-) where {T}
+    approach::StaticInfiltration, P_s, w_2, w_fc, p_inf=of_value_type(w_fc, 2)
+)
     Q_s = (w_2 / w_fc)^p_inf * P_s
     return Q_s
 end
 
 function surface_runoff(
-    approach::VegetationInfiltration, P_s::T, w_2::T, w_fc::T, f_veg::T, s_inf::T=T(3)
-) where {T}
+    approach::VegetationInfiltration, P_s, w_2, w_fc, f_veg, s_inf=of_value_type(f_veg, 3)
+)
     p_inf = f_veg * s_inf
     Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_fc, p_inf)
     return Q_s
 end
 
-function diffusion_layer_1(w_1::T, w_1eq::T, C_2::T) where {T}
+function diffusion_layer_1(w_1, w_1eq, C_2)
     D_1 = C_2 / τ * (w_1 - w_1eq)
     return D_1
 end
 
-function vertical_drainage_layer_2(w_2::T, w_fc::T, C_3::T, d_2::T) where {T}
-    K_2 = C_3 / (d_2 * τ) * max(0, w_2 - w_fc)
+function vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
+    K_2 = C_3 / (d_2 * τ) * max(zero(w_2), w_2 - w_fc)
     return K_2
 end
