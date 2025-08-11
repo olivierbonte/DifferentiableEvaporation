@@ -4,8 +4,8 @@ using Revise
 using Plots, Dates, Statistics, Parameters
 using BenchmarkTools
 using YAXArrays, NetCDF, DimensionalData
-using ADTypes, ComponentArrays,
-    DataInterpolations, OrdinaryDiffEq, DiffEqCallbacks, StaticArrays
+using ADTypes,
+    ComponentArrays, DataInterpolations, OrdinaryDiffEq, DiffEqCallbacks, StaticArrays
 using Bigleaf
 using EvaporationModel
 
@@ -294,10 +294,11 @@ function calculate_fluxes(u, p, t)
     ## Compute the dynamic parameters
     # Vegtation characteristics
     d_c, z_0mc = Bigleaf.roughness_parameters(
-        RoughnessCanopyHeightLAI(), h, ds_ec_sel.LAI[i]; hs=z_0ms
+        RoughnessCanopyHeightLAI(), h, LAI(t); hs=z_0ms
     )
     f_veg = fractional_vegetation_cover(LAI(t))
-    f_wet = fraction_wet_vegetation(w_r, LAI(t))
+    w_rmax = max_canopy_capacity(LAI(t))
+    f_wet = fraction_wet_vegetation(w_r, w_rmax)
 
     # Soil characteristics
     w_1eq = w_geq(w_2, w_sat, a, p)
@@ -338,6 +339,7 @@ function calculate_fluxes(u, p, t)
     return (
         d_c=d_c,
         z_0mc=z_0mc,
+        w_rmax=w_rmax,
         f_veg=f_veg,
         f_wet=f_wet,
         w_1eq=w_1eq,
@@ -377,7 +379,7 @@ function conservation_equations(u, p, t)
     # Unpack the static parameters needed
     @unpack d_1 = p
     # Unpack the fluxes
-    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i = fluxes_out
+    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i, w_rmax = fluxes_out
     dw1dt = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
     dw2dt = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
     dwrdt = f_veg * P(t) - E_i - D_c
@@ -388,10 +390,15 @@ function conservation_equations!(du, u, p, t)
     fluxes_out = calculate_fluxes(u, p, t)
     @unpack d_1 = p
     # Unpack the fluxes
-    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i = fluxes_out
+    # Define smoothing parameter for canopy water content
+    m_can = w_rmax / 100
+    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i, w_rmax = fluxes_out
     du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
     du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
-    return du[3] = f_veg * P(t) - E_i - D_c
+    du[3] =
+        f_veg * P(t) * smoothing_kernel(UpperBound(), w_r, w_rmax, m_can) -
+        E_i * smoothing_kernel(LowerBound(), w_r, zero(w_r), m_can) - D_c
+    return nothing
 end
 
 # Test the RHS of the ODE system function
@@ -440,30 +447,35 @@ end
 λE_tot_explicit = [fluxes_euler[i].λE_tot for i in 1:length(t_unix)]
 
 # The default "Hydrology solver"
-sol_explicit_euler = solve(prob, Euler(); dt=dt)
+sol_explicit_euler = solve(prob, Euler(); dt=dt / 10)
 plot(sol_explicit_euler)
+
+# integrator interface
+integrator = init(prob, Euler(); dt=dt / 10)
+step!(integrator)
 
 # Classic solver: ImplicitEuler fixed timestep at resolution of data
 sol_implicit_euler = solve(
-    prob, ImplicitEuler(; autodiff=AutoFiniteDiff()); adaptive=false, dt=dt
+    prob, ImplicitEuler(; autodiff=AutoForwardDiff()); adaptive=false, dt=dt / 100
 )
 
 # Implicit Euler with adapative timestepping
 sol_implicit_euler_adaptive = solve(
     prob,
-    ImplicitEuler(; autodiff=AutoFiniteDiff());
+    ImplicitEuler(; autodiff=AutoForwardDiff());
     adaptive=true,
     saveat=t_unix,
     #callback=PositiveDomain(),
     abstol=1e-5,
     reltol=1e-5,
+    #isoutofdomain=(u, p, t) -> any(x -> x < 0, u),
 )
 plot(sol_implicit_euler_adaptive)
 
 # Compare static array versions with in-place versions
 @benchmark solve(
     prob,
-    ImplicitEuler(; autodiff=AutoFiniteDiff());
+    ImplicitEuler(; autodiff=AutoForwardDiff());
     adaptive=true,
     saveat=t_unix,
     #callback=PositiveDomain(),
@@ -476,7 +488,7 @@ u0_inplace = [
     FT(0.0001),
 ]
 prob_inplace = ODEProblem(conservation_equations!, u0_inplace, t_span, param)
-@benchmark solve(
+solve(
     prob_inplace,
     ImplicitEuler(; autodiff=AutoFiniteDiff());
     adaptive=true,
@@ -548,7 +560,7 @@ prob_bis = ODEProblem(conservation_equations, u0_bis, t_span, param)
 condition(u, t, integrator) = true#(integrator.u[3] ≤ 0.0) | (u[3] ≤ 0.0)
 affect!(integrator) = integrator.u = max.(0, integrator.u) # Set w_r to 0 if it goes below 0
 cb = DiscreteCallback(condition, affect!)
-sol_ee_pos = solve(prob_bis, Euler(); dt=dt, callback=cb)#, tstops = t_unix)
+sol_ee_pos = solve(prob_bis, Euler(); dt=dt / 10, callback=cb)#, tstops = t_unix)
 plot(sol_ee_pos)
 
 ## Experiment
@@ -556,7 +568,6 @@ plot(sol_ee_pos)
 # https://docs.sciml.ai/DiffEqCallbacks/stable/output_saving/#DiffEqCallbacks.SavingCallback
 # Tutorial: https://nextjournal.com/sosiris-de/ode-diffeq
 # IDEA: try using saveat, does this make a difference?
-saved_flux_data = SavedValues(FT, NamedTuple)
 function save_flux_data(u, t, integrator)
     # Reuse the same calculations function
     fluxes = calculate_fluxes(u, integrator.p, t)
@@ -586,7 +597,8 @@ sol_cb_save = solve(
     reltol=1e-5,
     callback=save_cb,
 )
-plot(sol_cb_save)
+plosaved_flux_data = SavedValues(FT, NamedTuple)
+t(sol_cb_save)
 λE_tot_saved = [data.λE_tot for data in saved_flux_data.saveval]
 λE_t_saved = [data.λE_t for data in saved_flux_data.saveval]
 
