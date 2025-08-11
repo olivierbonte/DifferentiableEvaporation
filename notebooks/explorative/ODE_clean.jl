@@ -377,7 +377,7 @@ end
 function conservation_equations(u, p, t)
     fluxes_out = calculate_fluxes(u, p, t)
     # Unpack the static parameters needed
-    @unpack d_1 = p
+    @unpack d_1, d_2 = p
     # Unpack the fluxes
     @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i, w_rmax = fluxes_out
     dw1dt = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
