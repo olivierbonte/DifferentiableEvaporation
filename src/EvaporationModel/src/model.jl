@@ -21,26 +21,9 @@ function initialize!(model::ProcessBasedModel)
     return nothing
 end
 
-# function create_rhs(model::ProcessBasedModel)
-#     return (du, u, p, t) ->
-#         compute_tendencies!(du, u, p, t, model.forcings, model.diagnostics)
-# end
-# function create_rhs_function(forcings, diagnostics)
-#     function rhs_func(du, u, p, t)
-#         return compute_tendencies!(du, u, p, t, forcings, diagnostics)
-#     end
-#     return rhs_func
-# end
-
-# function create_rhs(model::ProcessBasedModel)
-#     return create_rhs_function(model.forcings, model.diagnostics)
-# end
-function (rhs::ModelRHS)(du, u, p, t)
-    return compute_tendencies!(du, u, p, t, rhs.forcings, rhs.diagnostics)
-end
-
 function create_rhs(model::ProcessBasedModel)
-    return ModelRHS(model.forcings, model.diagnostics)
+    return (du, u, p, t) ->
+        compute_tendencies!(du, u, p, t, model.forcings, model.diagnostics)
 end
 
 function solve!(model::ProcessBasedModel; kwargs...)
