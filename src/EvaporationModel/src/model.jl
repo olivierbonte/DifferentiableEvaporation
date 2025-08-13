@@ -141,7 +141,7 @@ function compute_diagnostics!(diagnostics, u, p::AbstractArray, t, forcings::Nam
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
     I_s = P_s - Q_s
     @pack! diagnostics = w_rmax,
-    C_1, λE_tot, VPD_m, E_t, λE_t, E_i, λE_i, E_s, λE_s, D_c, P_s, Q_s, D_1, K_2,
+    C_1, f_veg, λE_tot, VPD_m, E_t, λE_t, E_i, λE_i, E_s, λE_s, D_c, P_s, Q_s, D_1, K_2,
     I_s
     return nothing
 end
