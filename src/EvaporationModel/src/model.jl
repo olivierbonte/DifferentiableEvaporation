@@ -4,59 +4,47 @@ abstract type AbstractModel end
     parameters::AbstractArray
     t_span::Tuple
     u0
-    diagnostics::ComponentArray = create_diagnostics(FT)
+    saveat::AbstractArray
+    tstops::AbstractArray = saveat
     f = nothing
+    f_diagnostics = nothing
     prob = nothing
     sol = nothing
-end
-
-struct ModelRHS{F<:NamedTuple,D<:ComponentArray}
-    forcings::F
-    diagnostics::D
+    diagnostics = SavedValues(FT, NamedTuple)
+    output = nothing
 end
 
 function initialize!(model::ProcessBasedModel)
     model.f = create_rhs(model)
+    model.f_diagnostics = create_f_diagnostics(model)
     model.prob = ODEProblem(model.f, model.u0, model.t_span, model.parameters)
     return nothing
 end
 
 function create_rhs(model::ProcessBasedModel)
-    return (du, u, p, t) ->
-        compute_tendencies!(du, u, p, t, model.forcings, model.diagnostics)
+    return (du, u, p, t) -> compute_tendencies!(du, u, p, t, model.forcings)
+end
+
+function create_f_diagnostics(model::ProcessBasedModel)
+    return (u, p, t) -> compute_diagnostics(u, p, t, model.forcings)
 end
 
 function solve!(model::ProcessBasedModel; kwargs...)
-    model.sol = solve(model.prob; kwargs...)
+    cb = SavingCallback(
+        (u, t, integrator) -> model.f_diagnostics(u, integrator.p, t),
+        model.diagnostics;
+        saveat=model.saveat,
+    )
+    model.sol = solve(
+        model.prob; callback=cb, saveat=model.saveat, tstops=model.tstops, kwargs...
+    )
+    # df_diagnostics = DataFrame(model.diagnostics.saveval)
+    # df_prognostics = DataFrame(model.sol)
+    # axlist = ()
     return nothing
 end
 
-function create_diagnostics(FT)
-    fields = (
-        :w_r,
-        :w_rmax,
-        :C_1,
-        :f_veg,
-        :λE_tot,
-        :VPD_m,
-        :E_t,
-        :λE_t,
-        :E_i,
-        :λE_i,
-        :E_s,
-        :λE_s,
-        :D_c,
-        :P_s,
-        :Q_s,
-        :D_1,
-        :K_2,
-        :I_s,
-    )
-    values = ntuple(i -> zero(FT), length(fields))
-    return ComponentArray(NamedTuple{fields}(values))
-end
-
-function compute_diagnostics!(diagnostics, u, p::AbstractArray, t, forcings::NamedTuple)
+@inline function compute_diagnostics(u, p::AbstractArray, t, forcings::NamedTuple)
     w_1, w_2, w_r = u
     @unpack h,
     z_0ms,
@@ -140,14 +128,29 @@ function compute_diagnostics!(diagnostics, u, p::AbstractArray, t, forcings::Nam
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
     I_s = P_s - Q_s
-    @pack! diagnostics = w_rmax,
-    C_1, f_veg, λE_tot, VPD_m, E_t, λE_t, E_i, λE_i, E_s, λE_s, D_c, P_s, Q_s, D_1, K_2,
-    I_s
-    return nothing
+    return (
+        w_rmax=w_rmax,
+        C_1=C_1,
+        f_veg=f_veg,
+        λE_tot=λE_tot,
+        VPD_m=VPD_m,
+        E_t=E_t,
+        λE_t=λE_t,
+        E_i=E_i,
+        λE_i=λE_i,
+        E_s=E_s,
+        λE_s=λE_s,
+        D_c=D_c,
+        P_s=P_s,
+        Q_s=Q_s,
+        D_1=D_1,
+        K_2=K_2,
+        I_s=I_s,
+    )
 end
 
-function compute_tendencies!(du, u, p::AbstractArray, t, forcings::NamedTuple, diagnostics)
-    compute_diagnostics!(diagnostics, u, p, t, forcings)
+function compute_tendencies!(du, u, p::AbstractArray, t, forcings::NamedTuple)
+    diagnostics = compute_diagnostics(u, p, t, forcings)
     _, _, w_r = u
     @unpack d_1, d_2 = p
     @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i, w_rmax, f_veg, C_1 = diagnostics
