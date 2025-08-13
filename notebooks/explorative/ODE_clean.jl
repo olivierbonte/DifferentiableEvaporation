@@ -50,7 +50,7 @@ z_0ms = 0.01 # m, roughness length for momentum transfer of soil
 
 start_date = DateTime(2010, 3, 15)
 end_date = DateTime(2010, 3, 25)
-ds_ec_sel = ds_ec[time=start_date .. end_date]
+ds_ec_sel = ds_ec[time = start_date .. end_date]
 time_indices = 1:length(ds_ec_sel.time)[1]
 le_array = similar(collect(time_indices), FT)
 le_total_array = similar(le_array)

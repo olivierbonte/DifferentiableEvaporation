@@ -23,10 +23,16 @@ gr()
 #meteo_data = NCDataset(meteo_data_url)
 #Swith from NCDataset to NetCDF and YAXArray for convenience -> donwload of the data
 #Download the data to a folder
-ds_meteo = open_dataset(datadir("exp_raw", "eddy_covariance", "BE-Bra_2004-2014_FLUXNET2015_Met.nc"));
-ds_flux = open_dataset(datadir("exp_raw", "eddy_covariance", "BE-Bra_2004-2014_FLUXNET2015_Flux.nc"));
+ds_meteo = open_dataset(
+    datadir("exp_raw", "eddy_covariance", "BE-Bra_2004-2014_FLUXNET2015_Met.nc")
+);
+ds_flux = open_dataset(
+    datadir("exp_raw", "eddy_covariance", "BE-Bra_2004-2014_FLUXNET2015_Flux.nc")
+);
 
-ds_meteo_LM = open_dataset(datadir("exp_raw", "eddy_covariance", "ES-LM1_2014-2020_FLUXDATAKIT_Met.nc"));
+ds_meteo_LM = open_dataset(
+    datadir("exp_raw", "eddy_covariance", "ES-LM1_2014-2020_FLUXDATAKIT_Met.nc")
+);
 #now make a shorter subset of the data
 start_date = DateTime(2006, 04, 01, 00)
 end_date = DateTime(2006, 07, 01, 00)
@@ -78,39 +84,25 @@ z0h = Bigleaf.roughness_z0h(z0m, 2) #8 according to Ridgen & Salvucci, 2015
 #this is quite high though... no difference for
 d = 2 / 3 * h_veg
 
-
 #Test Penman-Monteith
 # aerodynamic_resistance
-param_ra = ComponentArray(
-    d=d,
-    z0m=z0m,
-    z0h=z0h,
-    z_measur=z_measur
-)
-r_a = EvaporationModel.aerodynamic_resistance(
-    ds_meteo_sub["Wind"][:],
-    param_ra
-)
+param_ra = ComponentArray(; d=d, z0m=z0m, z0h=z0h, z_measur=z_measur)
+r_a = EvaporationModel.aerodynamic_resistance(ds_meteo_sub["Wind"][:], param_ra)
 
 time_sub = collect(ds_meteo_sub.Ti)
-plot(time_sub, r_a, xformatter=x -> Dates.format(x, "Y-m-d H:M:S"))
+plot(time_sub, r_a; xformatter=x -> Dates.format(x, "Y-m-d H:M:S"))
 plot(time_sub, ds_meteo_sub.Wind[:])
 
 #surface resistance
-param_rs = ComponentArray(
-    w_fc=w_fc,
-    w_wilt=w_wp,
-    gd=gD,
-    r_smin=rsmin
-)
+param_rs = ComponentArray(; w_fc=w_fc, w_wilt=w_wp, gd=gD, r_smin=rsmin)
 # forcing_selection = NCDataset.@select(meteo_data, "SWdown", "VPD", "Tair", "LAI")
 #make a time selection
-forcing = ComponentArray(
+forcing = ComponentArray(;
     s_in=ds_meteo_sub["SWdown"][:],
     w_2=0.25, #constant SM for namd
     vpd=ds_meteo_sub["VPD"][:], #in hPa
     t_air=ds_meteo_sub["Tair"][:],
-    lai=ds_meteo_sub["LAI"][:]
+    lai=ds_meteo_sub["LAI"][:],
 )
 r_s = EvaporationModel.jarvis_stewart(forcing, param_rs)
 plot(time_sub, r_s)
@@ -135,12 +127,14 @@ function calculate_evaporation(Tair, Psurf, Rnet, VPD, r_a, r_s; kwargs...)
     for i in 1:length(Tair)
         et[i], le[i] = Bigleaf.potential_ET(
             Val(:PenmanMonteith),
-            Tair[i], Psurf[i],
-            Rnet[i], VPD[i],
-            1.0 ./ r_a[i],
-            G=0.05 * Rnet[i];
+            Tair[i],
+            Psurf[i],
+            Rnet[i],
+            VPD[i],
+            1.0 ./ r_a[i];
+            G=0.05 * Rnet[i],
             Gs_pot=ms_to_mol(1.0 ./ r_s[i], Tair[i] + 273.15, Psurf[i] * 1000), #eenheden aanpassen! mol m-2 s-1 moet het zijn
-            kwargs...
+            kwargs...,
         )
     end
     return et, le
@@ -150,11 +144,12 @@ et_pred, le_pred = calculate_evaporation(
     ds_meteo_sub.Psurf[:] / 1000, #Pa -> kPa
     ds_flux_sub.Rnet[:], #W/m²
     ds_meteo_sub.VPD[:] / 10, #hPa -> kPa
-    r_a, r_s
+    r_a,
+    r_s,
 )
 corr_test = Statistics.cor(le_pred, ds_flux_sub.Qle_cor[:])
-plot(time_sub, le_pred, label="predicted")
-plot!(time_sub, ds_flux_sub.Qle_cor[:], label="observed")
+plot(time_sub, le_pred; label="predicted")
+plot!(time_sub, ds_flux_sub.Qle_cor[:]; label="observed")
 #plot!(time_sub, ds_flux_sub.Rnet[:], label = "Rₙ")
 yaxis!("Latent heat [W/m²]")
 using Printf
@@ -172,34 +167,51 @@ using DataInterpolations, Dates
 #convert to numeric ms for interpolation
 interp_Rnet = ConstantInterpolation(
     ds_flux_sub["Rnet"][:],
-    Dates.datetime2epochms.(collect(ds_flux_sub.Ti)),
-    dir=:left, extrapolate=true
+    Dates.datetime2epochms.(collect(ds_flux_sub.Ti));
+    dir=:left,
+    extrapolate=true,
 )
-t_plot = collect(range(start_date, end_date, step=Minute(5)))
-scatter(collect(ds_flux_sub.Ti), ds_flux_sub["Rnet"][:], label="Data")
+t_plot = collect(range(start_date, end_date; step=Minute(5)))
+scatter(collect(ds_flux_sub.Ti), ds_flux_sub["Rnet"][:]; label="Data")
 plot!(t_plot, interp_Rnet(Dates.datetime2epochms.(t_plot)); label="Constant interpolation")
 #keep w_2 as constant for now
 #same interpolation everywhere
 #t_interp = Float64.(Dates.datetime2epochms.(collect(ds_flux_sub.Ti)))
 t_interp = Dates.value.(Dates.convert.(Second, ds_flux_sub.Ti .- ds_flux_sub.Ti[1])) #numer of seconds since start in Int64
 @with_kw struct struct_forcing_wg
-    r_net::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_flux_sub["Rnet"][:], t_interp, dir=:left)
-    vpd::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["VPD"][:], t_interp, dir=:left)
-    t_air::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["Tair"][:], t_interp, dir=:left)
-    p_surf::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["Psurf"][:], t_interp, dir=:left)
-    precip::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["Precip"][:], t_interp, dir=:left)
-    wind::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["Wind"][:], t_interp, dir=:left)
-    s_in::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["SWdown"][:], t_interp, dir=:left)
-    lai::DataInterpolations.AbstractInterpolation = ConstantInterpolation(ds_meteo_sub["LAI"][:], t_interp, dir=:left)
+    r_net::DataInterpolations.AbstractInterpolation = ConstantInterpolation(
+        ds_flux_sub["Rnet"][:], t_interp; dir=:left
+    )
+    vpd::DataInterpolations.AbstractInterpolation = ConstantInterpolation(
+        ds_meteo_sub["VPD"][:], t_interp; dir=:left
+    )
+    t_air::DataInterpolations.AbstractInterpolation = ConstantInterpolation(
+        ds_meteo_sub["Tair"][:], t_interp; dir=:left
+    )
+    p_surf::DataInterpolations.AbstractInterpolation = ConstantInterpolation(
+        ds_meteo_sub["Psurf"][:], t_interp; dir=:left
+    )
+    precip::DataInterpolations.AbstractInterpolation = ConstantInterpolation(
+        ds_meteo_sub["Precip"][:], t_interp; dir=:left
+    )
+    wind::DataInterpolations.AbstractInterpolation = ConstantInterpolation(
+        ds_meteo_sub["Wind"][:], t_interp; dir=:left
+    )
+    s_in::DataInterpolations.AbstractInterpolation = ConstantInterpolation(
+        ds_meteo_sub["SWdown"][:], t_interp; dir=:left
+    )
+    lai::DataInterpolations.AbstractInterpolation = ConstantInterpolation(
+        ds_meteo_sub["LAI"][:], t_interp; dir=:left
+    )
 end
 #ALTERNATIVE: JUST DEFINE THESE FUNCTIONS OUTSIDE OF THE
 # @with_kw struct struct_test
 #     test::DataInterpolations.AbstractInterpolation
 # end
-param_all = ComponentArray(
+param_all = ComponentArray(;
     d_1=d_1,
     d_2=d_2,
-    τ=24.0*3600, #[s]
+    τ=24.0 * 3600, #[s]
     w_sat=w_sat,
     c1_sat=C1sat,
     c2_ref=C2ref,
@@ -208,7 +220,7 @@ param_all = ComponentArray(
     b=b_ch,
     p=p_ch,
     w_res=w_res,
-    w_crit = w_crit,
+    w_crit=w_crit,
     w_fc=w_fc,
     w_wilt=w_wp,
     gd=gD,
@@ -216,7 +228,7 @@ param_all = ComponentArray(
     d=d,
     z0m=z0m,
     z0h=z0h,
-    z_measur=z_measur
+    z_measur=z_measur,
 )
 #p_total_wg = ComponentArray(forcing = forcing_wg, parameters = param_wg)
 @with_kw struct struct_total_pwg
@@ -226,9 +238,15 @@ end
 
 function compute_penman(Tair, Psurf, Rnet, VPD, r_a, r_s; kwargs...)
     et, le = Bigleaf.potential_ET(
-        Val(:PenmanMonteith), Tair, Psurf, Rnet, VPD, 1.0 / r_a,
-        G=0.05 * Rnet; Gs_pot=ms_to_mol(1.0 ./ r_s, Tair + 273.15, Psurf * 1000), #eenheden aanpassen! mol m-2 s-1 moet het zijn
-        kwargs...
+        Val(:PenmanMonteith),
+        Tair,
+        Psurf,
+        Rnet,
+        VPD,
+        1.0 / r_a;
+        G=0.05 * Rnet,
+        Gs_pot=ms_to_mol(1.0 ./ r_s, Tair + 273.15, Psurf * 1000), #eenheden aanpassen! mol m-2 s-1 moet het zijn
+        kwargs...,
     )
     return et, le
 end
@@ -237,13 +255,33 @@ using StaticArrays
 function wg_conservation(u, p, t)
     #t in ms because this easiest to work with for now
     #@unpack forcings, params = p
-    @unpack d_1, d_2, τ, w_sat, c1_sat, c2_ref, c_3, a, b, p, d, z0m, z0h, z_measur,
-    w_res, w_crit, w_fc, w_wilt, gd, r_smin = p
+    @unpack d_1,
+    d_2,
+    τ,
+    w_sat,
+    c1_sat,
+    c2_ref,
+    c_3,
+    a,
+    b,
+    p,
+    d,
+    z0m,
+    z0h,
+    z_measur,
+    w_res,
+    w_crit,
+    w_fc,
+    w_wilt,
+    gd,
+    r_smin = p
     #@unpack r_net, vpd, t_air, p_surf, precip, wind, s_in, lai = forcings
     # DO NOT UNPACK FUNCTION HERE, THIS IS SUPER SLOW!
     #w_2 = 0.25 #temporarily
     r_a = EvaporationModel.aerodynamic_resistance(wind(t), d, z0m, z0h, z_measur)
-    r_s = EvaporationModel.jarvis_stewart(s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin)
+    r_s = EvaporationModel.jarvis_stewart(
+        s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin
+    )
     c_1 = compute_c_1(u[1], w_sat, b, c1_sat)
     c_2 = compute_c_2(u[2], w_sat, c2_ref)
     w_geq = compute_w_geq(u[2], w_sat, a, p) #0.25 is temporarily
@@ -253,16 +291,15 @@ function wg_conservation(u, p, t)
         compute_penman(
             t_air(t) - 273.15, p_surf(t) / 1000, r_net(t), vpd(t) / 10, r_a, r_s
         )[1], #kg/(m^2 s)
-        f_veg, f_wet
+        f_veg,
+        f_wet,
     )
     e_g = EvaporationModel.compute_bare_soil_evaporation(
         compute_penman(
             t_air(t) - 273.15, p_surf(t) / 1000, r_net(t), vpd(t) / 10, r_a, r_s
         )[1], #kg/(m^2 s)
         f_veg,
-        EvaporationModel.compute_soil_evaporation_stress(
-            u[1], w_crit, w_res
-        ),
+        EvaporationModel.compute_soil_evaporation_stress(u[1], w_crit, w_res),
     )
     #correct fluxes:
     # - Bare soil evaporation to zero when below residual SM
@@ -271,8 +308,9 @@ function wg_conservation(u, p, t)
     e_g = max(w_min - w_res, 0.0) * e_g
     e_tr = max(u[2] - w_wilt, 0.0) * e_tr
     dwg = c_1 / (d_1 * ρ_w) * (precip(t) - e_g) - c_2 / τ * (u[1] - w_geq)
-    dw2 = 1 / (ρ_w * d_2) * (precip(t) - e_g - e_tr) - c_3 / (d_2 * τ) * max(u[2] - w_fc, 0.0)
-    SA[dwg, dw2]
+    dw2 =
+        1 / (ρ_w * d_2) * (precip(t) - e_g - e_tr) - c_3 / (d_2 * τ) * max(u[2] - w_fc, 0.0)
+    return SA[dwg, dw2]
 end
 #input_struct = struct_total_pwg()
 @unpack r_net, vpd, t_air, p_surf, precip, wind, s_in, lai = struct_forcing_wg()
@@ -281,29 +319,29 @@ using BenchmarkTools
 
 #try implementing saving callback
 using DiffEqCallbacks
-saved_values = SavedValues(Float64, Tuple{Float64, Float64})
+saved_values = SavedValues(Float64, Tuple{Float64,Float64})
 # saved_values = SavedValues(Float64, NamedTuple{(:value1, :value2), Tuple{Float64, Float64}})
-function save_func(u, t , integrator)
-    @unpack d, z0m, z0h, z_measur,
-    w_res, w_crit, w_fc, w_wilt, gd, r_smin = integrator.p
+function save_func(u, t, integrator)
+    @unpack d, z0m, z0h, z_measur, w_res, w_crit, w_fc, w_wilt, gd, r_smin = integrator.p
     r_a = EvaporationModel.aerodynamic_resistance(wind(t), d, z0m, z0h, z_measur)
-    r_s = EvaporationModel.jarvis_stewart(s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin)
+    r_s = EvaporationModel.jarvis_stewart(
+        s_in(t), u[2], vpd(t), t_air(t), lai(t), w_fc, w_wilt, gd, r_smin
+    )
     f_veg = 0.95 #temp value
     f_wet = 0.0 #temp value
     e_tr = EvaporationModel.compute_transpiration(
         compute_penman(
             t_air(t) - 273.15, p_surf(t) / 1000, r_net(t), vpd(t) / 10, r_a, r_s
         )[2], #W/m^2
-        f_veg, f_wet
+        f_veg,
+        f_wet,
     )
     e_g = EvaporationModel.compute_bare_soil_evaporation(
         compute_penman(
             t_air(t) - 273.15, p_surf(t) / 1000, r_net(t), vpd(t) / 10, r_a, r_s
         )[2], #W/m^2
         f_veg,
-        EvaporationModel.compute_soil_evaporation_stress(
-            u[1], w_crit, w_res
-        ),
+        EvaporationModel.compute_soil_evaporation_stress(u[1], w_crit, w_res),
     )
     #correct fluxes:
     # - Bare soil evaporation to zero when below residual SM
@@ -313,46 +351,82 @@ function save_func(u, t , integrator)
     e_tr = max(u[2] - w_wilt, 0.0) * e_tr
     return (e_g, e_tr)
 end
-cb = SavingCallback(save_func, saved_values, saveat = t_interp)
+cb = SavingCallback(save_func, saved_values; saveat=t_interp)
 
 w_init = w_fc
-prob = ODEProblem(wg_conservation, SA[w_init, w_init], (t_interp[1], t_interp[end]), param_all)
-sol = solve(prob, ImplicitEuler(), saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false, callback = cb)
+prob = ODEProblem(
+    wg_conservation, SA[w_init, w_init], (t_interp[1], t_interp[end]), param_all
+)
+sol = solve(
+    prob,
+    ImplicitEuler();
+    saveat=t_interp,
+    dt=(Second(Minute(30))).value,
+    adaptive=false,
+    callback=cb,
+)
 display(sol.destats)
 #plot
 color1, color2 = :blue, :black
-p = plot(collect(ds_flux_sub.Ti), sol[1, :], label="w_g", color=color1, dpi = 400)
+p = plot(collect(ds_flux_sub.Ti), sol[1, :]; label="w_g", color=color1, dpi=400)
 plot!(
-    collect(ds_flux_sub.Ti), sol[2, :], label="w_2", legend=:topleft, linestyle=:dash,
-    color=color1, yguidefontcolor=color1, ylabel="soil moisture [-]", yforeground_color_axis=color1,
-    ytickfontcolor=color1
+    collect(ds_flux_sub.Ti),
+    sol[2, :];
+    label="w_2",
+    legend=:topleft,
+    linestyle=:dash,
+    color=color1,
+    yguidefontcolor=color1,
+    ylabel="soil moisture [-]",
+    yforeground_color_axis=color1,
+    ytickfontcolor=color1,
 )
 plot!(
-    twinx(), collect(ds_flux_sub.Ti), ds_meteo_sub["Precip"][:], color=:black,
-    linestyle=:dot, ylabel="precipitation [kg/(m² s)]", label=""
+    twinx(),
+    collect(ds_flux_sub.Ti),
+    ds_meteo_sub["Precip"][:];
+    color=:black,
+    linestyle=:dot,
+    ylabel="precipitation [kg/(m² s)]",
+    label="",
 )
-savefig(projectdir("plots","test_picture.png"))
+savefig(projectdir("plots", "test_picture.png"))
 # plot
 
 #plot saved values
 E_total = map(x -> x[1], saved_values.saveval) + map(x -> x[2], saved_values.saveval)
-plot(collect(ds_flux_sub.Ti), ds_flux_sub.Qle_cor[:], label = "observed", ylabel = "LE [W/m²]", dpi = 400)
-plot!(collect(ds_flux_sub.Ti), E_total, label = "predicted", linestyle = :dash)
+plot(
+    collect(ds_flux_sub.Ti),
+    ds_flux_sub.Qle_cor[:];
+    label="observed",
+    ylabel="LE [W/m²]",
+    dpi=400,
+)
+plot!(collect(ds_flux_sub.Ti), E_total; label="predicted", linestyle=:dash)
 corr_model = Statistics.cor(E_total, ds_flux_sub.Qle_cor[:])
 title!(Printf.@sprintf("Correlation: %.4f", corr_model))
-savefig(projectdir("plots","test_picture_LE.png"))
+savefig(projectdir("plots", "test_picture_LE.png"))
 
 ## Try different solvers for the same problem
-sol_implicit = solve(prob, ImplicitEuler(), saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false)
-sol_explicit = solve(prob, Euler(), saveat=t_interp, dt=(Second(Minute(30))).value)
-sol_stiff = solve(prob, KenCarp4(), saveat=t_interp)
+sol_implicit = solve(
+    prob, ImplicitEuler(); saveat=t_interp, dt=(Second(Minute(30))).value, adaptive=false
+)
+sol_explicit = solve(prob, Euler(); saveat=t_interp, dt=(Second(Minute(30))).value)
+sol_stiff = solve(prob, KenCarp4(); saveat=t_interp)
 
 #benchmark
 # using LineSearches
 # display(@benchmark solve(prob, ImplicitEuler(nlsolve = NLNewton(relax=BackTracking())), saveat=t_interp,
 #     dt=(Second(Minute(30))).value, adaptive=false))
-display(@benchmark solve(prob, ImplicitEuler(), saveat=t_interp,
-    dt=(Second(Minute(30))).value, adaptive=false))
+display(
+    @benchmark solve(
+        prob,
+        ImplicitEuler(),
+        saveat=t_interp,
+        dt=(Second(Minute(30))).value,
+        adaptive=false,
+    )
+)
 display(@benchmark solve(prob, Euler(), saveat=t_interp, dt=(Second(Minute(30))).value))
 # display(@benchmark solve(prob, QNDF(), saveat=t_interp))
 display(@benchmark solve(prob, Rodas5P(), saveat=t_interp))
@@ -360,15 +434,15 @@ display(@benchmark solve(prob, Rodas5P(), saveat=t_interp))
 
 # test out of domain callback!
 # More info on how to constrain the solution, see https://doi.org/10.1016/j.amc.2004.12.011
-sol_Tsit5 = solve(prob, Tsit5(), cb = PositiveDomain(), abstol = 1e-8, reltol = 1e-8)
+sol_Tsit5 = solve(prob, Tsit5(); cb=PositiveDomain(), abstol=1e-8, reltol=1e-8)
 plot(sol_Tsit5)
 # Works somewhat, but this solver can not handle the stiffness...
-sol_Heun = solve(prob, Heun(), cb = PositiveDomain(), abstol = 1e-6, reltol = 1e-5)
+sol_Heun = solve(prob, Heun(); cb=PositiveDomain(), abstol=1e-6, reltol=1e-5)
 plot(sol_Heun)
 # https://docs.sciml.ai/DiffEqDocs/stable/basics/common_solver_opts/
 # The stiff solver Rodas5P with reltol set to 1e-4
 # This mean accurate op to 0.0001 for soil moisture
 # so max 0.0001 difference between the two orders used
 
-sol = solve(prob, alg_hints = [:stiff])
+sol = solve(prob; alg_hints=[:stiff])
 plot(sol)

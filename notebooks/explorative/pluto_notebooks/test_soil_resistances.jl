@@ -18,9 +18,9 @@ end
 
 # ╔═╡ 46088be8-160d-11f0-2139-370c4260b1ce
 begin
-	using PlutoUI
-	using Plots
-	using Bigleaf
+    using PlutoUI
+    using Plots
+    using Bigleaf
 end
 
 # ╔═╡ 361a3d82-9a4d-44be-b4db-80d80c8bbc58
@@ -39,27 +39,27 @@ rsmin = 50 #s/m
 θ_range = 0:0.001:0.6
 
 # ╔═╡ a9d987ca-5fdf-4f49-a29a-aceb3de3dc13
-β_lp92(θ,θ_fc) = 1/4 * (1 - cos(π * min(θ, θ_fc) / θ_fc))^2
+β_lp92(θ, θ_fc) = 1/4 * (1 - cos(π * min(θ, θ_fc) / θ_fc))^2
 
 # ╔═╡ edd595e2-7179-40bb-ab5e-da9e38480e21
-rss_ecmwf(θ,θ_fc,rsmin) = rsmin * θ_fc/θ
+rss_ecmwf(θ, θ_fc, rsmin) = rsmin * θ_fc/θ
 
 # ╔═╡ fa70912d-40dc-40b1-8d93-b64b02be72e6
-β_ecmwf(θ, θ_fc, rsmin, r_as) = r_as/(r_as + rss_ecmwf(θ,θ_fc,rsmin))
+β_ecmwf(θ, θ_fc, rsmin, r_as) = r_as/(r_as + rss_ecmwf(θ, θ_fc, rsmin))
 
 # ╔═╡ 13747ff4-91cf-4134-b742-58164902588c
-β_gleam(θ, θ_crit, θ_res) = min(max(0,(θ - θ_res) / (θ_crit - θ_res)),1)
+β_gleam(θ, θ_crit, θ_res) = min(max(0, (θ - θ_res) / (θ_crit - θ_res)), 1)
 
 # ╔═╡ dbb71c5f-bcba-47ca-ab1c-23420e2ed295
 function β_fortin(θ, θ_fc, rsmin, c, r_as)
-	if θ > θ_fc
-		p = 1
-	else
-		p = c + (1 - c) * θ / θ_fc
-	end
-	r_ss = rsmin * (θ_fc / θ)^p
-	β = r_as / (r_as + r_ss)
-	return β
+    if θ > θ_fc
+        p = 1
+    else
+        p = c + (1 - c) * θ / θ_fc
+    end
+    r_ss = rsmin * (θ_fc / θ)^p
+    β = r_as / (r_as + r_ss)
+    return β
 end
 
 # ╔═╡ a97ebd20-9353-46a8-bd82-63828dbb9e60
@@ -82,24 +82,24 @@ end
 
 # ╔═╡ 87b51b48-a8a9-4772-8590-2c941cbb1ea3
 begin
-	range_β_lp92 = β_lp92.(θ_range, θ_fc)
-	range_β_ecmwf = β_ecmwf.(θ_range, θ_fc, rsmin, r_as)
-	range_β_gleam = β_gleam.(θ_range, θ_crit, θ_res)
-	range_β_fortin = β_fortin.(θ_range, θ_fc, rsmin, c, r_as)
+    range_β_lp92 = β_lp92.(θ_range, θ_fc)
+    range_β_ecmwf = β_ecmwf.(θ_range, θ_fc, rsmin, r_as)
+    range_β_gleam = β_gleam.(θ_range, θ_crit, θ_res)
+    range_β_fortin = β_fortin.(θ_range, θ_fc, rsmin, c, r_as)
 end
 
 # ╔═╡ 0f8f9042-c495-45f9-93cb-778226a67af0
 begin
-	plot(θ_range, range_β_lp92, label = "lp92")
-	plot!(θ_range, range_β_ecmwf, label = "ecmwf")
-	plot!(θ_range, range_β_gleam, label = "gleam")
-	plot!(θ_range, range_β_fortin, label = "fortin")
-	vline!([θ_fc], label = "θ_fc", linestyle = :dash)
-	vline!([θ_crit], label = "θ_crit", linestyle = :dash)
-	vline!([θ_pwp], label = "θ_pwp", linestyle = :dash)
-	vline!([θ_res], label = "θ_res", linestyle = :dash)
-	ylabel!("β")
-	xlabel!("θ")
+    plot(θ_range, range_β_lp92; label="lp92")
+    plot!(θ_range, range_β_ecmwf; label="ecmwf")
+    plot!(θ_range, range_β_gleam; label="gleam")
+    plot!(θ_range, range_β_fortin; label="fortin")
+    vline!([θ_fc]; label="θ_fc", linestyle=:dash)
+    vline!([θ_crit]; label="θ_crit", linestyle=:dash)
+    vline!([θ_pwp]; label="θ_pwp", linestyle=:dash)
+    vline!([θ_res]; label="θ_res", linestyle=:dash)
+    ylabel!("β")
+    xlabel!("θ")
 end
 
 # ╔═╡ 34de8a36-46fe-4f9c-89f9-118cda9210fe
@@ -113,13 +113,13 @@ p = 101.325 #kPa
 
 # ╔═╡ 85ebd7df-8d73-4acb-87ca-c36e33d15c16
 function β_pm(r_ss, r_as, T_a, p)
-	Δ = Esat_from_Tair_deriv(T_a)
-	γ = psychrometric_constant(T_a, p)
-	return (Δ + γ) * r_as / ((Δ + γ) * r_as + γ * r_ss)
+    Δ = Esat_from_Tair_deriv(T_a)
+    γ = psychrometric_constant(T_a, p)
+    return (Δ + γ) * r_as / ((Δ + γ) * r_as + γ * r_ss)
 end
 
 # ╔═╡ 84280a18-a236-432e-9f2f-447ab0afc63e
-psychrometric_constant(20,p)
+psychrometric_constant(20, p)
 
 # ╔═╡ b9899fa8-a20f-4995-b0f5-b1a451b5a09d
 Esat_from_Tair_deriv(20)
@@ -138,39 +138,39 @@ T_a, r_as_bis
 
 # ╔═╡ ca830b05-1027-4ed7-bd1a-f89867fe9ad2
 begin
-	β_range_bulk = β_bulkresis.(r_ss_range, r_as_bis);
-	β_range_pm = β_pm.(r_ss_range, r_as_bis, T_a, p);
+    β_range_bulk = β_bulkresis.(r_ss_range, r_as_bis);
+    β_range_pm = β_pm.(r_ss_range, r_as_bis, T_a, p);
 end
 
 # ╔═╡ ccf957ab-1153-4135-8b50-3c32bb30a685
 begin
-	plot(r_ss_range, β_range_bulk, label = "Bulk resistance")
-	plot!(r_ss_range, β_range_pm, label = "Penman-Monteith")
-	xlabel!("r_ss [s/m]")
-	ylabel!("β")
-	title!("T_a = $T_a °C, r_as = $r_as_bis s/m")
-end	
+    plot(r_ss_range, β_range_bulk; label="Bulk resistance")
+    plot!(r_ss_range, β_range_pm; label="Penman-Monteith")
+    xlabel!("r_ss [s/m]")
+    ylabel!("β")
+    title!("T_a = $T_a °C, r_as = $r_as_bis s/m")
+end
 
 # ╔═╡ e3ecbaf6-b17c-4b70-82f4-cba7e6a17353
 md"Repeat the experiment, now using a rss parametrisation"
 
 # ╔═╡ bfe63bb8-cd69-4d97-b5ca-5f99586ad211
 begin
-	r_ss_range_ecmwf = rss_ecmwf.(θ_range,θ_fc,rsmin)
-	β_range_bulk_ecmwf = β_bulkresis.(r_ss_range_ecmwf, r_as_bis);
-	β_range_pm_ecmwf = β_pm.(r_ss_range_ecmwf, r_as_bis, T_a, p); 
+    r_ss_range_ecmwf = rss_ecmwf.(θ_range, θ_fc, rsmin)
+    β_range_bulk_ecmwf = β_bulkresis.(r_ss_range_ecmwf, r_as_bis);
+    β_range_pm_ecmwf = β_pm.(r_ss_range_ecmwf, r_as_bis, T_a, p);
 end
 
 # ╔═╡ 0b7b8e9d-27d2-4326-a052-aa101247ff27
 begin
-	plot(θ_range, β_range_bulk_ecmwf, label = "Bulk resistance")
-	plot!(θ_range, β_range_pm_ecmwf, lable = "Penman monteith")
-	vline!([θ_fc], label = "θ_fc", linestyle = :dash)
-	vline!([θ_crit], label = "θ_crit", linestyle = :dash)
-	vline!([θ_pwp], label = "θ_pwp", linestyle = :dash)
-	vline!([θ_res], label = "θ_res", linestyle = :dash)
-	ylabel!("β")
-	xlabel!("θ")
+    plot(θ_range, β_range_bulk_ecmwf; label="Bulk resistance")
+    plot!(θ_range, β_range_pm_ecmwf; lable="Penman monteith")
+    vline!([θ_fc]; label="θ_fc", linestyle=:dash)
+    vline!([θ_crit]; label="θ_crit", linestyle=:dash)
+    vline!([θ_pwp]; label="θ_pwp", linestyle=:dash)
+    vline!([θ_res]; label="θ_res", linestyle=:dash)
+    ylabel!("β")
+    xlabel!("θ")
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
