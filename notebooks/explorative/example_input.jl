@@ -66,3 +66,5 @@ FT = Float64
 u0_test = [0.2, 0.2, 0.001]
 t_end = 1 * 86400.0 # 1 day in seconds
 t_span_test = (0.0, t_end) # 1 day in seconds
+dt = 1800 #s, 30"
+saveat_test = 0:dt:t_end
