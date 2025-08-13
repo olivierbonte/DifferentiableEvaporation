@@ -34,6 +34,6 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
         with:
           project: src/EvaporationModel
-      - name: Run tests
-        run: >
-          julia --project=src/EvaporationModel/test/. src/EvaporationModel/test/runtests.jl
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          project: src/EvaporationModel
