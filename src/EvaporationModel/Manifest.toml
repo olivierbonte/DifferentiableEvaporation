@@ -2,7 +2,7 @@
 
 julia_version = "1.10.9"
 manifest_format = "2.0"
-project_hash = "249d3751bf971c1241448d264d11d43154068fa0"
+project_hash = "30181a567af0ff3bba4288c08b181b1f9cd1df92"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -327,6 +327,12 @@ version = "6.168.0"
     SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[[deps.DiffEqCallbacks]]
+deps = ["ConcreteStructs", "DataStructures", "DiffEqBase", "DifferentiationInterface", "Functors", "LinearAlgebra", "Markdown", "RecipesBase", "RecursiveArrayTools", "SciMLBase", "StaticArraysCore"]
+git-tree-sha1 = "397ef6fffcf418ba55264ba785b032b8a136903b"
+uuid = "459566f4-90b8-5000-8ac3-15dfb0a30def"
+version = "4.9.0"
 
 [[deps.DiffResults]]
 deps = ["StaticArraysCore"]

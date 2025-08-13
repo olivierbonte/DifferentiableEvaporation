@@ -3,6 +3,7 @@ module EvaporationModel
 using Bigleaf
 using ComponentArrays
 using Dates
+using DiffEqCallbacks
 using ForwardDiff
 using OrdinaryDiffEq
 using Parameters
@@ -49,7 +50,7 @@ export ground_heat_flux,
 
 include("model.jl")
 export AbstractModel,
-    ProcessBasedModel, compute_diagnostics!, compute_tendencies!, initialize!, solve!
+    ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!
 
 include("resistances.jl")
 export jarvis_stewart,
