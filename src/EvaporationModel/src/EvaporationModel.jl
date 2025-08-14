@@ -3,10 +3,12 @@ module EvaporationModel
 using Bigleaf
 using ComponentArrays
 using Dates
+using DataFrames
 using DiffEqCallbacks
 using ForwardDiff
 using OrdinaryDiffEq
 using Parameters
+using YAXArrays
 
 include("canopy.jl")
 export fractional_vegetation_cover,
