@@ -96,7 +96,13 @@ test_model_BE_Bra.diagnostics.saveval
 # DataFrame
 df_diagnostics = DataFrame(test_model_BE_Bra.diagnostics.saveval)
 df_prognostics = DataFrame(test_model_BE_Bra.sol)
+cols_prognostics = filter(x -> x != "timestamp", names(df_prognostics))
+rename!(df_prognostics, map(=>, cols_prognostics, ["w_1", "w_2", "w_r"]))
 df_all = hcat(df_diagnostics, df_prognostics)
 df_all_no_time = df_all[:, names(df_all) .!= "timestamp"]
 time_saved = unix2datetime.(test_model_BE_Bra.diagnostics.t)
 axlist = (YAXArrays.time(time_saved), Variables(names(df_all_no_time)))
+test_yax_array = YAXArray(axlist, Array(df_all_no_time))
+
+# Implemented in source code
+plot(test_model_BE_Bra.output)
