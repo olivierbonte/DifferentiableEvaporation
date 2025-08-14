@@ -38,65 +38,6 @@ test_func_4 = let forcings = forcings
     @closure (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
 end
 @benchmark test_func_4($du_test, $u0_test, $param_test, $t_span_test[1])
-# using let block
-# # Experiment with callable struct Idea
-# struct RHSFunction{F}
-#     forcings::F
-# end
-# (rhs::RHSFunction)(du, u, p, t) = compute_tendencies!(du, u, p, t, rhs.forcings)
-# # test_func_struct = RHSFunction(forcings)
-# # @benchmark test_func_struct($du_test, $u0_test, $param_test, $t_span_test[1])
-
-# # Struct instead of NamedTuple input for forcings
-# struct Forcings
-#     P
-#     T_a
-#     u_a
-#     p_a
-#     VPD_a
-#     SW_in
-#     R_n
-#     LAI
-# end
-# struct Forcings2{P,T,U,PA,V,S,R,L}
-#     P::P
-#     T_a::T
-#     u_a::U
-#     p_a::PA
-#     VPD_a::V
-#     SW_in::S
-#     R_n::R
-#     LAI::L
-# end
-# forcings_struct = Forcings(
-#     forcings.P,
-#     forcings.T_a,
-#     forcings.u_a,
-#     forcings.p_a,
-#     forcings.VPD_a,
-#     forcings.SW_in,
-#     forcings.R_n,
-#     forcings.LAI,
-# )
-# forcings_struct2 = Forcings2(
-#     forcings.P,
-#     forcings.T_a,
-#     forcings.u_a,
-#     forcings.p_a,
-#     forcings.VPD_a,
-#     forcings.SW_in,
-#     forcings.R_n,
-#     forcings.LAI,
-# )
-# @inline test_func_struct_forcings(du, u, p, t) =
-#     compute_tendencies!(du, u, p, t, forcings_struct2)
-# @benchmark test_func_struct_forcings($du_test, $u0_test, $param_test, $t_span_test[1])
-# # double struct
-# rhs_struct = RHSFunction(forcings_struct2)
-# @benchmark rhs_struct($du_test, $u0_test, $param_test, $t_span_test[1])
-# # Experiment with ODEFunction
-# ode_function = ODEFunction{true,SciMLBase.FullSpecialize}(test_func)
-# @benchmark ode_function($du_test, $u0_test, $param_test, $t_span_test[1])
 
 test_model = ProcessBasedModel{FT}(;
     forcings=forcings,
