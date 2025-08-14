@@ -4,7 +4,7 @@ makedocs(;
     sitename="EvaporationModel",
     pages=["Home" => "index.md"],
     modules=[EvaporationModel],
-    checkdocs=:none
+    checkdocs=:none,
 )
 
 deploydocs(;

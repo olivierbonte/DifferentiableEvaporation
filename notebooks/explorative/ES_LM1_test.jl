@@ -11,8 +11,12 @@ using Bigleaf
 # Site info BE-Bra: https://meta.icos-cp.eu/resources/stations/ES_BE-Bra
 # %% Load the data
 site = "DE-Hai"#"BE-Bra"#"ES-LM1"
-ds_meteo = open_dataset(glob(site*"*FLUXDATAKIT_Met.nc", datadir("exp_raw", "eddy_covariance"))[1]);
-ds_flux = open_dataset(glob(site*"*FLUXDATAKIT_Flux.nc", datadir("exp_raw", "eddy_covariance"))[1]);
+ds_meteo = open_dataset(
+    glob(site*"*FLUXDATAKIT_Met.nc", datadir("exp_raw", "eddy_covariance"))[1]
+);
+ds_flux = open_dataset(
+    glob(site*"*FLUXDATAKIT_Flux.nc", datadir("exp_raw", "eddy_covariance"))[1]
+);
 ds_soil = open_dataset(glob(site*"_soil_horizontal_agg.nc", datadir("exp_pro", "soil"))[1])
 ds_veg = open_dataset(glob(site*".nc", datadir("exp_pro", "vegetation"))[1])
 ds_soil = Cube(ds_soil) #easier for computations!
@@ -21,8 +25,8 @@ ds_soil = Cube(ds_soil) #easier for computations!
 
 # %% Parameter definitions
 # Initial simplification: just take average over the depths
-import Statistics: mean 
-ds_soil_avg = mapslices(mean, ds_soil, dims = "depth")
+import Statistics: mean
+ds_soil_avg = mapslices(mean, ds_soil; dims="depth")
 # # Table 8.2 of 
 # #TEST: dynamic f_veg
 # k_ext = 0.7 #see https://github.com/gee-hydro/gee_PML/blob/stable/src/pkg_PMLV2_v0.1.5.js#L422C32-L422C134
@@ -35,11 +39,10 @@ print("Vegetation type: " * IGBP_land_cover)
 # Assume Interruped forest here as closest from the ECMWF table for Savanna
 # Temporary dict for linking these two land cover classifications
 link_dict = Dict(
-    "Savannas" => "Interrupted forest",
-    "Mixed Forests" => "Mixed forest/woodland"
+    "Savannas" => "Interrupted forest", "Mixed Forests" => "Mixed forest/woodland"
 )
 land_cover_type = link_dict[IGBP_land_cover]
-veg_par_sub = veg_par[veg_par.vegetation_type .== land_cover_type,:]
+veg_par_sub = veg_par[veg_par.vegetation_type .== land_cover_type, :]
 g_d = veg_par_sub.g_d[1]
 r_smin = veg_par_sub.r_smin[1]
 
@@ -56,15 +59,14 @@ w_sat = ds_soil_avg[Variable = At("w_sat")].data[1]
 perc_clay = ds_soil_avg[Variable = At("mean_clay_percentage")].data[1]
 # Compute the other parameters
 a_ch = compute_a(perc_clay)
-b_ch = compute_b(Val(:clay), perc_clay) 
+b_ch = compute_b(Val(:clay), perc_clay)
 p_ch = compute_p(perc_clay)
-
 
 # %% make subset
 start_date = DateTime(2014, 04, 01, 00)
 end_date = DateTime(2014, 07, 01, 00)
-ds_meteo_sub = ds_meteo[time=DimensionalData.Between(start_date, end_date)]
-ds_flux_sub = ds_flux[time=DimensionalData.Between(start_date, end_date)]
+ds_meteo_sub = ds_meteo[time = DimensionalData.Between(start_date, end_date)]
+ds_flux_sub = ds_flux[time = DimensionalData.Between(start_date, end_date)]
 
 #site info
 z_measur = Float64(ds_flux.reference_height.data[:, :][1])
