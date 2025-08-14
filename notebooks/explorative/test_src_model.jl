@@ -23,8 +23,80 @@ compute_tendencies!(du_test, u0_test, param_test, t_span_test[1], forcings)
 #     return compute_tendencies!(du_test, u0_test, p, t_span_test[1], forcings)
 # end
 # @enter gradient(gradient_tendencies_wrapper, AutoForwardDiff(), param_test)
-test_func(du, u, p, t) = compute_tendencies!(du, u, p, t, forcings)
-@benchmark test_func($du_test, $u0_test, $param_test, $t_span_test[1])
+using FastClosures
+const test_func = @closure (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
+@benchmark test_func($du_test, $u0_test, $param_test, $t_span_test[1]) #zero allocs
+# Not using FastClosures
+const test_func_2 = (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
+@benchmark test_func_2($du_test, $u0_test, $param_test, $t_span_test[1])
+# Trying to make a constant forcings
+const forcings_const = forcings
+test_func_3(du, u, p, t) = compute_tendencies!(du, u, p, t, forcings_const)
+@benchmark test_func_3($du_test, $u0_test, $param_test, $t_span_test[1])
+# Using let block
+test_func_4 = let forcings = forcings
+    @closure (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
+end
+@benchmark test_func_4($du_test, $u0_test, $param_test, $t_span_test[1])
+# using let block
+# # Experiment with callable struct Idea
+# struct RHSFunction{F}
+#     forcings::F
+# end
+# (rhs::RHSFunction)(du, u, p, t) = compute_tendencies!(du, u, p, t, rhs.forcings)
+# # test_func_struct = RHSFunction(forcings)
+# # @benchmark test_func_struct($du_test, $u0_test, $param_test, $t_span_test[1])
+
+# # Struct instead of NamedTuple input for forcings
+# struct Forcings
+#     P
+#     T_a
+#     u_a
+#     p_a
+#     VPD_a
+#     SW_in
+#     R_n
+#     LAI
+# end
+# struct Forcings2{P,T,U,PA,V,S,R,L}
+#     P::P
+#     T_a::T
+#     u_a::U
+#     p_a::PA
+#     VPD_a::V
+#     SW_in::S
+#     R_n::R
+#     LAI::L
+# end
+# forcings_struct = Forcings(
+#     forcings.P,
+#     forcings.T_a,
+#     forcings.u_a,
+#     forcings.p_a,
+#     forcings.VPD_a,
+#     forcings.SW_in,
+#     forcings.R_n,
+#     forcings.LAI,
+# )
+# forcings_struct2 = Forcings2(
+#     forcings.P,
+#     forcings.T_a,
+#     forcings.u_a,
+#     forcings.p_a,
+#     forcings.VPD_a,
+#     forcings.SW_in,
+#     forcings.R_n,
+#     forcings.LAI,
+# )
+# @inline test_func_struct_forcings(du, u, p, t) =
+#     compute_tendencies!(du, u, p, t, forcings_struct2)
+# @benchmark test_func_struct_forcings($du_test, $u0_test, $param_test, $t_span_test[1])
+# # double struct
+# rhs_struct = RHSFunction(forcings_struct2)
+# @benchmark rhs_struct($du_test, $u0_test, $param_test, $t_span_test[1])
+# # Experiment with ODEFunction
+# ode_function = ODEFunction{true,SciMLBase.FullSpecialize}(test_func)
+# @benchmark ode_function($du_test, $u0_test, $param_test, $t_span_test[1])
 
 test_model = ProcessBasedModel{FT}(;
     forcings=forcings,
@@ -51,6 +123,7 @@ test_model_BE_Bra = ProcessBasedModel{FT}(;
     saveat=t_unix,
 )
 EvaporationModel.initialize!(test_model_BE_Bra)
+@benchmark test_model_BE_Bra.f($du_test, $u0_test, $param_test, $t_unix[1])
 # outside model source code definition
 sol_outside = solve(test_model_BE_Bra.prob; tstops=t_unix)
 # inside model source code definition (testing Rosenbrock method)
@@ -60,6 +133,21 @@ plot(test_model_BE_Bra.sol)
 # Benchmarking a solution
 @benchmark EvaporationModel.solve!(test_model_BE_Bra; alg=Heun())
 @benchmark EvaporationModel.solve!(test_model_BE_Bra; alg=Tsit5())
+
+# Test Ensemble simulation
+function prob_func(prob, i, repeat)
+    @. prob.u0 = max(0.2, rand()) * prob.u0
+    return prob
+end
+ens_prob = EnsembleProblem(test_model_BE_Bra.prob; prob_func=prob_func)
+@time ensemble_sim = solve(
+    ens_prob;
+    alg=Heun(),
+    ensemblealg=EnsembleThreads(),
+    tstops=t_unix,
+    saveat=t_unix,
+    trajectories=1000,
+); #around 5s
 
 # %% Experiment with saving diagnostics
 # Manual
