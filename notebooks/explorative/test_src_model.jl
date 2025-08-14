@@ -106,3 +106,22 @@ test_yax_array = YAXArray(axlist, Array(df_all_no_time))
 
 # Implemented in source code
 plot(test_model_BE_Bra.output)
+
+## Experiment with Differentiating the code
+# NOTE: TIMESTAMP ARE NOT YET CORRECTLY ALLIGNED!
+y_obs = ds_ec_sel.Qle[x=1, y=1]
+function loss_function(param, y_obs, forcings, t_span, u0, saveat)
+    model = ProcessBasedModel{FT}(;
+        forcings=forcings, parameters=param, t_span=t_span, u0=u0, saveat=saveat
+    )
+    EvaporationModel.initialize!(model)
+    EvaporationModel.solve!(model)
+    y_pred = model.output[Variables=At("λE_tot")]
+    return sum((y_pred .- y_obs) .^ 2)
+end
+y_pred_test = loss_function(param_test, y_obs, forcings_real, t_span_real, u0_test, t_unix)
+function loss_function_wrapper(param)
+    return loss_function(param, y_obs, forcings_real, t_span_real, u0_test, t_unix)
+end
+@benchmark gradient(loss_function_wrapper, AutoForwardDiff(), param_test) #35 ms
+@benchmark gradient(loss_function_wrapper, AutoFiniteDiff(), param_test) # 350 ms
