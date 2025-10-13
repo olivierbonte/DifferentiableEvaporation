@@ -1,5 +1,7 @@
-## Testing the C3 calculation from Mahfouf (1996) 
+## Testing the C3 calculation from Mahfouf (1996)
 ## https://doi.org/10.1175/1520-0450(1996)035%3C0987:IOGDIA%3E2.0.CO;2
+using DrWatson
+@quickactivate "DifferentiableEvaporation"
 using Plots
 
 τ = 24 * 60 * 60 # [s] # 24h in seconds

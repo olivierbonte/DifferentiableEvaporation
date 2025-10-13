@@ -51,6 +51,17 @@ using DrWatson
 
 which auto-activate the project and enable local path handling from DrWatson.
 
+Note that Julia scripts (`.jl`) which have the following header:
+```
+### A Pluto.jl notebook ###
+```
+are [Pluto Notebooks](https://plutojl.org/). You can run these as regular Julia scripts from the REPL, but you can also activate a notebook interface (which will open in a web browser). To do so, first activate the computational environment with DrWatson (see Julia snippet above), and then use:
+```julia
+import Pluto
+Pluto.run()
+```
+Subsequently, you can choose your notebook of choice to open. 
+
 Besides Julia, also Python is used in this project. The required dependencies to run the python code is given in `environment.yml`. Install via [(Mini)conda](https://docs.anaconda.com/miniconda/) or [Mamba](https://mamba.readthedocs.io/en/latest/) (in this case, replace `conda` by `mamba` in the command below) in the command line interface:
 
 ```
