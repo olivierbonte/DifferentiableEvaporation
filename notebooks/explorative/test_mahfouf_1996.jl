@@ -1,5 +1,7 @@
-## Testing the C3 calculation from Mahfouf (1996) 
+## Testing the C3 calculation from Mahfouf (1996)
 ## https://doi.org/10.1175/1520-0450(1996)035%3C0987:IOGDIA%3E2.0.CO;2
+using DrWatson
+@quickactivate "DifferentiableEvaporation"
 using Plots
 
 τ = 24 * 60 * 60 # [s] # 24h in seconds
@@ -21,10 +23,19 @@ function calculate_C_3(τ, b, K_sat, w_sat, w_fc)
 end
 
 C_3 = calculate_C_3.(τ, b, K_sat, w_sat, w_fc)
-X_clay_plot = range(0.0, maximum(X_clay), length=100)
-scatter(X_clay, C_3_mahfouf, label="C3 from Mahfouf (1996)", color=:blue, marker=:circle, markersize=7)
-scatter!(X_clay, C_3, label="C3 calculated", color=:red, marker=:circle, markersize=4)
-plot!(X_clay_plot, 5.32 * X_clay_plot .^ (-1.042), label="C3 in function of clay percentage")
+X_clay_plot = range(0.0, maximum(X_clay); length=100)
+scatter(
+    X_clay,
+    C_3_mahfouf;
+    label="C3 from Mahfouf (1996)",
+    color=:blue,
+    marker=:circle,
+    markersize=7,
+)
+scatter!(X_clay, C_3; label="C3 calculated", color=:red, marker=:circle, markersize=4)
+plot!(
+    X_clay_plot, 5.32 * X_clay_plot .^ (-1.042); label="C3 in function of clay percentage"
+)
 xlabel!("Clay content [%]")
 ylabel!("C₃ [m]")
 ylims!(0, 2.5)
