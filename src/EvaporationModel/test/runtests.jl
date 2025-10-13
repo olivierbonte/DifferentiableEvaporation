@@ -4,6 +4,7 @@ using EvaporationModel
 # Import packages used for testing
 using AllocCheck
 using BenchmarkTools
+using Dates
 using Documenter
 using Test
 # Here you include files using `srcdir`
