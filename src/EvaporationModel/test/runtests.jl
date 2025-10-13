@@ -4,9 +4,12 @@ using EvaporationModel
 # Import packages used for testing
 using AllocCheck
 using BenchmarkTools
+using Documenter
 using Test
 # Here you include files using `srcdir`
 # include(srcdir("file.jl"))
+
+DocMeta.setdocmeta!(EvaporationModel, :DocTestSetup, :(using Dates))
 
 # Run test suite
 println("Starting tests")
@@ -99,6 +102,11 @@ end
     @test (@ballocations Bigleaf.compute_Ram(ResistanceWindZr(), $u_star, $u)) == 0
     @test isempty(check_allocs(Bigleaf.Gb_constant_kB1, (FT, FT)))
 end
+
+@testset "Check test from doctest" begin
+    Documenter.doctest(EvaporationModel)
+end
+
 ti = time() - ti
 println("\nTest took total time of:")
 println(round(ti / 60; digits=3), " minutes")
