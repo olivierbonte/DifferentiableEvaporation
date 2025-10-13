@@ -10,6 +10,8 @@ using Test
 # Here you include files using `srcdir`
 # include(srcdir("file.jl"))
 
+DocMeta.setdocmeta!(EvaporationModel, :DocTestSetup, :(using Dates))
+
 # Run test suite
 println("Starting tests")
 ti = time()
