@@ -22,11 +22,17 @@ function initialize!(model::ProcessBasedModel)
 end
 
 function create_rhs(model::ProcessBasedModel)
-    return (du, u, p, t) -> compute_tendencies!(du, u, p, t, model.forcings)
+    forcings = model.forcings
+    return let forcings = forcings
+        return (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
+    end
 end
 
 function create_f_diagnostics(model::ProcessBasedModel)
-    return (u, p, t) -> compute_diagnostics(u, p, t, model.forcings)
+    forcings = model.forcings
+    return let forcings = forcings
+        return (u, p, t) -> compute_diagnostics(u, p, t, forcings)
+    end
 end
 
 function solve!(model::ProcessBasedModel; kwargs...)
