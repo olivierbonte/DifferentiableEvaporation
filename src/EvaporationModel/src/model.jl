@@ -35,7 +35,7 @@ function create_f_diagnostics(model::ProcessBasedModel)
     end
 end
 
-function solve!(model::ProcessBasedModel; kwargs...)
+function solve!(model::ProcessBasedModel; AD=false, kwargs...)
     cb = SavingCallback(
         (u, t, integrator) -> model.f_diagnostics(u, integrator.p, t),
         model.diagnostics;
@@ -46,16 +46,18 @@ function solve!(model::ProcessBasedModel; kwargs...)
     )
 
     # Save data in datacube
-    df_diagnostics = DataFrame(model.diagnostics.saveval)
-    df_prognostics = DataFrame(model.sol)
-    cols_prognostics = filter(x -> x != "timestamp", names(df_prognostics))
-    rename!(df_prognostics, map(=>, cols_prognostics, ["w_1", "w_2", "w_r"]))
-    df_all = hcat(df_diagnostics, df_prognostics)
-    df_all_no_time = df_all[:, names(df_all) .!= "timestamp"]
-    axlist = (
-        YAXArrays.time(unix2datetime.(model.saveat)), Variables(names(df_all_no_time))
-    )
-    model.output = YAXArray(axlist, Array(df_all_no_time))
+    if ~AD
+        df_diagnostics = DataFrame(model.diagnostics.saveval)
+        df_prognostics = DataFrame(model.sol)
+        cols_prognostics = filter(x -> x != "timestamp", names(df_prognostics))
+        rename!(df_prognostics, map(=>, cols_prognostics, ["w_1", "w_2", "w_r"]))
+        df_all = hcat(df_diagnostics, df_prognostics)
+        df_all_no_time = df_all[:, names(df_all) .!= "timestamp"]
+        axlist = (
+            YAXArrays.time(unix2datetime.(model.saveat)), Variables(names(df_all_no_time))
+        )
+        model.output = YAXArray(axlist, Array(df_all_no_time))
+    end
     return nothing
 end
 
