@@ -9,8 +9,10 @@ using DataFrames
 using DifferentiationInterface
 using EvaporationModel
 using OrdinaryDiffEq
+using SciMLSensitivity
 using Plots
 using YAXArrays
+using Zygote: Zygote
 include("example_input.jl")
 
 @benchmark compute_diagnostics($u0_test, $param_test, $t_span_test[1], $forcings)
@@ -108,18 +110,61 @@ plot(test_model_BE_Bra.output)
 ## Experiment with Differentiating the code
 # NOTE: TIMESTAMP ARE NOT YET CORRECTLY ALLIGNED!
 y_obs = ds_ec_sel.Qle[x=1, y=1]
-function loss_function(param, y_obs, forcings, t_span, u0, saveat)
+function loss_function(param, y_obs, forcings, t_span, u0, saveat; kwargs...)
     model = ProcessBasedModel{FT}(;
         forcings=forcings, parameters=param, t_span=t_span, u0=u0, saveat=saveat
     )
     EvaporationModel.initialize!(model)
-    EvaporationModel.solve!(model)
-    y_pred = model.output[Variables=At("λE_tot")]
+    EvaporationModel.solve!(model; AD=true, kwargs...)
+    # y_pred = model.output[Variables=At("λE_tot")] Use of YAXArray and dataframes problematic with AD
+    y_pred = [
+        model.diagnostics.saveval[i].λE_tot for i in 1:length(model.diagnostics.saveval)
+    ]
     return sum((y_pred .- y_obs) .^ 2)
 end
-y_pred_test = loss_function(param_test, y_obs, forcings_real, t_span_real, u0_test, t_unix)
-function loss_function_wrapper(param)
-    return loss_function(param, y_obs, forcings_real, t_span_real, u0_test, t_unix)
+loss_function(param_test, y_obs, forcings_real, t_span_real, u0_test, t_unix)
+function loss_function_wrapper(param; kwargs...)
+    return loss_function(
+        param, y_obs, forcings_real, t_span_real, u0_test, t_unix; kwargs...
+    )
 end
+# Direct AD
 @benchmark gradient(loss_function_wrapper, AutoForwardDiff(), param_test) #35 ms
 @benchmark gradient(loss_function_wrapper, AutoFiniteDiff(), param_test) # 350 ms
+# Continuous AD
+loss_function_gauss(param) = loss_function_wrapper(param; sensealg=GaussAdjoint())
+gradient(loss_function_gauss, AutoReverseDiff(), param_test) # wrong gradient
+#gradient(loss_function_gauss, AutoZygote(), param_test) # Fails
+
+## Easier AD experiments: just sum the states!
+function sum_of_solutions(model, p; kwargs...)
+    _prob = remake(model.prob; p=p)
+    return sum(solve(_prob, Heun(); kwargs...))
+end
+test_sum = sum_of_solutions(test_model_BE_Bra, param_test; tstops=t_unix)
+
+sum_wrapper(p) = sum_of_solutions(test_model_BE_Bra, p; tstops=t_unix)
+@benchmark gradient(sum_wrapper, AutoForwardDiff(), $param_test)
+@benchmark gradient(sum_wrapper, AutoFiniteDiff(), $param_test)
+# Note: these are fast, but this is because forwarddiff is choisen as a default sensealg
+# I think, see
+# https://github.com/SciML/SciMLSensitivity.jl/blob/5d955d387beb90c10bd7a3d85f15ed68baed50f5/src/concrete_solve.jl#L322
+@benchmark gradient(sum_wrapper, AutoReverseDiff(), $param_test)
+@benchmark gradient(sum_wrapper, AutoZygote(), $param_test)
+
+function sum_wrapper_adjoint(p)
+    return sum_of_solutions(test_model_BE_Bra, p; sensealg=GaussAdjoint(), tstops=t_unix)
+end
+@benchmark gradient(sum_wrapper_adjoint, AutoReverseDiff(), $param_test)
+@benchmark gradient(sum_wrapper_adjoint, AutoZygote(), $param_test)
+
+function sum_wrapper_reverse(p)
+    return sum_of_solutions(
+        test_model_BE_Bra, p; sensealg=ReverseDiffAdjoint(), tstops=t_unix
+    )
+end
+gradient(sum_wrapper_reverse, AutoReverseDiff(), param_test) # All Nan
+# function sum_wrapper_zygote(p)
+#     return sum_of_solutions(test_model_BE_Bra, p; sensealg=ZygoteAdjoint(), tstops=t_unix)
+# end
+# gradient(sum_wrapper_zygote, AutoZygote(), param_test)
