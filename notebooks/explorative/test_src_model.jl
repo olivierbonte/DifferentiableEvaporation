@@ -15,29 +15,12 @@ include("example_input.jl")
 
 @benchmark compute_diagnostics($u0_test, $param_test, $t_span_test[1], $forcings)
 @code_warntype compute_diagnostics(u0_test, param_test, t_span_test[1], forcings)
+# Zero allocs, type stable
 
 du_test = similar(u0_test)
 compute_tendencies!(du_test, u0_test, param_test, t_span_test[1], forcings)
 @benchmark compute_tendencies!($du_test, $u0_test, $param_test, $t_span_test[1], $forcings)
-# function gradient_tendencies_wrapper(p)
-#     return compute_tendencies!(du_test, u0_test, p, t_span_test[1], forcings)
-# end
-# @enter gradient(gradient_tendencies_wrapper, AutoForwardDiff(), param_test)
-using FastClosures
-const test_func = @closure (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
-@benchmark test_func($du_test, $u0_test, $param_test, $t_span_test[1]) #zero allocs
-# Not using FastClosures
-const test_func_2 = (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
-@benchmark test_func_2($du_test, $u0_test, $param_test, $t_span_test[1])
-# Trying to make a constant forcings
-const forcings_const = forcings
-test_func_3(du, u, p, t) = compute_tendencies!(du, u, p, t, forcings_const)
-@benchmark test_func_3($du_test, $u0_test, $param_test, $t_span_test[1])
-# Using let block
-test_func_4 = let forcings = forcings
-    @closure (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
-end
-@benchmark test_func_4($du_test, $u0_test, $param_test, $t_span_test[1])
+# Zero allocs, type stable
 
 test_model = ProcessBasedModel{FT}(;
     forcings=forcings,
@@ -49,8 +32,23 @@ test_model = ProcessBasedModel{FT}(;
 EvaporationModel.initialize!(test_model)
 @code_warntype test_model.f(du_test, u0_test, param_test, t_span_test[1])
 @benchmark test_model.f($du_test, $u0_test, $param_test, $t_span_test[1])
+# Two allocs (<-> zero allocs above...)
+# Compare to SciML version of f inside problem
 @code_warntype test_model.prob.f(du_test, u0_test, param_test, t_span_test[1])
 @benchmark test_model.prob.f($du_test, $u0_test, $param_test, $t_span_test[1])
+# Three allocs
+
+# Key Q: does this matter in solving the ODE?
+const forcings_const = forcings
+test_func_no_alloc(du, u, p, t) = compute_tendencies!(du, u, p, t, forcings_const)
+@benchmark test_func_no_alloc($du_test, $u0_test, $param_test, $t_span_test[1])
+# zero allocs for this closure with forcings as const (impossible inside of struct)
+test_prob_no_alloc = ODEProblem(test_func_no_alloc, u0_test, t_span_test, param_test)
+@benchmark solve($test_prob_no_alloc) # 925 allocs
+@benchmark solve($test_model.prob) # 926 allocs
+# Conclusion: the 2 vs 0 allocs in f does not seem to matter for the overall solve allocs
+
+# Test solve
 EvaporationModel.solve!(test_model; alg=ImplicitEuler(; autodiff=AutoForwardDiff()))
 plot(test_model.sol)
 
