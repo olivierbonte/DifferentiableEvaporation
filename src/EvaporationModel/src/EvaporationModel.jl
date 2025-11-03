@@ -3,9 +3,12 @@ module EvaporationModel
 using Bigleaf
 using ComponentArrays
 using Dates
+using DataFrames
+using DiffEqCallbacks
 using ForwardDiff
-using LinearSolve
+using OrdinaryDiffEq
 using Parameters
+using YAXArrays
 
 include("canopy.jl")
 export fractional_vegetation_cover,
@@ -46,6 +49,10 @@ export penman_monteith, total_evaporation, transpiration, interception, soil_eva
 include("ground_heat_flux.jl")
 export ground_heat_flux,
     compute_harmonic_sum, GroundHeatFluxMethod, Allen07, SantanelloFriedl03
+
+include("model.jl")
+export AbstractModel,
+    ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!
 
 include("resistances.jl")
 export jarvis_stewart,

@@ -17,9 +17,9 @@ macro bind(def, element)
 end
 
 # ╔═╡ 587f9491-4ab7-4892-a29f-e701d97a5228
-begin 
-	using PlutoUI
-	using Plots
+begin
+    using PlutoUI
+    using Plots
 end
 
 # ╔═╡ ca8bd427-1a02-4150-9ce9-701adcc95845
@@ -66,17 +66,17 @@ y_min = smooth_min.(x, upper, m)
 
 # ╔═╡ a17b27e7-d3db-495c-98ad-e485689b7bc1
 begin
-	Plots.plot(x,y_clamped, label = "clamped")
-	plot!(x, y_max, label = "max", linestyle = :dash)
-	plot!(x, y_min, label = "min")
-	title!("m = $m")
-end	
+    Plots.plot(x, y_clamped; label="clamped")
+    plot!(x, y_max; label="max", linestyle=:dash)
+    plot!(x, y_min; label="min")
+    title!("m = $m")
+end
 
 # ╔═╡ 5d6a65aa-7388-4c7e-b65a-af7b454276cb
 diff = y_clamped - min.(max.(x, 0), 1)
 
 # ╔═╡ bd86709d-29f3-48c7-8e36-5868ed78f3c9
-plot(x,diff)
+plot(x, diff)
 
 # ╔═╡ f0a5521d-abf8-4000-985a-e058a8dbd86e
 md"My conclusion: if you clamp between 0 and 1, then a smoothing parameter of about 1/200 seems good"
@@ -88,7 +88,7 @@ md"For maximum value of surface resistance, there is also a need for a smooth mi
 r_smax = 500_000
 
 # ╔═╡ 103c81c1-8652-43ec-a964-11411cc33488
-m_rs = r_smax 
+m_rs = r_smax
 
 # ╔═╡ c1cb23b7-9d1e-4f21-a770-a48bd8a20909
 x_rs = 490_000:500:510_000.0
@@ -100,7 +100,7 @@ y_rs = smooth_min.(x_rs, 500_000.0, m_rs)
 plot(x_rs, y_rs)
 
 # ╔═╡ 621bc8c8-c41c-4394-b470-0c4d80bd8f4e
-diff_rs = abs.(y_rs - min.(x_rs, 500_000)) 
+diff_rs = abs.(y_rs - min.(x_rs, 500_000))
 
 # ╔═╡ 3fb7c9cc-5c88-4168-aaac-f11a4df3885e
 plot(x_rs, diff_rs)

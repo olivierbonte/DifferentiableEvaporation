@@ -26,7 +26,7 @@ function ground_heat_flux(
     Θ = w_1 / w_1sat
     c_g = c_gmax * (1 - Θ) + c_gmin * Θ
     t_g = t_gmax * (1 - Θ) + t_gmin * Θ
-    G = c_g * cos(2π * (t_soln  + 10_800) / t_g) * R_ns
+    G = c_g * cos(2π * (t_soln + 10_800) / t_g) * R_ns
     return G
 end
 
