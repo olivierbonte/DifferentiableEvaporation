@@ -42,8 +42,13 @@ val_fd, grad_fd = value_and_gradient(f_simple, AutoForwardDiff(), u0_test)
 # Works in nansafe mode of ForwardDiff
 
 # Using Enzyme
-val_test, jac_test = value_and_gradient(
-    f_simple,
-    AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.set_strong_zero(Enzyme.Forward))),
-    u0_test,
+auto_forward_enzyme = AutoEnzyme(;
+    mode=Enzyme.set_runtime_activity(Enzyme.set_strong_zero(Enzyme.Forward))
 )
+auto_reverse_enzyme = AutoEnzyme(;
+    mode=Enzyme.set_runtime_activity(Enzyme.set_strong_zero(Enzyme.Reverse))
+)
+val_test, jac_test = value_and_gradient(f_simple, auto_forward_enzyme, u0_test)
+
+val_test, jac_test = value_and_gradient(f_simple, auto_reverse_enzyme, u0_test)
+# Forward and Reverse work
