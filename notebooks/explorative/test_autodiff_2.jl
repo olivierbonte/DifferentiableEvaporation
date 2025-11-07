@@ -27,7 +27,12 @@ function f_simple(u0)
         f_tendencies, u0, t_span_test, param_test
     )
     sol = DiffEqBase.solve(
-        prob, Tsit5(); saveat=saveat_const, sensealg=DiffEqBase.SensitivityADPassThrough()
+        prob,
+        Tsit5();
+        abstol=1e-6,
+        reltol=1e-6,
+        saveat=saveat_const,
+        sensealg=DiffEqBase.SensitivityADPassThrough(),
     )
     return sol[1, end]
 end
