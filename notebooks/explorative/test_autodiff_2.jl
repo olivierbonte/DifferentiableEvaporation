@@ -2,10 +2,16 @@
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
 
-using Revise
-using Bigleaf, EvaporationModel
-using DiffEqBase, DifferentiationInterface, OrdinaryDiffEq, StaticArrays
+# Ordered imports (alphabetical, one per line)
+using BenchmarkTools
+using Bigleaf
+using DiffEqBase
+using DifferentiationInterface
 using Enzyme: Enzyme
+using EvaporationModel
+using OrdinaryDiffEq
+using Revise
+using StaticArrays
 
 # Test dx/dt for gradients
 include("example_input.jl")
@@ -52,3 +58,5 @@ val_test, jac_test = value_and_gradient(f_simple, auto_forward_enzyme, u0_test)
 
 val_test, jac_test = value_and_gradient(f_simple, auto_reverse_enzyme, u0_test)
 # Forward and Reverse work
+
+# Attempt at BenchmarkGroup
