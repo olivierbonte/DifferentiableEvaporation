@@ -60,3 +60,24 @@ val_test, jac_test = value_and_gradient(f_simple, auto_reverse_enzyme, u0_test)
 # Forward and Reverse work
 
 # Attempt at BenchmarkGroup
+suite = BenchmarkGroup()
+suite["ForwardDiff"] = @benchmarkable value_and_gradient(
+    $f_simple, AutoForwardDiff(), $u0_test
+)
+suite["Enzyme Forward"] = @benchmarkable value_and_gradient(
+    $f_simple, $auto_forward_enzyme, $u0_test
+)
+suite["Enzyme Reverse"] = @benchmarkable value_and_gradient(
+    $f_simple, $auto_reverse_enzyme, $u0_test
+)
+tune!(suite)
+results = run(suite; verbose=true)
+BenchmarkTools.save("test_results.json", results)
+print(keys(results))
+
+# Get limits for plot = 2 * std
+vec_std = [std(results)[bench].time for bench in keys(results)] #ns
+vec_medians = [median(results)[bench].time for bench in keys(results)] #ns
+max_plot = maximum(vec_medians .+ 2 .* vec_std)
+using BenchmarkPlots, StatsPlots
+plot(results; ylims=(0, max_plot))
