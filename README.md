@@ -22,7 +22,7 @@ To (locally) reproduce this project, do the following:
    juliaup add 1.10.9
    ```
 
-2. Nex navigate to the folder DifferentiableEvaporation and open Julia by running
+2. Next, navigate to the folder DifferentiableEvaporation and open Julia by running
    ```
    julia
    ```
