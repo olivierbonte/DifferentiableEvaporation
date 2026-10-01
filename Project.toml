@@ -25,7 +25,6 @@ JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
-Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
 NetCDF = "30363a11-5582-574a-97bb-aa9a979735b9"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
@@ -38,13 +37,12 @@ Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 SciMLSensitivity = "1ed8b502-d754-442c-8d5d-10ac956f44a1"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
-Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 YAXArrays = "c21b50f5-aa40-41ea-b809-c0f5e47bfa5c"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
-
-[preferences.ForwardDiff]
-nansafe_mode = true
 
 [compat]
 DrWatson = "2.18.0"
 julia = "1.10.9"
+
+[preferences.ForwardDiff]
+nansafe_mode = true
