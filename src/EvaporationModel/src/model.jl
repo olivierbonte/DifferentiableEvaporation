@@ -82,11 +82,21 @@ end
     g_d,
     r_smin,
     k_ext = p
-    d_c, z_0mc = Bigleaf.roughness_parameters(
-        RoughnessCanopyHeightLAI(), h, forcings.LAI(t); hs=z_0ms
+    P, T_a, u_a, p_a, VPD_a, SW_in, R_n, LAI = (
+        forcings.P(t),
+        forcings.T_a(t),
+        forcings.u_a(t),
+        forcings.p_a(t),
+        forcings.VPD_a(t),
+        forcings.SW_in(t),
+        forcings.R_n(t),
+        forcings.LAI(t),
     )
-    f_veg = fractional_vegetation_cover(forcings.LAI(t), k_ext)
-    w_rmax = max_canopy_capacity(forcings.LAI(t))
+    d_c, z_0mc = Bigleaf.roughness_parameters(
+        RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms
+    )
+    f_veg = fractional_vegetation_cover(LAI, k_ext)
+    w_rmax = max_canopy_capacity(LAI)
     f_wet = fraction_wet_vegetation(w_r, w_rmax)
 
     w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
@@ -94,24 +104,24 @@ end
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
     t_sol = seconds_since_solar_noon(t, forcings.lon, forcings.utc_offset)
-    R_nc, R_ns = net_radiation_partitioning(forcings.R_n(t), f_veg)
+    R_nc, R_ns = net_radiation_partitioning(R_n, f_veg)
     G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol)
     A, A_c, A_s = available_energy_partitioning(R_nc, R_ns, G)
 
     # Resistances
-    ustar = ustar_from_u(forcings.u_a(t), z_obs, d_c, z_0mc)
-    r_aa = Bigleaf.compute_Ram(ResistanceWindZr(), ustar, forcings.u_a(t))
+    ustar = ustar_from_u(u_a, z_obs, d_c, z_0mc)
+    r_aa = Bigleaf.compute_Ram(ResistanceWindZr(), ustar, u_a)
     r_ac = (Bigleaf.Gb_constant_kB1(ustar, kB⁻¹))^-1
     r_as = soil_aerodynamic_resistance(Choudhury1988soil(), ustar, h, d_c, z_0mc, z_0ms)
     r_sc = surface_resistance(
         JarvisStewart(),
-        forcings.SW_in(t),
-        forcings.VPD_a(t),
-        forcings.T_a(t),
+        SW_in,
+        VPD_a,
+        T_a,
         w_2,
         w_fc,
         w_wp,
-        forcings.LAI(t),
+        LAI,
         g_d,
         r_smin,
     )
@@ -120,9 +130,9 @@ end
 
     # Turbulent fluxes calculations
     λE_tot, λE_tot_p = total_evaporation(
-        forcings.T_a(t),
-        forcings.p_a(t),
-        forcings.VPD_a(t),
+        T_a,
+        p_a,
+        VPD_a,
         A,
         A_c,
         A_s,
@@ -134,18 +144,18 @@ end
         f_wet,
     )
     VPD_m = vpd_veg_source_height(
-        forcings.VPD_a(t), forcings.T_a(t), forcings.p_a(t), A, λE_tot, r_aa
+        VPD_a, T_a, p_a, A, λE_tot, r_aa
     )
     E_t, λE_t = transpiration(
-        forcings.T_a(t), forcings.p_a(t), VPD_m, A_c, r_ac, r_sc, f_wet
+        T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet
     )
-    E_i, λE_i = interception_loss(forcings.T_a(t), forcings.p_a(t), VPD_m, A_c, r_ac, f_wet)
-    E_s, λE_s = soil_evaporation(forcings.T_a(t), forcings.p_a(t), VPD_m, A_s, r_as, r_ss)
+    E_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet)
+    E_s, λE_s = soil_evaporation(T_a, p_a, VPD_m, A_s, r_as, r_ss)
 
-    P_c = canopy_input(forcings.P(t), f_veg)
-    D_c = canopy_drainage(forcings.P(t), w_r, f_veg, k_ext)
-    P_s = precip_below_canopy(forcings.P(t), P_c, D_c)
-    Q_s = surface_runoff(StaticInfiltration(), forcings.P(t), w_2, w_sat)
+    P_c = canopy_input(P, f_veg)
+    D_c = canopy_drainage(P, w_r, f_veg, k_ext)
+    P_s = precip_below_canopy(P, P_c, D_c)
+    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
     I_s = P_s - Q_s
