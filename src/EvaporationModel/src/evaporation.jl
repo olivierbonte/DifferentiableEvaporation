@@ -57,7 +57,7 @@ end
     total_evaporation(T_a, p_a, VPD, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet)
 
 Compute total evaporation (ET) / latent heat flux (λE) using a multi-source model accounting for
-bare soil evaporation, transpiration and interception
+bare soil evaporation, transpiration and interception loss
 
 # Arguments
 - `T_a`: Air temperature (at ``z_a``) [K]
@@ -118,7 +118,13 @@ function transpiration(T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet)
     return ET_t, λE_t
 end
 
-function interception(T_a, p_a, VPD_m, A_c, r_ac, f_wet; r_sc=of_value_type(f_wet, 0))
+"""
+    interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet; r_sc=0)
+
+Interception loss ``E_i`` [kg m⁻² s⁻¹] and ``λE_i`` [W m⁻²]: evaporation of the water
+intercepted by the canopy, from the wet fraction `f_wet` of the canopy.
+"""
+function interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet; r_sc=of_value_type(f_wet, 0))
     ET_pc, λE_pc = penman_monteith(T_a, p_a, VPD_m, A_c, r_ac, r_sc)
     ET_i, λE_i = f_wet .* (ET_pc, λE_pc)
     return ET_i, λE_i

@@ -80,11 +80,12 @@ end
     z_obs,
     kB⁻¹,
     g_d,
-    r_smin = p
+    r_smin,
+    k_ext = p
     d_c, z_0mc = Bigleaf.roughness_parameters(
         RoughnessCanopyHeightLAI(), h, forcings.LAI(t); hs=z_0ms
     )
-    f_veg = fractional_vegetation_cover(forcings.LAI(t))
+    f_veg = fractional_vegetation_cover(forcings.LAI(t), k_ext)
     w_rmax = max_canopy_capacity(forcings.LAI(t))
     f_wet = fraction_wet_vegetation(w_r, w_rmax)
 
@@ -139,8 +140,9 @@ end
     E_i, λE_i = interception(forcings.T_a(t), forcings.p_a(t), VPD_m, A_c, r_ac, f_wet)
     E_s, λE_s = soil_evaporation(forcings.T_a(t), forcings.p_a(t), VPD_m, A_s, r_as, r_ss)
 
-    D_c = canopy_drainage(forcings.P(t), w_r, f_veg)
-    P_s = precip_below_canopy(forcings.P(t), f_veg, D_c)
+    P_c = canopy_input(forcings.P(t), f_veg)
+    D_c = canopy_drainage(forcings.P(t), w_r, f_veg, k_ext)
+    P_s = precip_below_canopy(forcings.P(t), P_c, D_c)
     Q_s = surface_runoff(StaticInfiltration(), forcings.P(t), w_2, w_sat)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
@@ -157,6 +159,7 @@ end
         λE_i=λE_i,
         E_s=E_s,
         λE_s=λE_s,
+        P_c=P_c,
         D_c=D_c,
         P_s=P_s,
         Q_s=Q_s,
@@ -168,16 +171,10 @@ end
 
 function compute_tendencies!(du, u, p::AbstractArray, t, forcings::NamedTuple)
     diagnostics = compute_diagnostics(u, p, t, forcings)
-    _, _, w_r = u
     @unpack d_1, d_2 = p
-    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i, w_rmax, f_veg, C_1 = diagnostics
-    # Define smoothing parameter for canopy water content
-    m_can = w_rmax / 100
-    # Define ODE
+    @unpack P_c, D_c, I_s, D_1, K_2, E_s, E_t, E_i, C_1 = diagnostics
     du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
     du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
-    du[3] =
-        f_veg * forcings.P(t) * smoothing_kernel(UpperBound(), w_r, w_rmax, m_can) -
-        E_i * smoothing_kernel(LowerBound(), w_r, zero(w_r), m_can) - D_c
+    du[3] = P_c - E_i - D_c
     return nothing
 end
