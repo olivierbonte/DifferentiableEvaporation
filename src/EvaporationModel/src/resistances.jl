@@ -180,7 +180,8 @@ With `approach = Martens17()`, the following inputs are
 # Details
 
 With `approach = Pielke92()`, β is calculated using euqation (7) of
-[Lee & Pielke (1992)](https://doi.org/10.1175/1520-0450(1992)031%3C0480:ETSSSH%3E2.0.CO;2)
+[Lee & Pielke (1992)](https://doi.org/10.1175/1520-0450(1992)031%3C0480:ETSSSH%3E2.0.CO;2),
+with β = 1 for `w_1 ≥ w_fc`.
 
 With `approach = Martens17()`, β is calculated using equation (6) of
 [Martens et al. (2017)](https://doi.org/10.5194/gmd-10-1903-2017).
@@ -192,7 +193,9 @@ using EvaporationModel
 w_fc = 0.35
 w_1 = w_fc / 2
 β_p = soil_evaporation_efficiency(Pielke92(), w_1, w_fc)
-β_p ≈ 0.25
+β_fc = soil_evaporation_efficiency(Pielke92(), w_fc, w_fc)
+β_wet = soil_evaporation_efficiency(Pielke92(), 1.5 * w_fc, w_fc)
+β_p ≈ 0.25 && β_fc ≈ 1 && β_wet ≈ 1
 
 # output
 
@@ -201,7 +204,7 @@ true
 
 """
 function soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc)
-    return 1 / 4 * (1 - cos(π * w_1 / w_fc))^2
+    return 1 / 4 * (1 - cos(π * min(w_1, w_fc) / w_fc))^2
 end
 
 function soil_evaporation_efficiency(approach::Martens17, w_1, w_res, w_c)
