@@ -12,7 +12,8 @@ using YAXArrays
 
 include("canopy.jl")
 export fractional_vegetation_cover,
-    available_energy_partioning,
+    net_radiation_partitioning,
+    available_energy_partitioning,
     max_canopy_capacity,
     fraction_wet_vegetation,
     canopy_drainage,

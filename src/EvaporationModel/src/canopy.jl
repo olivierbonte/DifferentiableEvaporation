@@ -9,12 +9,28 @@ function fractional_vegetation_cover(LAI, k_ext=of_value_type(LAI, 0.5))
     return 1 - exp(-k_ext * LAI)
 end
 
-function available_energy_partioning(R_n, G, f_veg)
-    A = R_n - G
+"""
+    net_radiation_partitioning(R_n, f_veg)
+
+Split the net radiation `R_n` [W m⁻²] into the part absorbed by the canopy,
+``R_{nc} = f_{veg} R_n``, and the part reaching the soil, ``R_{ns} = (1 - f_{veg}) R_n``.
+"""
+function net_radiation_partitioning(R_n, f_veg)
     R_nc = R_n * f_veg
     R_ns = R_n * (1 - f_veg)
+    return R_nc, R_ns
+end
+
+"""
+    available_energy_partitioning(R_nc, R_ns, G)
+
+Available energy of the canopy, ``A_c = R_{nc}``, of the soil, ``A_s = R_{ns} - G``, and in
+total, ``A = A_c + A_s`` [W m⁻²].
+"""
+function available_energy_partitioning(R_nc, R_ns, G)
     A_c = R_nc
     A_s = R_ns - G
+    A = A_c + A_s
     return A, A_c, A_s
 end
 

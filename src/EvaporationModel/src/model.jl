@@ -93,8 +93,10 @@ end
     C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
-    G = ground_heat_flux(Allen07(), forcings.R_n(t), forcings.LAI(t))
-    A, A_c, A_s = available_energy_partioning(forcings.R_n(t), G, f_veg)
+    t_sol = seconds_since_solar_noon(t, forcings.lon, forcings.utc_offset)
+    R_nc, R_ns = net_radiation_partitioning(forcings.R_n(t), f_veg)
+    G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol)
+    A, A_c, A_s = available_energy_partitioning(R_nc, R_ns, G)
 
     # Resistances
     ustar = ustar_from_u(forcings.u_a(t), z_obs, d_c, z_0mc)
@@ -137,7 +139,7 @@ end
     E_t, λE_t = transpiration(
         forcings.T_a(t), forcings.p_a(t), VPD_m, A_c, r_ac, r_sc, f_wet
     )
-    E_i, λE_i = interception(forcings.T_a(t), forcings.p_a(t), VPD_m, A_c, r_ac, f_wet)
+    E_i, λE_i = interception_loss(forcings.T_a(t), forcings.p_a(t), VPD_m, A_c, r_ac, f_wet)
     E_s, λE_s = soil_evaporation(forcings.T_a(t), forcings.p_a(t), VPD_m, A_s, r_as, r_ss)
 
     P_c = canopy_input(forcings.P(t), f_veg)
