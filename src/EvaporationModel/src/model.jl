@@ -141,7 +141,7 @@ end
 
     D_c = canopy_drainage(forcings.P(t), w_r, f_veg)
     P_s = precip_below_canopy(forcings.P(t), f_veg, D_c)
-    Q_s = surface_runoff(StaticInfiltration(), forcings.P(t), w_2, w_fc)
+    Q_s = surface_runoff(StaticInfiltration(), forcings.P(t), w_2, w_sat)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
     I_s = P_s - Q_s
