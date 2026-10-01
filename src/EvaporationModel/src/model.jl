@@ -89,7 +89,7 @@ end
     f_wet = fraction_wet_vegetation(w_r, w_rmax)
 
     w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
-    C_1 = c_1(w_1, w_sat, b, C_1sat) # no allocs
+    C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
     G = ground_heat_flux(Allen07(), forcings.R_n(t), forcings.LAI(t))
