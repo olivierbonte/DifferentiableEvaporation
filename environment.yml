@@ -8,12 +8,14 @@ dependencies:
   - matplotlib=3.10.*
   - hvplot=0.11.*
   - geoviews=1.14.*
-  - jupyterlab=4.3.*
+  - jupyter=1.1*
+  - quarto=1.9.*
   - netcdf4=1.7.*
   - owslib=0.32.*
   - rioxarray=0.18.*
   - soilgrids=0.1.4 
   - cubo=2024.8.0
+  - sympy=1.14.*
   - pip
   - pip:
     - zenodo_get==1.6.*
