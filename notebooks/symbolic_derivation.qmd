@@ -1,0 +1,161 @@
+---
+title: "Symbolic derivation resistance network"
+format: 
+    html:
+        embed-resources: true
+jupyter: python3
+---
+
+The goal of the current notebook is to extend upon the derivations of a series network from:
+
+- "Evaporation from sparse crops-an energy combination theory" by [Shuttleworth and Wallace (1985)](https://doi.org/10.1002/qj.49711146910) (S&W85)
+- "Evaporation from Heterogeneous and Sparse Canopies: On the Formulations Related to Multi-Source Representations" by [Lhomme et al. (2012)](https://doi.org/10.1007/s10546-012-9713-x) (Lh12)
+
+Start by defining the different variables
+
+```{python}
+import sympy as sp
+
+As = sp.symbols("A_s")  # Available energy at the surface (soil) (W/m^2)
+Ac = sp.symbols("A_c")  # Available energy at the canopy (W/m^2)
+rho = sp.symbols("rho")  # Density of air (kg/m^3)
+cp = sp.symbols("c_p")  # Specific heat of air (J/kg/K)
+VPD_a = sp.symbols("VPD_a")  # Vapor pressure deficit (Pa) at observation height
+gamma = sp.symbols("gamma")  # Psychrometric constant (Pa/K)
+Delta = sp.symbols("Delta")  # Slope of the saturation vapor pressure curve (Pa/K)
+r_aa = sp.symbols("r_aa")  # Aerodynamic resistance (s/m) between source height and observation height
+r_ac = sp.symbols("r_ac")  # Aerodynamic resistance (s/m) between canopy and source height
+r_as = sp.symbols("r_as")  # Aerodynamic resistance (s/m) between soil and source height
+r_ss = sp.symbols("r_ss")  # Surface resistance (s/m) of soil
+r_sc = sp.symbols("r_sc")  # Surface resistance (s/m) of canopy
+lambdaE = sp.symbols("lambdaE")  # Latent heat flux from the complete canopy (W/m^2)
+# Ra
+# Rs
+# Rc
+f_wet = sp.symbols("f_wet")  # Fraction of canopy that is wet (-)
+
+# Pretty printing 
+sp.init_printing(symbol_names={lambdaE: r"\lambda E"})
+```
+
+## Reference case from Lhomme et al. (2012)
+
+Symbolically solve the equations governing the standard case of a two source model, as depicted in Figure 1 of Lh12.
+
+```{python}
+A = As + Ac  # Total available energy
+VPD_m = VPD_a + (Delta * A - (Delta + gamma) * lambdaE) * r_aa / (rho * cp)  # Vapor pressure deficit at source height, (7) of Lh12
+lambdaE_s = (Delta * As + rho * cp * VPD_m / r_as) / (Delta + gamma * (1 + r_ss / r_as))  # Latent heat flux from the soil
+lambdaE_c = (Delta * Ac + rho * cp * VPD_m / r_ac) / (Delta + gamma * (1 + r_sc / r_ac))  # Latent heat flux from the canopy
+equation = sp.Eq(lambdaE - (lambdaE_s + lambdaE_c), 0)  # (1) of Lh12
+equation
+```
+
+```{python}
+sol = sp.solve(equation, lambdaE)[0]
+sol
+```
+
+Check if the solution matches with the solution as given by equation 16 of Lh12. Note that $f$ (foliage) is replaced by $c$ (canopy). First the reference solution is implemented below.
+
+```{python}
+Rc = r_sc + (1 + Delta / gamma) * r_ac  # (20) of Lh12
+Rs = r_ss + (1 + Delta / gamma) * r_as  # (21) of Lh12
+Ra = (1 + Delta / gamma) * r_aa  # (22) of Lh12
+Ps = (r_aa * Rc) / (Rc * Rs + Ra * Rc + Rs * Ra)  # (18) of Lh12
+Pc = (r_aa * Rs) / (Rc * Rs + Ra * Rc + Rs * Ra)  # (19) of Lh12
+lambdaEp = (Delta * A + rho * cp * VPD_a / r_aa) / (Delta + gamma)  # (17) of Lh12
+lambdaE_lhomme = ((Delta + gamma) / gamma) * (Pc + Ps) * lambdaEp + \
+    (Delta / (gamma * r_aa)) * (Pc * Ac * r_ac + Ps * As * r_as)  # (16) of Lh12
+lambdaE_lhomme
+```
+
+Symbolically check the equality between the two solutions by subtracting them after simplifying.
+
+```{python}
+lambdaE_computer_simple = sp.simplify(sol)
+lambdaE_lhomme_simple = sp.simplify(lambdaE_lhomme)
+diff_reference = sp.simplify(lambdaE_computer_simple - lambdaE_lhomme_simple)
+diff_reference.equals(0)
+```
+
+## Own derivation: adding interception
+
+Idea is to extend the fluxes so that from a leaf, there are now 2 fluxes in parallel:
+
+1. Interception flux from wet fraction of the leaf ($f_{wet}$) with a zero surface resistance
+2. Evaporation flux from the dry fraction of the leaf ($1 - f_{wet}$)
+
+```{python}
+lambdaE_t = (1 - f_wet) * (Delta * Ac + rho * cp * VPD_m / r_ac) / (Delta + gamma * (1 + r_sc / r_ac))
+lambdaE_i = f_wet * (Delta * Ac + rho * cp * VPD_m / r_ac) / (Delta + gamma)
+equation_interception = sp.Eq(lambdaE - (lambdaE_t + lambdaE_i + lambdaE_s), 0)
+sol_interception = sp.solve(equation_interception, lambdaE)[0]
+sol_interception
+```
+
+Below the solution from the manual derivation is given.
+
+```{python}
+Ri = (1 + Delta / gamma) * r_ac  # in analogy to (20)-(22) of Lh12
+X = Rc * Ri + (1 - f_wet) * Rs * Ri + f_wet * Rs * Rc
+DE = Rs * Rc * Ri + Ra * X
+lambdaE_check = (X * r_aa / DE) * ((Delta + gamma) / gamma) * lambdaEp + \
+    (Delta / gamma) * ((Rc * Ri * As * r_as + r_ac * Ac * ((1 - f_wet) * Rs * Ri + f_wet * Rc * Rs)) / DE)
+lambdaE_check
+```
+
+```{python}
+lambdaE_check_simple = sp.simplify(lambdaE_check)
+lambdaE_interception_simple = sp.simplify(sol_interception)
+diff_interception = sp.simplify(lambdaE_check_simple - lambdaE_interception_simple)
+diff_interception.equals(0)
+```
+
+The same derivation can also be written in a form closer to the original equations of Lh12 (see (16) and (33)). Also this form is checked against the computer solution.
+
+```{python}
+DE_ = Rs * Rc * Ri + Ra * (Rc * Ri + (1 - f_wet) * Rs * Ri + f_wet * Rs * Rc)
+Pc_ = sp.simplify(r_aa * (1 - f_wet) * Ri * Rs / DE_)
+Pi_ = sp.simplify(r_aa * f_wet * Rc * Rs / DE_)
+Ps_ = sp.simplify(r_aa * Rc * Ri / DE_)
+lambdaE_check_2 = sp.simplify(((Delta + gamma) / gamma) * (Pc_ + Pi_ + Ps_) * lambdaEp) + \
+    sp.simplify((Delta / (gamma * r_aa)) * (Pc_ * Ac * r_ac + Pi_ * Ac * r_ac + Ps_ * As * r_as))
+lambdaE_check_2_simple = sp.simplify(lambdaE_check_2)
+diff_check_2 = sp.simplify(lambdaE_check_2_simple - lambdaE_interception_simple)
+diff_check_2.equals(0)
+```
+
+There is also a different approach to solve the problem by hand, where the $R_c$ value as defined in (20) of Lh12 is adapted for the current case (denoted as $R_c^*$). Once this is defined, the same equations as in the reference case (Section 2.2 of Lh12) can be reused.
+
+```{python}
+Rcstar = ((1 - f_wet) / Rc + f_wet / Ri) ** -1
+Psstar = sp.simplify((r_aa * Rcstar) / (Rcstar * Rs + Ra * Rcstar + Rs * Ra))  # analogous to (18) of Lh12
+Pcstar = sp.simplify((r_aa * Rs) / (Rcstar * Rs + Ra * Rcstar + Rs * Ra))  # analogous to (19) of Lh12
+lambdaE_check_alt = sp.simplify(((Delta + gamma) / gamma) * (Pcstar + Psstar) * lambdaEp) + \
+    sp.simplify((Delta / (gamma * r_aa)) * (Pcstar * Ac * r_ac + Psstar * As * r_as))  # analogous to (16) of Lh12
+lambdaE_check_alt_simple = sp.simplify(lambdaE_check_alt)
+diff_check_alt = sp.simplify(lambdaE_interception_simple - lambdaE_check_alt_simple)
+diff_check_alt.equals(0)
+```
+
+## Add derivation for $\beta$ equivalence
+
+```{python}
+beta, esatTs, e0 = sp.symbols("beta esatT_s e_0")
+
+# esatTs denotes esat(T_s) (saturation vapor pressure at T_s), not a subscript
+sp.init_printing(symbol_names={lambdaE: r"\lambda E", esatTs: r"e_{sat}(T_s)"})
+
+lambdaE_sp = (Delta * As + rho * cp * VPD_m / r_as) / (Delta + gamma)
+equation_beta = sp.Eq(beta * lambdaE_sp - lambdaE_s, 0)  # Latent heat flux balance, (1) of Lh12
+beta_pm = sp.solve(equation_beta, beta)[0]
+beta_pm
+```
+
+```{python}
+lambdaE_sbulk = ((rho * cp) / gamma) * ((esatTs - e0) / (r_as + r_ss))
+lambdaE_sbulk_beta = beta * ((rho * cp) / gamma) * ((esatTs - e0) / r_as)
+beta_bulk = sp.solve(sp.Eq(lambdaE_sbulk_beta - lambdaE_sbulk, 0), beta)[0]
+beta_bulk
+```
