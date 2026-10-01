@@ -17,7 +17,7 @@ end
     t_gmin=74_000, t_gmax=100_000, phase_shift=10_800)
 
 Ground heat flux ``G = c_g \\cos(2π (t_{sol} + t_{shift}) / t_g) R_{ns}`` [W m⁻²], with
-`t_sol` the time since solar noon [s] (negative before noon) and `R_ns` the net radiation
+`t_sol` the time since solar noon [s] - negative before noon - and `R_ns` the net radiation
 at the soil surface [W m⁻²].
 
 Equation 4 of [Santanello & Friedl (2003)](https://doi.org/10.1175/1520-0450(2003)042%3C0851:DCISHF%3E2.0.CO;2),
