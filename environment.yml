@@ -1,10 +1,11 @@
 name: DifferentiableEvaporation
 channels:
   - conda-forge
-  - defaults 
 dependencies:
   - python=3.12
   - xee=0.0.19
+  - xarray=2026.9.*
+  - pandas
   - matplotlib=3.10.*
   - hvplot=0.11.*
   - geoviews=1.14.*
@@ -16,8 +17,9 @@ dependencies:
   - soilgrids=0.1.4 
   - cubo=2024.8.0
   - sympy=1.14.*
+  - tabulate=0.10.*
   - pip
   - pip:
     - zenodo_get==1.6.*
-    - icoscp==0.2.2
+    - icoscp==0.2.*
     - timezonefinder==6.5.*
