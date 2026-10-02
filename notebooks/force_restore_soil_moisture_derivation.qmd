@@ -558,28 +558,22 @@ wave reaches about 0.5–2.5 m in saturated soil.
 ## Time scales {#sec-time_scales}
 
 The force term gives the rate at which a flux changes $w_g$:
-$\partial w_g/\partial t = 2P_{net}/(\rho_w d)$. For 1 mm h⁻¹ of infiltration:
-
+$$
+\frac{\partial w_g}{\partial t} = \frac{C_1}{\rho_w d_1} P_{net} = \frac{2 d_1}{d}\frac{1}{\rho_w d_1} P_{net} = \frac{2}{\rho_w d}P_{net}. 
+$$
+For 1 mm h⁻¹ of net precipitation, the rate is
 ```{python}
-P_net_val = 1.0 / 3600  # kg m-2 s-1 (1 mm/h)
-for d_val in (1.0, 0.1, 0.01, 0.001):
-    rate = 2 * P_net_val / (1000 * d_val)  # m3 m-3 s-1
-    print(f"d = {d_val:6.3f} m:  dw_g/dt = {rate:9.2e} s^-1 = {3600 * rate:8.3f} per hour")
+net_precip_mmh = 1.0  # mm/h
+# Note: 1 mm of water = 1 kg m-2
+P_net_ = net_precip_mmh / 3600  # kg m-2 s-1 
+rho_w_ = 1000.0  # kg m-3
+d_val_list = (1.0, 0.1, 0.01, 0.001)  # m
+for d_val in d_val_list:
+    rate = 2 * P_net_ / (rho_w_ * d_val)  # m3 m-3 s-1
+    print(f"d = {d_val:6.3f} m:  dw_g/dt = {rate:9.2e} m3 m-3 s-1 = {3600 * rate:8.3f} m3 m-3 h-1")
 ```
 
 The restore term relaxes $w_g$ towards $w_{geq}$ with time scale $\tau/C_2$, of the order of
 hours to days.
 
-A penetration depth below a centimetre means a response within minutes. For the ODE this is the
-stiff direction. It is physical as long as $C_{1sat}$ and $d_1$ are paired consistently, but it
-becomes 100 times stiffer when a $d_1$ = 1 m value of $C_{1sat}$ is combined with $d_1$ = 1 cm.
-
-## Summary of assumptions {#sec-assumptions}
-
-1. Richards equation without vapour transport. Very dry soils need the separate Gaussian $C_1$
-   of Giordani (1993) / Braud et al. (1993), or Giard & Bazile, below the wilting point.
-2. Homogeneous soil with $K$ and $C_w$ linearized around a representative state.
-3. Diurnal harmonic forcing, with the resulting relation applied to arbitrary fluxes.
-4. A homogeneous mean profile for $w_{geq}$; in practice $C_2$ and $w_{geq}$ are calibrated.
-5. The CH78 power laws for $\phi(w)$ and $K(w)$, which give the $(w_{sat}/w_g)^{b/2+1}$ shape of
-   $C_1$.
+A penetration depth below a centimetre means a response within minutes. For the ODE this means numerical stiffness! The stiffness increases with decreasing penetration depth. It is physical as long as $C_{1sat}$ and $d_1$ are paired consistently.  
