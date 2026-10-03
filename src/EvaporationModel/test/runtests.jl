@@ -45,13 +45,14 @@ u = 5.0 # m/s
 P_s = 1.5e-5 # kg / (m2 * s)
 
 @testset "Check evaporation sum" begin
-    A, A_c, A_s = available_energy_partioning(Rn, G, f_veg)
+    R_nc, R_ns = net_radiation_partitioning(Rn, f_veg)
+    A, A_c, A_s = available_energy_partitioning(R_nc, R_ns, G)
     λE_tot, λE_tot_p = total_evaporation(
         T_a, p_a, VPD_a, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet
     )
     VPD_m = vpd_veg_source_height(VPD_a, T_a, p_a, A, λE_tot, r_aa)
     ET_t, λE_t = transpiration(T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet)
-    ET_i, λE_i = interception(T_a, p_a, VPD_m, A_c, r_ac, f_wet)
+    ET_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet)
     ET_s, λE_s = soil_evaporation(T_a, p_a, VPD_m, A_s, r_as, r_ss)
     @test λE_tot ≈ λE_t + λE_i + λE_s
 end
@@ -62,9 +63,11 @@ end
     # @test (@ballocations fractional_vegetation_cover($LAI)) == 0
     println("Testing functions from canopy.jl")
     @test isempty(check_allocs(fractional_vegetation_cover, (FT,)))
-    @test isempty(check_allocs(available_energy_partioning, (FT, FT, FT)))
+    @test isempty(check_allocs(net_radiation_partitioning, (FT, FT)))
+    @test isempty(check_allocs(available_energy_partitioning, (FT, FT, FT)))
     @test isempty(check_allocs(fraction_wet_vegetation, (FT, FT)))
-    @test isempty(check_allocs(canopy_drainage, (FT, FT, FT)))
+    @test isempty(check_allocs(canopy_input, (FT, FT)))
+    @test isempty(check_allocs(canopy_drainage, (FT, FT, FT, FT)))
     @test isempty(check_allocs(precip_below_canopy, (FT, FT, FT)))
     @test isempty(check_allocs(vpd_veg_source_height, (FT, FT, FT, FT, FT, FT)))
 
@@ -74,7 +77,7 @@ end
         check_allocs(total_evaporation, (FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT))
     )
     @test isempty(check_allocs(transpiration, (FT, FT, FT, FT, FT, FT, FT)))
-    @test isempty(check_allocs(interception, (FT, FT, FT, FT, FT, FT)))
+    @test isempty(check_allocs(interception_loss, (FT, FT, FT, FT, FT, FT)))
     @test isempty(check_allocs(soil_evaporation, (FT, FT, FT, FT, FT, FT)))
 
     println("Testing functions from resistances.jl")
