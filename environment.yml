@@ -5,7 +5,7 @@ dependencies:
   - python=3.12
   - xee=0.0.19
   - xarray=2026.9.*
-  - pandas
+  - pandas=3.0.*
   - matplotlib=3.10.*
   - hvplot=0.11.*
   - geoviews=1.14.*
