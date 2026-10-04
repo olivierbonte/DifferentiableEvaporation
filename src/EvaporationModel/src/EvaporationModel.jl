@@ -10,6 +10,18 @@ using OrdinaryDiffEq
 using Parameters
 using YAXArrays
 
+include("thresholds.jl")
+export ThresholdTreatment,
+    HardThresholds,
+    KavetskiSmoothing,
+    threshold_max,
+    threshold_min,
+    threshold_clamp,
+    lower_bound_kernel,
+    moisture_scale,
+    storage_scale,
+    factor_scale
+
 include("canopy.jl")
 export fractional_vegetation_cover,
     net_radiation_partitioning,
@@ -92,6 +104,7 @@ export c_1,
 
 include("soil_fluxes.jl")
 export surface_runoff,
+    surface_infiltration_factor,
     diffusion_layer_1,
     vertical_drainage_layer_2,
     InfiltrationMethod,

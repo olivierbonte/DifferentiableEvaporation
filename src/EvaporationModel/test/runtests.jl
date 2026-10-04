@@ -1,10 +1,15 @@
 # Import Packages to test
 using Bigleaf
+using ComponentArrays
+using Dates
 using EvaporationModel
 # Import packages used for testing
 using AllocCheck
 using BenchmarkTools
+using DifferentiationInterface
 using Documenter
+import ForwardDiff # backend for DifferentiationInterface
+using OrdinaryDiffEq
 using Test
 # Here you include files using `srcdir`
 # include(srcdir("file.jl"))
@@ -42,7 +47,93 @@ z_obs = 39.0 # m
 z_0ms = 0.01 # m
 u_star = 3.0 # m/s
 u = 5.0 # m/s
-P_s = 1.5e-5 # kg / (m2 * s)
+P = 2.0e-5 # gross precipitation, kg / (m2 * s)
+P_s = 1.5e-5 # precipitation below the canopy, kg / (m2 * s)
+w_sat = 0.45
+
+p_model = ComponentArray(;
+    h=h, z_0ms=z_0ms, w_sat=w_sat, a=0.15, p_soil=6.0, b=6.1, w_res=0.04,
+    w_wp=w_wp, w_fc=w_fc, C_1sat=0.019, C_2ref=0.83, C_3=0.25, d_1=0.01, d_2=1.3,
+    z_obs=z_obs, kB⁻¹=log(10), g_d=3e-4, r_smin=395.0, k_ext=0.5,
+)
+constant_forcings(P) = (
+    P=t -> P, T_a=t -> T_a, u_a=t -> u, p_a=t -> p_a, VPD_a=t -> VPD_a,
+    SW_in=t -> SW_in, R_n=t -> Rn, LAI=t -> LAI, lon=4.52, utc_offset=1,
+)
+t_unix = datetime2unix(DateTime(2010, 7, 1, 10)) # model time [s since Unix epoch], 10:00 local
+treatments = (HardThresholds(), KavetskiSmoothing())
+
+@testset "Mass conservation of tendencies" begin
+    forcings = constant_forcings(P)
+    for thresholds in treatments,
+        u0 in ([0.2, 0.32, 0.3], [0.05, 0.1, 0.0], [0.4, 0.44, 0.7], [w_sat, w_sat, 0.7])
+
+        du = zeros(3)
+        compute_tendencies!(du, u0, p_model, t_unix, forcings, thresholds)
+        d = compute_diagnostics(u0, p_model, t_unix, forcings, thresholds)
+        @test all(isfinite, du)
+        @test d.λE_tot ≈ d.λE_t + d.λE_i + d.λE_s
+        # Water balance of the column, d/dt(ρ_w d_2 w_2 + w_r) = inputs - outputs, with both
+        # sides in kg m⁻² s⁻¹ (mm s⁻¹).
+        lhs = ρ_w * p_model.d_2 * du[2] + du[3]
+        rhs = P - d.Q_s - d.E_s - d.E_t - d.E_i - ρ_w * p_model.d_2 * d.K_2
+        @test lhs ≈ rhs atol = 1e-12
+    end
+end
+
+@testset "Threshold treatments" begin
+    hard, smooth = treatments
+    @test threshold_max(hard, 0.2, 0.3, moisture_scale(hard)) == 0.3
+    @test threshold_min(hard, 0.2, 0.3, moisture_scale(hard)) == 0.2
+    @test threshold_clamp(hard, 1.5, 0.0, 1.0, factor_scale(hard)) == 1.0
+    # The smooth clamp never drops below the lower bound, and exceeds the upper by < s/2
+    s = factor_scale(smooth)
+    for x in (-1.0, 0.0, 0.5, 1.0, 2.0)
+        @test 0 <= threshold_clamp(smooth, x, 0.0, 1.0, s) <= 1 + s / 2
+    end
+    # Smoothed f_wet has a finite slope at w_r = 0 (the hard 2/3 power does not)
+    @test isfinite(
+        derivative(w_r -> fraction_wet_vegetation(w_r, 0.6, smooth), AutoForwardDiff(), 0.0)
+    )
+    # HardThresholds is the default treatment
+    forcings = constant_forcings(P)
+    u0 = [0.2, 0.32, 0.3]
+    @test compute_diagnostics(u0, p_model, t_unix, forcings) ==
+        compute_diagnostics(u0, p_model, t_unix, forcings, hard)
+end
+
+@testset "Surface layer bounded at saturation" begin
+    @test surface_infiltration_factor(w_sat, w_sat) == 0
+    @test surface_infiltration_factor(0.0, w_sat) ≈ 1
+    @test surface_infiltration_factor(w_sat - 0.05, w_sat) > 0.99
+    @test surface_infiltration_factor(w_sat + 0.01, w_sat) < 0
+    # Heavy rain (20 mm/h) on a saturated surface layer during the day: no further wetting
+    P_heavy = 20 / 3600 # kg / (m2 * s)
+    forcings = constant_forcings(P_heavy)
+    for thresholds in treatments
+        du = zeros(3)
+        compute_tendencies!(du, [w_sat, 0.4, 0.7], p_model, t_unix, forcings, thresholds)
+        @test du[1] <= 0
+        # 12 h of heavy rain on a wet surface over a drier root zone (so most rain
+        # infiltrates) drives w_1 to the bound, but not above it
+        t_span = (t_unix, t_unix + 12 * 3600.0)
+        model = ProcessBasedModel{Float64}(;
+            forcings=forcings,
+            parameters=p_model,
+            t_span=t_span,
+            u0=[0.35, 0.25, 0.5],
+            saveat=collect(t_span[1]:600.0:t_span[2]),
+            thresholds=thresholds,
+        )
+        EvaporationModel.initialize!(model)
+        # Explicit solver: the ForwardDiff Jacobian is NaN for w_1 > w_fc, where r_ss = 0
+        EvaporationModel.solve!(model; AD=true, alg=Tsit5(), abstol=1e-8, reltol=1e-8)
+        @test OrdinaryDiffEq.SciMLBase.successful_retcode(model.sol)
+        @test maximum(u -> u[1], model.sol.u) <= w_sat + 1e-6
+        @test maximum(u -> u[2], model.sol.u) <= w_sat + 1e-6
+        @test maximum(u -> u[1], model.sol.u) > w_sat - 0.01 # the bound is active
+    end
+end
 
 @testset "Check evaporation sum" begin
     R_nc, R_ns = net_radiation_partitioning(Rn, f_veg)
@@ -94,6 +185,8 @@ end
     @test (@ballocations surface_runoff(
         VegetationInfiltration(), $P_s, $w_2, $w_fc, $f_veg
     )) == 0
+    @test isempty(check_allocs(c_1, (FT, FT, FT, FT, FT)))
+    @test isempty(check_allocs(surface_infiltration_factor, (FT, FT)))
     @test isempty(check_allocs(diffusion_layer_1, (FT, FT, FT)))
     @test isempty(check_allocs(vertical_drainage_layer_2, (FT, FT, FT, FT)))
 

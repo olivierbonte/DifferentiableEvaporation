@@ -176,8 +176,9 @@ function smooth_max(a::FT, b, m) where {FT}
     return convert(FT, 1 / 2) * (a + b + √((a - b)^2 + m))
 end
 
+# min first and max last, so the result never drops below `lower`
 function smooth_clamp(x::FT, lower, upper, m) where {FT}
-    return smooth_min(smooth_max(x, lower, m), upper, m)
+    return smooth_max(smooth_min(x, upper, m), lower, m)
 end
 
 function smoothing_kernel(approach::LowerBound, x, treshold, m)
