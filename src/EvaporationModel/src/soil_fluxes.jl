@@ -50,6 +50,6 @@ function diffusion_layer_1(w_1, w_1eq, C_2)
 end
 
 function vertical_drainage_layer_2(w_2, w_fc, C_3, d_2, t=HardThresholds())
-    K_2 = C_3 / (d_2 * τ) * threshold_max(t, w_2 - w_fc, zero(w_2), moisture_scale(t))
+    K_2 = C_3 / (d_2 * τ) * max(t, w_2 - w_fc, zero(w_2), moisture_scale(t))
     return K_2
 end

@@ -83,13 +83,13 @@ end
 
 @testset "Threshold treatments" begin
     hard, smooth = treatments
-    @test threshold_max(hard, 0.2, 0.3, moisture_scale(hard)) == 0.3
-    @test threshold_min(hard, 0.2, 0.3, moisture_scale(hard)) == 0.2
-    @test threshold_clamp(hard, 1.5, 0.0, 1.0, factor_scale(hard)) == 1.0
+    @test max(hard, 0.2, 0.3, moisture_scale(hard)) == 0.3
+    @test min(hard, 0.2, 0.3, moisture_scale(hard)) == 0.2
+    @test clamp(hard, 1.5, 0.0, 1.0, factor_scale(hard)) == 1.0
     # The smooth clamp never drops below the lower bound, and exceeds the upper by < s/2
     s = factor_scale(smooth)
     for x in (-1.0, 0.0, 0.5, 1.0, 2.0)
-        @test 0 <= threshold_clamp(smooth, x, 0.0, 1.0, s) <= 1 + s / 2
+        @test 0 <= clamp(smooth, x, 0.0, 1.0, s) <= 1 + s / 2
     end
     # Smoothed f_wet has a finite slope at w_r = 0 (the hard 2/3 power does not)
     @test isfinite(

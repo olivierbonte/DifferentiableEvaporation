@@ -11,12 +11,16 @@ using Parameters
 using YAXArrays
 
 include("thresholds.jl")
-export ThresholdTreatment,
+export smooth_min,
+    smooth_max,
+    smooth_clamp,
+    smoothing_kernel,
+    KernelMethod,
+    LowerBound,
+    UpperBound,
+    ThresholdTreatment,
     HardThresholds,
     KavetskiSmoothing,
-    threshold_max,
-    threshold_min,
-    threshold_clamp,
     lower_bound_kernel,
     moisture_scale,
     storage_scale,
@@ -117,14 +121,7 @@ export compute_amplitude_and_phase,
     fit_fourier_coefficients,
     local_to_solar_time,
     seconds_since_solar_noon,
-    smooth_min,
-    smooth_max,
-    smooth_clamp,
-    smoothing_kernel,
     value_type,
-    of_value_type,
-    KernelMethod,
-    LowerBound,
-    UpperBound
+    of_value_type
 
 end # module EvaporationModel

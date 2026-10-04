@@ -9,7 +9,7 @@ Compute force coefficient `c_1` [-] of force restore framework for soil mositure
 ``C_1 = C_{1sat} (w_{sat} / \\max(w_1, w_{wp}))^{b/2 + 1}``.
 See equation 20 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
 `w_1` is floored at the wilting point, the lower validity bound of the formula, with
-[`threshold_max`](@ref) for the threshold treatment `t`.
+a `max` under the threshold treatment `t`.
 
 # Arguments
 - `w_1`: Surface soil moisutre [m³ m⁻³]
@@ -20,7 +20,7 @@ See equation 20 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 
 """
 function c_1(w_1, w_sat, b, c_1sat, w_wp, t=HardThresholds())
-    return c_1sat * (w_sat / threshold_max(t, w_1, w_wp, moisture_scale(t)))^(b / 2 + 1)
+    return c_1sat * (w_sat / max(t, w_1, w_wp, moisture_scale(t)))^(b / 2 + 1)
 end
 
 """

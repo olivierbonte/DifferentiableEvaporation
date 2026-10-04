@@ -62,8 +62,8 @@ function surface_resistance(
     f_3 = exp(-g_d * VPD)
     f_4 = 1 - T(0.0016) * (T_opt - T_a)^2
     s_f = factor_scale(thresholds)
-    f = prod(threshold_clamp(thresholds, f_i, zero(f_i), one(f_i), s_f) for f_i in (f_1, f_2, f_3, f_4))
-    g_s = threshold_max(thresholds, LAI / r_smin * f, 1 / r_smax, 1 / r_smax)
+    f = prod(clamp(thresholds, f_i, zero(f_i), one(f_i), s_f) for f_i in (f_1, f_2, f_3, f_4))
+    g_s = max(thresholds, LAI / r_smin * f, 1 / r_smax, 1 / r_smax)
     return 1 / g_s
 end
 

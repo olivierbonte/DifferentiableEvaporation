@@ -58,9 +58,9 @@ below ``w_r = 0``, and the cap at one is a smooth minimum.
 """
 function fraction_wet_vegetation(w_r, w_rmax, t=HardThresholds())
     s = storage_scale(t, w_rmax)
-    w_r⁺ = threshold_max(t, w_r, zero(w_r), s)
+    w_r⁺ = max(t, w_r, zero(w_r), s)
     f_wet = (w_r⁺ / w_rmax)^of_value_type(w_r, 2 / 3) * lower_bound_kernel(t, w_r, zero(w_r), s)
-    return threshold_min(t, f_wet, one(f_wet), factor_scale(t))
+    return min(t, f_wet, one(f_wet), factor_scale(t))
 end
 
 """
