@@ -25,12 +25,31 @@ function surface_runoff(
     return Q_s
 end
 
+"""
+    surface_infiltration_factor(w_1, w_sat, m_1=0.01)
+
+Share of the infiltration `I_s` that wets the surface layer,
+``f_1 = 1 - e^{(w_1 - w_{sat})/m_1}`` [-],`
+It keeps ``w_1 \\le w_{sat}`` without clipping the state:
+
+This is the continuous counterpart of the clip of `w_g` at `w_sat` in SURFEX
+([`hydro_soil.F90`](https://github.com/joewkr/open-SURFEX/blob/70d23957e90ac9dfe4f076669f78e967a5e234e3/src/SURFEX/hydro_soil.F90#L513-L526)),
+which produces no runoff: `w_1` is not a water store, it only represent as thin surface layer.
+`w_2` still receives all of `I_s`and the water balance is unchanged.
+The kernel is the exponential smoothing kernel of Eq. 20 in
+[Kavetski & Kuczera (2007)](https://doi.org/10.1029/2006WR005195) (see [`smoothing_kernel`](@ref))
+`m_1` [m³ m⁻³] sets the width of the transition.
+"""
+function surface_infiltration_factor(w_1, w_sat, m_1=of_value_type(w_1, 0.01))
+    return smoothing_kernel(UpperBound(), w_1, w_sat, m_1)
+end
+
 function diffusion_layer_1(w_1, w_1eq, C_2)
     D_1 = C_2 / τ * (w_1 - w_1eq)
     return D_1
 end
 
-function vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
-    K_2 = C_3 / (d_2 * τ) * max(zero(w_2), w_2 - w_fc)
+function vertical_drainage_layer_2(w_2, w_fc, C_3, d_2, t=HardThresholds())
+    K_2 = C_3 / (d_2 * τ) * max(t, w_2 - w_fc, zero(w_2), moisture_scale(t))
     return K_2
 end

@@ -1,7 +1,3 @@
-abstract type KernelMethod end
-struct LowerBound <: KernelMethod end
-struct UpperBound <: KernelMethod end
-
 """
     fourier_series(t, coeffs, ω)
 
@@ -166,26 +162,6 @@ function seconds_since_solar_noon(t::Real, lon, utc_offset)
     EoT = equation_of_time(γ)
     t_solar = t_utc + 60 * (4 * lon + EoT) # time offset in minutes
     return mod(t_solar, day) - day / 2
-end
-
-function smooth_min(a::FT, b, m) where {FT}
-    return convert(FT, 1 / 2) * (a + b - √((a - b)^2 + m))
-end
-
-function smooth_max(a::FT, b, m) where {FT}
-    return convert(FT, 1 / 2) * (a + b + √((a - b)^2 + m))
-end
-
-function smooth_clamp(x::FT, lower, upper, m) where {FT}
-    return smooth_min(smooth_max(x, lower, m), upper, m)
-end
-
-function smoothing_kernel(approach::LowerBound, x, treshold, m)
-    return 1 - exp(-(x - treshold) / m)
-end
-
-function smoothing_kernel(approach::UpperBound, x, treshold, m)
-    return 1 - exp((x - treshold) / m)
 end
 
 @inline function value_type(x::T) where {T}

@@ -12,6 +12,7 @@ abstract type AbstractModel end
     sol = nothing
     diagnostics = SavedValues(FT, NamedTuple)
     output = nothing
+    thresholds::ThresholdTreatment = HardThresholds()
 end
 
 function initialize!(model::ProcessBasedModel)
@@ -22,16 +23,14 @@ function initialize!(model::ProcessBasedModel)
 end
 
 function create_rhs(model::ProcessBasedModel)
-    forcings = model.forcings
-    return let forcings = forcings
-        return (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
+    return let forcings = model.forcings, thresholds = model.thresholds
+        (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings, thresholds)
     end
 end
 
 function create_f_diagnostics(model::ProcessBasedModel)
-    forcings = model.forcings
-    return let forcings = forcings
-        return (u, p, t) -> compute_diagnostics(u, p, t, forcings)
+    return let forcings = model.forcings, thresholds = model.thresholds
+        (u, p, t) -> compute_diagnostics(u, p, t, forcings, thresholds)
     end
 end
 
@@ -61,7 +60,9 @@ function solve!(model::ProcessBasedModel; AD=false, kwargs...)
     return nothing
 end
 
-@inline function compute_diagnostics(u, p::AbstractArray, t, forcings::NamedTuple)
+@inline function compute_diagnostics(
+    u, p::AbstractArray, t, forcings::NamedTuple, thresholds::ThresholdTreatment=HardThresholds()
+)
     w_1, w_2, w_r = u
     @unpack h,
     z_0ms,
@@ -97,10 +98,10 @@ end
     )
     f_veg = fractional_vegetation_cover(LAI, k_ext)
     w_rmax = max_canopy_capacity(LAI)
-    f_wet = fraction_wet_vegetation(w_r, w_rmax)
+    f_wet = fraction_wet_vegetation(w_r, w_rmax, thresholds)
 
     w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
-    C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp) # no allocs
+    C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp, thresholds) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
     t_sol = seconds_since_solar_noon(t, forcings.lon, forcings.utc_offset)
@@ -123,7 +124,8 @@ end
         w_wp,
         LAI,
         g_d,
-        r_smin,
+        r_smin;
+        thresholds,
     )
     β = soil_evaporation_efficiency(Pielke92(), w_1, w_fc)
     r_ss = beta_to_r_ss(β, r_as)
@@ -157,8 +159,9 @@ end
     P_s = precip_below_canopy(P, P_c, D_c)
     Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
-    K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
+    K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2, thresholds)
     I_s = P_s - Q_s
+    f_1 = surface_infiltration_factor(w_1, w_sat) # bounds w_1 at w_sat
     return (
         w_rmax=w_rmax,
         C_1=C_1,
@@ -178,14 +181,17 @@ end
         D_1=D_1,
         K_2=K_2,
         I_s=I_s,
+        f_1=f_1,
     )
 end
 
-function compute_tendencies!(du, u, p::AbstractArray, t, forcings::NamedTuple)
-    diagnostics = compute_diagnostics(u, p, t, forcings)
+function compute_tendencies!(
+    du, u, p::AbstractArray, t, forcings::NamedTuple, thresholds::ThresholdTreatment=HardThresholds()
+)
+    diagnostics = compute_diagnostics(u, p, t, forcings, thresholds)
     @unpack d_1, d_2 = p
-    @unpack P_c, D_c, I_s, D_1, K_2, E_s, E_t, E_i, C_1 = diagnostics
-    du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
+    @unpack P_c, D_c, I_s, f_1, D_1, K_2, E_s, E_t, E_i, C_1 = diagnostics
+    du[1] = C_1 / (ρ_w * d_1) * (f_1 * I_s - E_s) - D_1
     du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
     du[3] = P_c - E_i - D_c
     return nothing

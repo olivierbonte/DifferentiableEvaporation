@@ -10,6 +10,22 @@ using OrdinaryDiffEq
 using Parameters
 using YAXArrays
 
+include("thresholds.jl")
+export smooth_min,
+    smooth_max,
+    smooth_clamp,
+    smoothing_kernel,
+    KernelMethod,
+    LowerBound,
+    UpperBound,
+    ThresholdTreatment,
+    HardThresholds,
+    KavetskiSmoothing,
+    lower_bound_kernel,
+    moisture_scale,
+    storage_scale,
+    factor_scale
+
 include("canopy.jl")
 export fractional_vegetation_cover,
     net_radiation_partitioning,
@@ -92,6 +108,7 @@ export c_1,
 
 include("soil_fluxes.jl")
 export surface_runoff,
+    surface_infiltration_factor,
     diffusion_layer_1,
     vertical_drainage_layer_2,
     InfiltrationMethod,
@@ -104,14 +121,7 @@ export compute_amplitude_and_phase,
     fit_fourier_coefficients,
     local_to_solar_time,
     seconds_since_solar_noon,
-    smooth_min,
-    smooth_max,
-    smooth_clamp,
-    smoothing_kernel,
     value_type,
-    of_value_type,
-    KernelMethod,
-    LowerBound,
-    UpperBound
+    of_value_type
 
 end # module EvaporationModel
