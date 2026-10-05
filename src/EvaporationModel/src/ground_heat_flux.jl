@@ -2,7 +2,7 @@ abstract type GroundHeatFluxMethod end
 struct Allen07 <: GroundHeatFluxMethod end
 struct SantanelloFriedl03 <: GroundHeatFluxMethod end
 
-function ground_heat_flux(method::Allen07, R_n::T, LAI::T) where {T}
+function ground_heat_flux(method::Allen07, R_n, LAI)
     if LAI < 0.5
         @error "Ground heat flux from net radiation for LAI < 0.5
         not yet implemented"
@@ -12,21 +12,35 @@ function ground_heat_flux(method::Allen07, R_n::T, LAI::T) where {T}
     return G
 end
 
+"""
+    ground_heat_flux(::SantanelloFriedl03, R_ns, w_1, w_sat, t_sol; c_gmin=0.31, c_gmax=0.35,
+    t_gmin=74_000, t_gmax=100_000, phase_shift=10_800)
+
+Ground heat flux ``G = c_g \\cos(2π (t_{sol} + t_{shift}) / t_g) R_{ns}`` [W m⁻²], with
+`t_sol` the time since solar noon [s] - negative before noon - and `R_ns` the net radiation
+at the soil surface [W m⁻²].
+
+Equation 4 of [Santanello & Friedl (2003)](https://doi.org/10.1175/1520-0450(2003)042%3C0851:DCISHF%3E2.0.CO;2),
+applied to `R_ns` as in ALEXI ([Anderson et al. 2018](https://lpdaac.usgs.gov/documents/332/ECO3ETALEXIU_ATBD_V1.pdf), Eq. 15),
+with ``c_g`` and ``t_g`` interpolated linearly in ``Θ = w_1 / w_{sat}`` as in
+[Mallick et al. (2022)](https://doi.org/10.1029/2021GL097568), Eqs. S1.19-S1.20.
+"""
 function ground_heat_flux(
     method::SantanelloFriedl03,
-    R_ns::T,
-    w_1::T,
-    w_1sat::T,
-    t_soln::T,
-    c_gmin::T=T(0.31),
-    c_gmax::T=T(0.35),
-    t_gmin::T=T(74_000),
-    t_gmax::T=T(100_000),
-) where {T}
-    Θ = w_1 / w_1sat
+    R_ns,
+    w_1,
+    w_sat,
+    t_sol;
+    c_gmin=of_value_type(w_1, 0.31),
+    c_gmax=of_value_type(w_1, 0.35),
+    t_gmin=of_value_type(w_1, 74_000),
+    t_gmax=of_value_type(w_1, 100_000),
+    phase_shift=of_value_type(w_1, 10_800),
+)
+    Θ = w_1 / w_sat
     c_g = c_gmax * (1 - Θ) + c_gmin * Θ
     t_g = t_gmax * (1 - Θ) + t_gmin * Θ
-    G = c_g * cos(2π * (t_soln + 10_800) / t_g) * R_ns
+    G = c_g * cos(2π * (t_sol + phase_shift) / t_g) * R_ns
     return G
 end
 

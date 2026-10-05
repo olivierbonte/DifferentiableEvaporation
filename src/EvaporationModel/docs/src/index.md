@@ -31,6 +31,18 @@ Modules = [EvaporationModel]
 Pages = ["soil.jl"]
 ```
 
+## Soil fluxes
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["soil_fluxes.jl"]
+```
+
+## Threshold treatment
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["thresholds.jl"]
+```
+
 ## Resistances
 ```@autodocs
 Modules = [EvaporationModel]

@@ -26,6 +26,8 @@ Calculate surface resistance
 - `r_smin`: Minimum surface resistance [s/m]
 - `T_opt`: Optimum temperature for stomatal conductance [K], default = 298.0 K
 - `r_smax`: Maximum surface resistance [s/m], default = 500_000 s/m
+- `thresholds`: [`ThresholdTreatment`](@ref) for clamping the factors to [0, 1] and
+  flooring the conductance at `1/r_smax`; default [`HardThresholds`](@ref).
 
 # Returns
 - `r_s`: Surface resistance [s/m]
@@ -52,22 +54,19 @@ function surface_resistance(
     r_smin;
     T_opt=of_value_type(T_a, 298.0),
     r_smax=of_value_type(r_smin, 500_000),
+    thresholds=HardThresholds(),
 )
     T = value_type(r_smax)
-    m_smooth = 1 / 200 # smoothing factor for 0 to 1 clamping
-    f_1 = smooth_clamp(
-        (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0))),
-        0,
-        1,
-        m_smooth,
-    )
-    f_2 = smooth_clamp((w_2 - w_wilt) / (w_fc - w_wilt), 0, 1, m_smooth)
-    f_3 = smooth_clamp(exp(-g_d * VPD), 0, 1, m_smooth)
-    f_4 = smooth_clamp(1 - T(0.0016) * (T_opt - T_a)^2, 0, 1, m_smooth)
-    m_smooth_rs = r_smax
-    r_s = smooth_min(r_smin / LAI * (f_1 * f_2 * f_3 * f_4)^(-1), r_smax, m_smooth_rs)
-    return r_s
+    f_1 = (T(0.004) * SW_in + T(0.05)) / (T(0.81) * (T(0.004) * SW_in + T(1.0)))
+    f_2 = (w_2 - w_wilt) / (w_fc - w_wilt)
+    f_3 = exp(-g_d * VPD)
+    f_4 = 1 - T(0.0016) * (T_opt - T_a)^2
+    s_f = factor_scale(thresholds)
+    f = prod(clamp(thresholds, f_i, zero(f_i), one(f_i), s_f) for f_i in (f_1, f_2, f_3, f_4))
+    g_s = max(thresholds, LAI / r_smin * f, 1 / r_smax, 1 / r_smax)
+    return 1 / g_s
 end
+
 """
     soil_aerodynamic_resistance(::Choudhury1988soil, ustar, h, d_c, z_0mc, z_0ms, η=3)
 
@@ -180,7 +179,8 @@ With `approach = Martens17()`, the following inputs are
 # Details
 
 With `approach = Pielke92()`, β is calculated using euqation (7) of
-[Lee & Pielke (1992)](https://doi.org/10.1175/1520-0450(1992)031%3C0480:ETSSSH%3E2.0.CO;2)
+[Lee & Pielke (1992)](https://doi.org/10.1175/1520-0450(1992)031%3C0480:ETSSSH%3E2.0.CO;2),
+with β = 1 for `w_1 ≥ w_fc`.
 
 With `approach = Martens17()`, β is calculated using equation (6) of
 [Martens et al. (2017)](https://doi.org/10.5194/gmd-10-1903-2017).
@@ -192,7 +192,9 @@ using EvaporationModel
 w_fc = 0.35
 w_1 = w_fc / 2
 β_p = soil_evaporation_efficiency(Pielke92(), w_1, w_fc)
-β_p ≈ 0.25
+β_fc = soil_evaporation_efficiency(Pielke92(), w_fc, w_fc)
+β_wet = soil_evaporation_efficiency(Pielke92(), 1.5 * w_fc, w_fc)
+β_p ≈ 0.25 && β_fc ≈ 1 && β_wet ≈ 1
 
 # output
 
@@ -201,7 +203,7 @@ true
 
 """
 function soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc)
-    return 1 / 4 * (1 - cos(π * w_1 / w_fc))^2
+    return 1 / 4 * (1 - cos(π * min(w_1, w_fc) / w_fc))^2
 end
 
 function soil_evaporation_efficiency(approach::Martens17, w_1, w_res, w_c)

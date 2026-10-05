@@ -12,6 +12,7 @@ abstract type AbstractModel end
     sol = nothing
     diagnostics = SavedValues(FT, NamedTuple)
     output = nothing
+    thresholds::ThresholdTreatment = HardThresholds()
 end
 
 function initialize!(model::ProcessBasedModel)
@@ -22,16 +23,14 @@ function initialize!(model::ProcessBasedModel)
 end
 
 function create_rhs(model::ProcessBasedModel)
-    forcings = model.forcings
-    return let forcings = forcings
-        return (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings)
+    return let forcings = model.forcings, thresholds = model.thresholds
+        (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings, thresholds)
     end
 end
 
 function create_f_diagnostics(model::ProcessBasedModel)
-    forcings = model.forcings
-    return let forcings = forcings
-        return (u, p, t) -> compute_diagnostics(u, p, t, forcings)
+    return let forcings = model.forcings, thresholds = model.thresholds
+        (u, p, t) -> compute_diagnostics(u, p, t, forcings, thresholds)
     end
 end
 
@@ -61,7 +60,9 @@ function solve!(model::ProcessBasedModel; AD=false, kwargs...)
     return nothing
 end
 
-@inline function compute_diagnostics(u, p::AbstractArray, t, forcings::NamedTuple)
+@inline function compute_diagnostics(
+    u, p::AbstractArray, t, forcings::NamedTuple, thresholds::ThresholdTreatment=HardThresholds()
+)
     w_1, w_2, w_r = u
     @unpack h,
     z_0ms,
@@ -80,46 +81,60 @@ end
     z_obs,
     kB⁻¹,
     g_d,
-    r_smin = p
-    d_c, z_0mc = Bigleaf.roughness_parameters(
-        RoughnessCanopyHeightLAI(), h, forcings.LAI(t); hs=z_0ms
+    r_smin,
+    k_ext = p
+    P, T_a, u_a, p_a, VPD_a, SW_in, R_n, LAI = (
+        forcings.P(t),
+        forcings.T_a(t),
+        forcings.u_a(t),
+        forcings.p_a(t),
+        forcings.VPD_a(t),
+        forcings.SW_in(t),
+        forcings.R_n(t),
+        forcings.LAI(t),
     )
-    f_veg = fractional_vegetation_cover(forcings.LAI(t))
-    w_rmax = max_canopy_capacity(forcings.LAI(t))
-    f_wet = fraction_wet_vegetation(w_r, w_rmax)
+    d_c, z_0mc = Bigleaf.roughness_parameters(
+        RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms
+    )
+    f_veg = fractional_vegetation_cover(LAI, k_ext)
+    w_rmax = max_canopy_capacity(LAI)
+    f_wet = fraction_wet_vegetation(w_r, w_rmax, thresholds)
 
     w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
-    C_1 = c_1(w_1, w_sat, b, C_1sat) # no allocs
+    C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp, thresholds) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
-    G = ground_heat_flux(Allen07(), forcings.R_n(t), forcings.LAI(t))
-    A, A_c, A_s = available_energy_partioning(forcings.R_n(t), G, f_veg)
+    t_sol = seconds_since_solar_noon(t, forcings.lon, forcings.utc_offset)
+    R_nc, R_ns = net_radiation_partitioning(R_n, f_veg)
+    G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol)
+    A, A_c, A_s = available_energy_partitioning(R_nc, R_ns, G)
 
     # Resistances
-    ustar = ustar_from_u(forcings.u_a(t), z_obs, d_c, z_0mc)
-    r_aa = Bigleaf.compute_Ram(ResistanceWindZr(), ustar, forcings.u_a(t))
+    ustar = ustar_from_u(u_a, z_obs, d_c, z_0mc)
+    r_aa = Bigleaf.compute_Ram(ResistanceWindZr(), ustar, u_a)
     r_ac = (Bigleaf.Gb_constant_kB1(ustar, kB⁻¹))^-1
     r_as = soil_aerodynamic_resistance(Choudhury1988soil(), ustar, h, d_c, z_0mc, z_0ms)
     r_sc = surface_resistance(
         JarvisStewart(),
-        forcings.SW_in(t),
-        forcings.VPD_a(t),
-        forcings.T_a(t),
+        SW_in,
+        VPD_a,
+        T_a,
         w_2,
         w_fc,
         w_wp,
-        forcings.LAI(t),
+        LAI,
         g_d,
-        r_smin,
+        r_smin;
+        thresholds,
     )
     β = soil_evaporation_efficiency(Pielke92(), w_1, w_fc)
     r_ss = beta_to_r_ss(β, r_as)
 
     # Turbulent fluxes calculations
     λE_tot, λE_tot_p = total_evaporation(
-        forcings.T_a(t),
-        forcings.p_a(t),
-        forcings.VPD_a(t),
+        T_a,
+        p_a,
+        VPD_a,
         A,
         A_c,
         A_s,
@@ -131,20 +146,22 @@ end
         f_wet,
     )
     VPD_m = vpd_veg_source_height(
-        forcings.VPD_a(t), forcings.T_a(t), forcings.p_a(t), A, λE_tot, r_aa
+        VPD_a, T_a, p_a, A, λE_tot, r_aa
     )
     E_t, λE_t = transpiration(
-        forcings.T_a(t), forcings.p_a(t), VPD_m, A_c, r_ac, r_sc, f_wet
+        T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet
     )
-    E_i, λE_i = interception(forcings.T_a(t), forcings.p_a(t), VPD_m, A_c, r_ac, f_wet)
-    E_s, λE_s = soil_evaporation(forcings.T_a(t), forcings.p_a(t), VPD_m, A_s, r_as, r_ss)
+    E_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet)
+    E_s, λE_s = soil_evaporation(T_a, p_a, VPD_m, A_s, r_as, r_ss)
 
-    D_c = canopy_drainage(forcings.P(t), w_r, f_veg)
-    P_s = precip_below_canopy(forcings.P(t), f_veg, D_c)
-    Q_s = surface_runoff(StaticInfiltration(), forcings.P(t), w_2, w_fc)
+    P_c = canopy_input(P, f_veg)
+    D_c = canopy_drainage(P, w_r, f_veg, k_ext)
+    P_s = precip_below_canopy(P, P_c, D_c)
+    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
-    K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2)
+    K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2, thresholds)
     I_s = P_s - Q_s
+    f_1 = surface_infiltration_factor(w_1, w_sat) # bounds w_1 at w_sat
     return (
         w_rmax=w_rmax,
         C_1=C_1,
@@ -157,27 +174,25 @@ end
         λE_i=λE_i,
         E_s=E_s,
         λE_s=λE_s,
+        P_c=P_c,
         D_c=D_c,
         P_s=P_s,
         Q_s=Q_s,
         D_1=D_1,
         K_2=K_2,
         I_s=I_s,
+        f_1=f_1,
     )
 end
 
-function compute_tendencies!(du, u, p::AbstractArray, t, forcings::NamedTuple)
-    diagnostics = compute_diagnostics(u, p, t, forcings)
-    _, _, w_r = u
+function compute_tendencies!(
+    du, u, p::AbstractArray, t, forcings::NamedTuple, thresholds::ThresholdTreatment=HardThresholds()
+)
+    diagnostics = compute_diagnostics(u, p, t, forcings, thresholds)
     @unpack d_1, d_2 = p
-    @unpack D_c, I_s, D_1, K_2, E_s, E_t, E_i, w_rmax, f_veg, C_1 = diagnostics
-    # Define smoothing parameter for canopy water content
-    m_can = w_rmax / 100
-    # Define ODE
-    du[1] = C_1 / (ρ_w * d_1) * (I_s - E_s) - D_1
+    @unpack P_c, D_c, I_s, f_1, D_1, K_2, E_s, E_t, E_i, C_1 = diagnostics
+    du[1] = C_1 / (ρ_w * d_1) * (f_1 * I_s - E_s) - D_1
     du[2] = 1 / (ρ_w * d_2) * (I_s - E_s - E_t) - K_2
-    du[3] =
-        f_veg * forcings.P(t) * smoothing_kernel(UpperBound(), w_r, w_rmax, m_can) -
-        E_i * smoothing_kernel(LowerBound(), w_r, zero(w_r), m_can) - D_c
+    du[3] = P_c - E_i - D_c
     return nothing
 end

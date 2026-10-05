@@ -10,13 +10,31 @@ using OrdinaryDiffEq
 using Parameters
 using YAXArrays
 
+include("thresholds.jl")
+export smooth_min,
+    smooth_max,
+    smooth_clamp,
+    smoothing_kernel,
+    KernelMethod,
+    LowerBound,
+    UpperBound,
+    ThresholdTreatment,
+    HardThresholds,
+    KavetskiSmoothing,
+    lower_bound_kernel,
+    moisture_scale,
+    storage_scale,
+    factor_scale
+
 include("canopy.jl")
 export fractional_vegetation_cover,
-    available_energy_partioning,
+    net_radiation_partitioning,
+    available_energy_partitioning,
     max_canopy_capacity,
     fraction_wet_vegetation,
     canopy_drainage,
     precip_below_canopy,
+    canopy_input,
     vpd_veg_source_height
 
 include("config.jl")
@@ -44,7 +62,7 @@ include("constants.jl")
 export ρ_w, τ
 
 include("evaporation.jl")
-export penman_monteith, total_evaporation, transpiration, interception, soil_evaporation
+export penman_monteith, total_evaporation, transpiration, interception_loss, soil_evaporation
 
 include("ground_heat_flux.jl")
 export ground_heat_flux,
@@ -76,6 +94,9 @@ export c_1,
     c_2,
     c_3,
     c_1sat,
+    C1satMethod,
+    NoilhanMahfouf96,
+    NoilhanPlanton89,
     c_2ref,
     w_geq,
     compute_a,
@@ -87,6 +108,7 @@ export c_1,
 
 include("soil_fluxes.jl")
 export surface_runoff,
+    surface_infiltration_factor,
     diffusion_layer_1,
     vertical_drainage_layer_2,
     InfiltrationMethod,
@@ -99,13 +121,7 @@ export compute_amplitude_and_phase,
     fit_fourier_coefficients,
     local_to_solar_time,
     seconds_since_solar_noon,
-    smooth_min,
-    smooth_max,
-    smoothing_kernel,
     value_type,
-    of_value_type,
-    KernelMethod,
-    LowerBound,
-    UpperBound
+    of_value_type
 
 end # module EvaporationModel

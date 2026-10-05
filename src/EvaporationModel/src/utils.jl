@@ -1,7 +1,3 @@
-abstract type KernelMethod end
-struct LowerBound <: KernelMethod end
-struct UpperBound <: KernelMethod end
-
 """
     fourier_series(t, coeffs, ω)
 
@@ -25,8 +21,8 @@ function fourier_series(t, coeffs::ComponentArray, ω)
     M = length(an)
     series =
         a0 +
-        sum(an[n] * cos(n * ω * t) for n in 1:M) +
-        sum(bn[n] * sin(n * ω * t) for n in 1:M)
+            sum(an[n] * cos(n * ω * t) for n in 1:M) +
+            sum(bn[n] * sin(n * ω * t) for n in 1:M)
     return series
 end
 
@@ -40,7 +36,7 @@ function fit_fourier_coefficients(t::AbstractVector, x::AbstractVector, M::Int, 
     linsolve = init(prob)
     sol = solve(linsolve)
     coeffs = sol.u
-    return ComponentArray(; a0=coeffs[1], an=coeffs[2:(M + 1)], bn=coeffs[(M + 2):end])
+    return ComponentArray(; a0=coeffs[1], an=coeffs[2:(M+1)], bn=coeffs[(M+2):end])
 end
 
 """
@@ -59,6 +55,14 @@ function compute_amplitude_and_phase(an::AbstractVector, bn::AbstractVector)
     a_bn = @. √(an^2 + bn^2)
     ϕ = @. atan(an, bn)
     return a_bn, ϕ
+end
+
+# NOAA equation of time [min] for the fractional year γ [rad]
+function equation_of_time(γ::T) where {T}
+    return T(229.18) * (
+        T(0.000075) + T(0.001868) * cos(γ) - T(0.032077) * sin(γ) -
+            T(0.014615) * cos(2γ) - T(0.040849) * sin(2γ)
+    )
 end
 
 """
@@ -105,11 +109,7 @@ function local_to_solar_time(time::DateTime, timezone::Integer, lon)
     # EoT = 9.87 * sin(2B) - 7.53 * cos(B) - 1.5 * sin(B) # Equation of Time, in minutes
     days_in_year = daysinyear(year(time))
     γ = 2 * π / days_in_year * (doy - 1 + (hour(time) - 12) / 24) #fractional year
-    EoT =
-        229.18 * (
-            0.000075 + 0.001868 * cos(γ) - 0.032077 * sin(γ) - 0.014615cos(2γ) -
-            0.040849sin(2γ)
-        ) #NOAA
+    EoT = equation_of_time(γ)
     LSTM = 4 * (lon - 15 * timezone) + EoT # Local Standard Time Meridian , in minutes
     LSTM_ms = round(LSTM * 60 * 1000) # Local Standard Time Meridian, in milliseconds
     t_sol = time + Millisecond(LSTM_ms) # Local solar time
@@ -131,24 +131,37 @@ function seconds_since_solar_noon(t_sol::DateTime)
     return t_diff
 end
 
-function smooth_min(a::FT, b, m) where {FT}
-    return convert(FT, 1 / 2) * (a + b - √((a - b)^2 + m))
-end
+"""
+    seconds_since_solar_noon(t::Real, lon, utc_offset)
 
-function smooth_max(a::FT, b, m) where {FT}
-    return convert(FT, 1 / 2) * (a + b + √((a - b)^2 + m))
-end
+Seconds since solar noon [s], in [-43200, 43200), for `t` the local standard time in
+seconds since 1970-01-01T00:00, `lon` the longitude [°E] and `utc_offset` the offset of
+local standard time to UTC [h]. Negative before solar noon. The NOAA equation of time is
+evaluated with a mean year length, so no `DateTime` is needed (AD-compatible).
 
-function smooth_clamp(x::FT, lower, upper, m) where {FT}
-    return smooth_min(smooth_max(x, lower, m), upper, m)
-end
+# Examples
 
-function smoothing_kernel(approach::LowerBound, x, treshold, m)
-    return 1 - exp(-(x - treshold) / m)
-end
+```jldoctest
+using EvaporationModel, Dates
+lon, timezone = 4.52, 1
+time = DateTime(2010, 7, 1, 12, 30)
+t_ref = seconds_since_solar_noon(local_to_solar_time(time, timezone, lon)).value
+t = seconds_since_solar_noon(datetime2unix(time), lon, timezone)
+abs(t - t_ref) < 60
 
-function smoothing_kernel(approach::UpperBound, x, treshold, m)
-    return 1 - exp((x - treshold) / m)
+# output
+
+true
+```
+"""
+function seconds_since_solar_noon(t::Real, lon, utc_offset)
+    T = value_type(t)
+    day = T(86_400)
+    t_utc = t - 3600 * utc_offset
+    γ = 2 * T(π) * mod(t_utc / day - T(0.5), T(365.2425)) / T(365.2425) # fractional year
+    EoT = equation_of_time(γ)
+    t_solar = t_utc + 60 * (4 * lon + EoT) # time offset in minutes
+    return mod(t_solar, day) - day / 2
 end
 
 @inline function value_type(x::T) where {T}
