@@ -92,8 +92,9 @@ end
         @test 0 <= clamp(smooth, x, 0.0, 1.0, s) <= 1 + s / 2
     end
     # Smoothed f_wet has a finite slope at w_r = 0 (the hard 2/3 power does not)
+    w_rmax = 0.6
     @test isfinite(
-        derivative(w_r -> fraction_wet_vegetation(w_r, 0.6, smooth), AutoForwardDiff(), 0.0)
+        derivative(w_r -> fraction_wet_vegetation(w_r, w_rmax, smooth), AutoForwardDiff(), 0.0)
     )
     # HardThresholds is the default treatment
     forcings = constant_forcings(P)
@@ -192,7 +193,7 @@ end
 
     println("Testing Bigleaf functions")
     @test (@ballocations Bigleaf.roughness_parameters(
-        RoughnessCanopyHeightLAI(), $h, $LAI; hs=$z_0ms
+        RoughnessCanopyHeightLAI(), $h, $LAI; hs=($z_0ms)
     )) == 0
     rough_dict = Bigleaf.roughness_parameters(RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms)
     @test (@ballocations Bigleaf.compute_Ram(ResistanceWindZr(), $u_star, $u)) == 0
