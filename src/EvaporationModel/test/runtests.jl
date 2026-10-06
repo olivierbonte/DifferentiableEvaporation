@@ -128,7 +128,7 @@ end
         )
         EvaporationModel.initialize!(model)
         # Explicit solver: the ForwardDiff Jacobian is NaN for w_1 > w_fc, where r_ss = 0
-        EvaporationModel.solve!(model; AD=true, alg=Tsit5(), abstol=1e-8, reltol=1e-8)
+        EvaporationModel.solve!(model; yaxarray_output=true, alg=Tsit5(), abstol=1e-8, reltol=1e-8)
         @test OrdinaryDiffEq.SciMLBase.successful_retcode(model.sol)
         @test maximum(u -> u[1], model.sol.u) <= w_sat + 1e-6
         @test maximum(u -> u[2], model.sol.u) <= w_sat + 1e-6
