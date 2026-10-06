@@ -24,7 +24,7 @@ ti = time()
 
 include("common.jl")
 
-@testset "EvaporationModel" begin
+@testset "EvaporationModel" verbose = true begin
     include("test_processes.jl")
     #include("test_model.jl")
     include("test_allocations.jl")
