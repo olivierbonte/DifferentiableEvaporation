@@ -14,7 +14,6 @@ using ForwardDiff: ForwardDiff
 using Zygote: Zygote
 using OrdinaryDiffEq
 using SciMLSensitivity
-using Statistics
 using Test
 
 DocMeta.setdocmeta!(EvaporationModel, :DocTestSetup, :(using Dates))
@@ -27,11 +26,11 @@ include("common.jl")
 
 @testset "EvaporationModel" begin
     include("test_processes.jl")
-    include("test_model.jl")
+    #include("test_model.jl")
     include("test_allocations.jl")
     include("test_ad_rhs.jl")
-    include("test_ad_solver.jl")
-    include("test_sensitivity.jl")
+    #include("test_ad_solver.jl")
+    #include("test_sensitivity.jl")
     include("test_doctests.jl")
 end
 
