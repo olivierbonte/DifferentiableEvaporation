@@ -8,6 +8,7 @@ using DataFrames
 using DiffEqCallbacks
 using Enzyme: Enzyme
 using ForwardDiff
+using LinearSolve
 using OrdinaryDiffEq
 using OrdinaryDiffEqLowOrderRK: Euler, Heun
 using OrdinaryDiffEqSDIRK: ImplicitEuler
