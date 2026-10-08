@@ -881,7 +881,7 @@ uuid = "7cc45869-7501-5eee-bdea-0790c847d4ef"
 version = "0.0.302+0"
 
 [[deps.EvaporationModel]]
-deps = ["ADTypes", "Bigleaf", "ComponentArrays", "DataFrames", "Dates", "DiffEqCallbacks", "Enzyme", "ForwardDiff", "OrdinaryDiffEq", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqSDIRK", "Parameters", "YAXArrays"]
+deps = ["ADTypes", "Bigleaf", "ComponentArrays", "DataFrames", "Dates", "DiffEqCallbacks", "Enzyme", "ForwardDiff", "LinearSolve", "OrdinaryDiffEq", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqSDIRK", "Parameters", "YAXArrays"]
 path = "src/EvaporationModel"
 uuid = "49da8130-70c8-449e-9091-2395ad2fb07e"
 version = "0.1.0"
