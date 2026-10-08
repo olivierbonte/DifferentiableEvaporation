@@ -22,23 +22,24 @@ end
         Constant(solver_kwargs),
     )
 
-    # Forward mode: the reference gradient once sanity checked against finite differences
-    g_ref = gradient(toy_loss, AutoForwardDiff(), p_model, context(ForwardDiffSensitivity())...)
+    # Forward mode: the reference gradient, once sanity checked against finite differences.
+    # Thight tolerances to minimalise the effect of the solver tolerances on the gradient.
+    tight = (; abstol=1e-12, reltol=1e-12)
+    g_ref = gradient(
+        toy_loss, AutoForwardDiff(), p_model, context(ForwardDiffSensitivity(), tight)...
+    )
     @testset "Forward mode (ForwardDiff)" begin
         @test all(isfinite, g_ref)
-        # At the default tolerances (1e-6) the adaptive step noise dominates the finite
-        # differences of this small loss, so both gradients are computed at tight tolerances
-        tight = (; abstol=1e-12, reltol=1e-12)
-        sensealg = ForwardDiffSensitivity()
-        g_fwd = gradient(toy_loss, AutoForwardDiff(), p_model, context(sensealg, tight)...)
-        g_fd = gradient(toy_loss, AutoFiniteDiff(), p_model, context(sensealg, tight)...)
-        @test isapprox(g_fwd, g_fd; rtol=1e-3)
+        g_fd = gradient(
+            toy_loss, AutoFiniteDiff(), p_model, context(ForwardDiffSensitivity(), tight)...
+        )
+        @test isapprox(g_ref, g_fd; rtol=1e-3)
     end
 
     @testset "Reverse mode (Enzyme + GaussAdjoint with EnzymeVJP)" begin
         enzyme_reverse = AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse))
         sensealg = GaussAdjoint(; autojacvec=EnzymeVJP())
-        g = gradient(toy_loss, enzyme_reverse, p_model, context(sensealg)...)
+        g = gradient(toy_loss, enzyme_reverse, p_model, context(sensealg, tight)...)
         @test isapprox(g, g_ref; rtol=1e-3)
         prob = fresh_prob()
         gradient(toy_loss, enzyme_reverse, p_model, Constant(prob), Constant(saveat_toy),
@@ -53,8 +54,9 @@ end
         enzyme_reverse = AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse))
         # Skipped: Enzyme segfaults while compiling the reverse pass of the solve
         # (Enzyme v0.13.214, SciMLSensitivity v7.119.12, OrdinaryDiffEq v7.8.1, Julia 1.10)
+        sensealg = EnzymeAdjoint()
         @test_skip isapprox(
-            gradient(toy_loss, enzyme_reverse, p_model, context(EnzymeAdjoint())...), g_ref;
+            gradient(toy_loss, enzyme_reverse, p_model, context(sensealg, tight)...), g_ref;
             rtol=1e-3,
         )
     end
