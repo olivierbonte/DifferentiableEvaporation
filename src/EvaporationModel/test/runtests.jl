@@ -11,7 +11,6 @@ using Documenter
 using Enzyme: Enzyme # backends for DifferentiationInterface
 using FiniteDiff: FiniteDiff
 using ForwardDiff: ForwardDiff
-using Zygote: Zygote
 using OrdinaryDiffEq
 using SciMLSensitivity
 using Test
@@ -26,11 +25,11 @@ include("common.jl")
 
 @testset "EvaporationModel" verbose = true begin
     include("test_processes.jl")
-    #include("test_model.jl")
+    include("test_model.jl")
     include("test_allocations.jl")
     include("test_ad_rhs.jl")
-    #include("test_ad_solver.jl")
-    #include("test_sensitivity.jl")
+    include("test_ad_solver.jl")
+    include("test_sensitivity.jl")
     include("test_doctests.jl")
 end
 
