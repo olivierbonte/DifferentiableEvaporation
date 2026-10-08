@@ -3,11 +3,11 @@
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using ADTypes
+using CairoMakie
 using ComponentArrays
 using Dates
 using EvaporationModel
 using OrdinaryDiffEq
-using Plots
 using Statistics
 using YAXArrays
 
@@ -107,122 +107,104 @@ end
 println("cor(λE IEₐ, λE observed) = ", cor(λE_ie, λE_obs))
 
 ## PLOTS FOR EGU 2025
-gr()
 figdir(args...) = projectdir("figures", args...)
 mkpath(figdir())
 cm = 37.8 #1cm = 37.8 px
-time_plot = unix2datetime.(t_unix)
-date_ticks = [unix2datetime(t_unix[50]), unix2datetime(t_unix[end-50])]
-xticks = (date_ticks, Dates.format.(date_ticks, "yyyy-mm-dd"))
-precip_plot_mm_h = forcings_real.P.(t_unix) * 3600 #kg/(m²s) -> mm/h
-y_ticks_precip = ([0, 10, 20], ["0", "10", "20"])
-state_labels = ["w₁ [-]" "w₂ [-]" "wᵣ [kg/m²]"]
+time_plot = collect(unix2datetime.(t_unix)) # plain Vector: t_unix is a DimVector
+precip_plot_mm_h = collect(forcings_real.P.(t_unix)) * 3600 #kg/(m²s) -> mm/h
+state_labels = ["w₁ [-]", "w₂ [-]", "wᵣ [kg/m²]"]
+state_ylims = (0, maximum(model_ie.sol[1, :]) * 1.5)
+colors = Makie.wong_colors()
 
-function add_precipitation!(fig)
-    plot!(
-        twinx(fig),
-        time_plot,
-        precip_plot_mm_h;
-        fill=(0, :gray),
-        color=:gray,
-        yflip=true,
+# States of a solution, with the precipitation as an inverted bar on a second y-axis.
+# `Makie.Axis` since ComponentArrays also exports an `Axis`.
+function plot_states!(pos, sol, title; legend=true)
+    ax = Makie.Axis(pos; title=title, xlabel="Time", limits=(nothing, state_ylims))
+    for (i, label) in enumerate(state_labels)
+        lines!(ax, time_plot, sol[i, :]; label=label)
+    end
+    legend && axislegend(ax)
+    ax_precip = Makie.Axis(
+        pos;
+        yaxisposition=:right,
+        yreversed=true,
         ylabel="Precipitation [mm/h]",
-        legend=:none,
-        xticks=xticks,
-        yticks=y_ticks_precip,
-        ylims=(0, maximum(precip_plot_mm_h) * 2.5),
+        yticks=([0, 10, 20], ["0", "10", "20"]),
+        limits=(nothing, (0, maximum(precip_plot_mm_h) * 2.5)),
+        backgroundcolor=:transparent,
     )
-    return fig
+    hidexdecorations!(ax_precip)
+    hidespines!(ax_precip, :l, :t, :b)
+    linkxaxes!(ax, ax_precip)
+    barplot!(ax_precip, time_plot, precip_plot_mm_h; color=(:gray, 0.6), gap=0)
+    return ax
+end
+
+function plot_fluxes!(pos)
+    ax = Makie.Axis(pos; xlabel="Time", ylabel="λE [W/m²]")
+    lines!(ax, time_plot, λE_obs; label="Observation", color=:black)
+    lines!(ax, time_plot, λE_ee; label="EE", color=colors[1])
+    lines!(ax, time_plot, λE_ie; label="IEₐ", color=colors[2])
+    axislegend(ax)
+    return ax
+end
+
+function plot_flux_difference!(pos)
+    ax = Makie.Axis(pos; xlabel="Time", ylabel="λE(IEₐ) - λE(EE) [W/m²]")
+    lines!(ax, time_plot, λE_ie - λE_ee; color=colors[3])
+    return ax
 end
 
 # Figure 1: states for stable adapative implicit euler
-fig_implicit = plot(
-    time_plot,
-    Array(model_ie.sol)';
-    label=state_labels,
-    xlabel="Time",
-    ylims=(0, maximum(model_ie.sol[1, :]) * 1.5),
-    title="Adaptive Implicit Euler (IEₐ)",
-    xticks=xticks,
-)
-add_precipitation!(fig_implicit)
-savefig(fig_implicit, figdir("IE_a_states.png"))
+fig_implicit = Figure()
+plot_states!(fig_implicit[1, 1], model_ie.sol, "Adaptive Implicit Euler (IEₐ)")
+save(figdir("IE_a_states.png"), fig_implicit)
 
 # Figure 2: states for explicit euler
-fig_explicit = plot(
-    time_plot,
-    Array(model_ee.sol)';
-    label=state_labels,
-    xlabel="Time",
-    ylims=ylims(fig_implicit),
-    title="Explicit Euler (EE)",
-)
-add_precipitation!(fig_explicit)
-savefig(fig_explicit, figdir("EE_states.png"))
+fig_explicit = Figure()
+plot_states!(fig_explicit[1, 1], model_ee.sol, "Explicit Euler (EE)")
+save(figdir("EE_states.png"), fig_explicit)
 
 # Figure 3: fluxes for both methods
-fig_implicit_fluxes = plot(
-    time_plot,
-    λE_obs;
-    label="Observation",
-    color=:black,
-    ylabel="λE [W/m²]",
-    xlabel="Time",
-    xticks=xticks,
-    framestyle=:box,
-)
-plot!(time_plot, λE_ee; label="EE", color=palette(:default)[1])
-plot!(time_plot, λE_ie; label="IEₐ", color=palette(:default)[2])
-savefig(fig_implicit_fluxes, figdir("IE_a_fluxes.png"))
+fig_implicit_fluxes = Figure()
+plot_fluxes!(fig_implicit_fluxes[1, 1])
+save(figdir("IE_a_fluxes.png"), fig_implicit_fluxes)
 
 # Figure 4: difference in fluxes between implicit and explicit euler
-fig_fluxes_diff = plot(
-    time_plot,
-    λE_ie - λE_ee;
-    label=:none,
-    ylabel="λE(IEₐ) - λE(EE) [W/m²]",
-    xlabel="Time",
-    xticks=xticks,
-    framestyle=:box,
-    color=palette(:default)[3],
-)
-savefig(fig_fluxes_diff, figdir("IEa_diff_EE_fluxes.png"))
+fig_fluxes_diff = Figure()
+plot_flux_difference!(fig_fluxes_diff[1, 1])
+save(figdir("IEa_diff_EE_fluxes.png"), fig_fluxes_diff)
 
 # Combine the plots in one
-l = @layout [_ a{0.485w} b{0.485w} _; _ c{0.485w} d{0.485w} _]
 title_fontsize = 18
 tick_fontsize = title_fontsize - 4
-fig_implicit_combine = plot(
-    fig_implicit;
-    xlabel="",
-    xtickfontcolor=:white,
-    xtickfontsize=1,
-    ytickfontsize=tick_fontsize,
-)
-fig_explicit_combine = plot(
-    fig_explicit;
-    xlabel="",
-    xtickfontcolor=:white,
-    xtickfontsize=1,
-    ytickfontsize=tick_fontsize,
-    legend=false,
-)
-fig_implicit_fluxes_combine = plot(fig_implicit_fluxes; tickfontsize=tick_fontsize)
-fig_fluxes_diff_combine = plot(fig_fluxes_diff; tickfontsize=tick_fontsize)
-fig_combined = plot(
-    fig_implicit_combine,
-    fig_explicit_combine,
-    fig_implicit_fluxes_combine,
-    fig_fluxes_diff_combine;
-    layout=l,
-    size=(30cm, 29cm),
-    link=:x,
-    legendfontsize=12,
-    titlefontsize=title_fontsize,
-    guidefontsize=title_fontsize - 4,
-    line=2.5,
-)
-savefig(fig_combined, figdir("combined.png"))
-savefig(fig_combined, figdir("combined.svg"))
-fig_combined_transparent = plot(fig_combined; background_color=:transparent)
-savefig(fig_combined_transparent, figdir("combined_transparent.svg"))
+function combined_figure(; background=:white)
+    theme = Theme(;
+        backgroundcolor=background,
+        Axis=(
+            backgroundcolor=background,
+            titlesize=title_fontsize,
+            xlabelsize=title_fontsize - 4,
+            ylabelsize=title_fontsize - 4,
+            xticklabelsize=tick_fontsize,
+            yticklabelsize=tick_fontsize,
+        ),
+        Legend=(labelsize=12,),
+        Lines=(linewidth=2.5,),
+    )
+    return with_theme(theme) do
+        fig = Figure(; size=(30cm, 29cm))
+        ax_ie = plot_states!(fig[1, 1], model_ie.sol, "Adaptive Implicit Euler (IEₐ)")
+        ax_ee = plot_states!(fig[1, 2], model_ee.sol, "Explicit Euler (EE)"; legend=false)
+        ax_fluxes = plot_fluxes!(fig[2, 1])
+        ax_diff = plot_flux_difference!(fig[2, 2])
+        hidexdecorations!(ax_ie; grid=false)
+        hidexdecorations!(ax_ee; grid=false)
+        linkxaxes!(ax_ie, ax_ee, ax_fluxes, ax_diff)
+        return fig
+    end
+end
+fig_combined = combined_figure()
+save(figdir("combined.png"), fig_combined)
+save(figdir("combined.svg"), fig_combined)
+save(figdir("combined_transparent.svg"), combined_figure(; background=:transparent))

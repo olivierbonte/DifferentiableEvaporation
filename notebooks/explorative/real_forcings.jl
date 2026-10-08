@@ -3,7 +3,7 @@ using DrWatson
 using DataInterpolations
 using Dates
 using NetCDF
-using Plots
+using CairoMakie
 using YAXArrays
 
 FT = Float64
@@ -13,10 +13,10 @@ file_ec = datadir("exp_pro", "eddy_covariance", site * ".nc")
 ds_ec = readcubedata(open_dataset(file_ec))
 start_date = DateTime(2010, 3, 15)
 end_date = DateTime(2010, 3, 25)
-ds_ec_sel = ds_ec[time = start_date .. end_date]
+ds_ec_sel = ds_ec[time=start_date..end_date]
 t_unix = datetime2unix.(ds_ec_sel.time)
 t_span_real = (t_unix[1], t_unix[end])
-plot(ds_ec_sel.Precip[x = 1, y = 1])
+lines(ds_ec_sel.Precip[x=1, y=1])
 
 #Constant Piecewise interpolation
 R_n = ConstantInterpolation(FT.(ds_ec_sel.Rnet[:]), t_unix; dir=:left)
