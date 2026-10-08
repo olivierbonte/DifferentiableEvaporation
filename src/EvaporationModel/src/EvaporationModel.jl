@@ -9,13 +9,13 @@ using DiffEqCallbacks
 using Enzyme: Enzyme
 using ForwardDiff
 using OrdinaryDiffEq
-using OrdinaryDiffEqLowOrderRK: Heun
+using OrdinaryDiffEqLowOrderRK: Euler, Heun
 using OrdinaryDiffEqSDIRK: ImplicitEuler
 using Parameters
 using YAXArrays
 
 # Solvers and AD backends for the Jacobian of implicit solvers
-export Tsit5, Heun, ImplicitEuler, AutoForwardDiff, AutoEnzyme
+export Tsit5, Euler, Heun, ImplicitEuler, AutoForwardDiff, AutoEnzyme
 
 include("thresholds.jl")
 export smooth_min,

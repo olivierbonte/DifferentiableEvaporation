@@ -56,7 +56,7 @@ applied before the diagnostics are saved. yaxarray_output=true saves the output 
 `YAXArray datacube, but is false by default because it interferes with automatic
 differentiation application.
 
-The solver is set with `alg`, e.g. `Tsit5()`, `Heun()` or `ImplicitEuler()`. The Jacobian of
+The solver is set with `alg`, e.g. `Tsit5()`, `Euler()`, `Heun()` or `ImplicitEuler()`. The Jacobian of
 an implicit solver is computed with ForwardDiff, `ImplicitEuler(; autodiff=AutoForwardDiff())`,
 or with Enzyme,
 `ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=EvaporationModel.Enzyme.Duplicated))`.
