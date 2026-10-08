@@ -119,6 +119,7 @@ for site in sites:
             )
 
             da_temp = rioxarray.open_rasterio(out_path_tif, mask_and_scale=True)
+            da_temp = da_temp.rio.write_crs(crs_homolsine)
             # Extra masking for uncertainty at int16 max of 32767
             if da_temp.max().values == 32767:
                 da_temp = da_temp.where(da_temp != da_temp.max())
@@ -141,7 +142,7 @@ for site in sites:
         # https://doi.org/10.5194/essd-14-449-2022
         # Make 1 datacube per site
         nr_pixels = 2
-        ds_cube = xr.merge(ds_list)
+        ds_cube = xr.merge(ds_list, compat="no_conflicts")
         ds_point = ds_cube.sel(
             x=coords_homolsine[0], y=coords_homolsine[1], method="nearest"
         )
