@@ -5,12 +5,19 @@ import cubo
 import ee
 import xarray as xr
 from conf import ec_dir, gee_project_id, sites, veg_dir
-from geoviews import project
 
 veg_dir.mkdir(exist_ok=True)
-ee.Initialize(
-    project=gee_project_id, opt_url="https://earthengine-highvolume.googleapis.com"
-)
+try:
+    ee.Initialize(
+        project=gee_project_id,
+        opt_url="https://earthengine-highvolume.googleapis.com",
+    )
+except ee.EEException:
+    ee.Authenticate(auth_mode="notebook")
+    ee.Initialize(
+        project=gee_project_id,
+        opt_url="https://earthengine-highvolume.googleapis.com",
+    )
 
 # %% Define variables of interest
 var_list_vcf = [

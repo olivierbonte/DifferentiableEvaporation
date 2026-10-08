@@ -1,10 +1,4 @@
 # %% Imports
-import subprocess
-from operator import ge
-
-subprocess.run(
-    "earthengine authenticate --quiet", shell=True, capture_output=True, text=True
-)
 import glob
 import os
 
@@ -14,9 +8,17 @@ import xarray as xr
 from conf import gee_project_id, hihydrosoil_dir, sites, soilgrids_dir
 from rasterio.enums import Resampling
 
-ee.Initialize(
-    project=gee_project_id, opt_url="https://earthengine-highvolume.googleapis.com"
-)
+try:
+    ee.Initialize(
+        project=gee_project_id,
+        opt_url="https://earthengine-highvolume.googleapis.com",
+    )
+except ee.EEException:
+    ee.Authenticate(auth_mode="notebook")
+    ee.Initialize(
+        project=gee_project_id,
+        opt_url="https://earthengine-highvolume.googleapis.com",
+    )
 
 hihydrosoil_dir.mkdir(exist_ok=True)
 
