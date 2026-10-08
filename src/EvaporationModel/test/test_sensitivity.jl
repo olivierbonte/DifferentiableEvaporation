@@ -6,6 +6,20 @@ function toy_loss(p, prob, saveat, y_obs, sensealg, solver_kwargs)
     return sum(abs2, Array(sol) .- y_obs) / length(y_obs)
 end
 
+# For differentiating directly through the solver with Enzyme: the problem is built inside the
+# loss, with `FullSpecialize` (no FunctionWrappers around `f`), instead of a `remake` of a
+# `Constant` problem, and `SensitivityADPassThrough` skips the SciMLSensitivity adjoint rules
+function toy_loss_direct(p, f, u0, tspan, saveat, y_obs, solver_kwargs)
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(f, copy(u0), tspan, p)
+    sensealg = DiffEqBase.SensitivityADPassThrough()
+    sol = solve(prob, Tsit5(); saveat, sensealg, solver_kwargs...)
+    return sum(abs2, Array(sol) .- y_obs) / length(y_obs)
+end
+
+# Error norm of the adaptive step size control, ignored by Enzyme, so that the step sizes are
+# treated as constants (as ForwardDiff does)
+inactive_norm(u, t) = Enzyme.ignore_derivatives(DiffEqBase.ODE_DEFAULT_NORM(u, t))
+
 @testset "Sensitivities of a toy loss" verbose = true begin
     # Reference = slightly perturbed parameters
     model = toy_model()
@@ -49,15 +63,19 @@ end
         @test prob.u0 == model.u0
     end
 
-    # Enzyme reverse mode through the solver internals (discretize-then-differentiate)
-    @testset "Reverse mode (Enzyme + EnzymeAdjoint)" begin
+    # Enzyme reverse mode through the solver internals (discretize-then-differentiate),
+    # following the Enzyme.jl SciML integration tests:
+    # https://github.com/EnzymeAD/Enzyme.jl/blob/d11e92e353b2469d5fe513b3c356e52baf2b47b5/test/integration/SciML/runtests.jl#L45
+    @testset "Reverse mode (Enzyme, direct through the solver)" begin
         enzyme_reverse = AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse))
-        # Skipped: Enzyme segfaults while compiling the reverse pass of the solve
-        # (Enzyme v0.13.214, SciMLSensitivity v7.119.12, OrdinaryDiffEq v7.8.1, Julia 1.10)
-        sensealg = EnzymeAdjoint()
-        @test_skip isapprox(
-            gradient(toy_loss, enzyme_reverse, p_model, context(sensealg, tight)...), g_ref;
-            rtol=1e-3,
+        # Without `inactive_norm`, Enzyme also differentiates the adaptive step size control,
+        # which gives a wrong gradient (relative error ~1)
+        solver_kwargs = (; tight..., internalnorm=inactive_norm)
+        g = gradient(
+            toy_loss_direct, enzyme_reverse, p_model, Constant(model.f), Constant(model.u0),
+            Constant(model.t_span), Constant(saveat_toy), Constant(y_obs),
+            Constant(solver_kwargs),
         )
+        @test isapprox(g, g_ref; rtol=1e-3)
     end
 end

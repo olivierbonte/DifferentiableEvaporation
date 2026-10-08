@@ -16,6 +16,7 @@ using Documenter
 using FiniteDiff: FiniteDiff # backend for DifferentiationInterface, reference
 using OrdinaryDiffEq
 using SciMLSensitivity
+using SciMLSensitivity: DiffEqBase, SciMLBase
 using Test
 
 DocMeta.setdocmeta!(EvaporationModel, :DocTestSetup, :(using Dates))
