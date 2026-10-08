@@ -55,6 +55,15 @@ Solve the model, saving the diagnostics at `model.saveat`. `kwargs` are passed t
 applied before the diagnostics are saved. yaxarray_output=true saves the output in a
 `YAXArray datacube, but is false by default because it interferes with automatic
 differentiation application.
+
+The solver is set with `alg`, e.g. `Tsit5()`, `Heun()` or `ImplicitEuler()`. The Jacobian of
+an implicit solver is computed with ForwardDiff, `ImplicitEuler(; autodiff=AutoForwardDiff())`,
+or with Enzyme,
+`ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=EvaporationModel.Enzyme.Duplicated))`.
+`Duplicated` is needed because the right-hand side is a closure over the forcings.
+
+Any OrdinaryDiffEq solver can be used, but only the options above are exported by this package.
+For other solvers, the user has to manage installation of required packages.
 """
 function solve!(model::ProcessBasedModel; yaxarray_output=false, callback=nothing, kwargs...)
     cb = SavingCallback(

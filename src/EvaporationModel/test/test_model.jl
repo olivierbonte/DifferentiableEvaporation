@@ -17,7 +17,14 @@
 end
 
 @testset "ProcessBasedModel initialize! and solve!" begin
-    for thresholds in treatments, alg in (Tsit5(), ImplicitEuler(; autodiff=AutoForwardDiff()))
+    # Test exported solvers
+    algs = (
+        Tsit5(),
+        Heun(),
+        ImplicitEuler(; autodiff=AutoForwardDiff()),
+        ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=Enzyme.Duplicated)),
+    )
+    for thresholds in treatments, alg in algs
         model = toy_model(; thresholds)
         @test model.solver_kwargs == (; abstol=1e-6, reltol=1e-6)
         EvaporationModel.solve!(model; alg=alg)
