@@ -1,40 +1,36 @@
 # %% Imports
-import logging
-from datetime import datetime
-from importlib.machinery import SourceFileLoader
-from pathlib import Path
+from conf import LOG_FORMAT, datarawdir
+from eddy_covariance_download import main as download_eddy_covariance
+from hihydrosoil_download import main as download_hihydrosoil
+from land_cover_translation_download import main as download_land_cover_translation
+from loguru import logger
+from root_depth_stocker_download import main as download_root_depth_stocker
+from soil_grids_download import main as download_soil_grids
+from soil_moisture_fluxnet_download import main as download_soil_moisture_fluxnet
+from vegetation_vcf_download import main as download_vegetation_vcf
 
-from conf import datarawdir
-from icoscp_core.icos import auth
+# %% Run all downloads, logging to file
+if __name__ == "__main__":
+    datarawdir.mkdir(exist_ok=True, parents=True)
+    logger.add(
+        str(datarawdir / "data_download_log_{time:YYYY-MM-DD_HH-mm}.txt"),
+        format=LOG_FORMAT,
+        enqueue=True,
+        mode="w",
+    )
 
-project_folder = Path(__file__).parent.parent.parent.resolve()
-py_functions_module = SourceFileLoader(
-    "py_functions", (project_folder / "src" / "py_functions.py").as_posix()
-).load_module()
-
-# %% Logging set up
-datarawdir.mkdir(exist_ok=True, parents=True)
-current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M")
-log_file = Path(datarawdir / f"data_download_log_{current_datetime}.txt")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-    handlers=[logging.FileHandler(log_file, mode="w"), logging.StreamHandler()],
-)
-
-# %%  Logging of the subprocesses
-logging.info("\n Starting data download script \n")
-logging.info("\n 1: Downloading eddy covaraince data \n")
-py_functions_module.run_and_log("python 01_eddy_covariance.py", sys_info=True)
-logging.info("\n 2: Downloading data from SoilGrids \n")
-py_functions_module.run_and_log("python 02_soil_grids.py")
-logging.info("\n 3: Download data from HiHydroSoil \n")
-py_functions_module.run_and_log("python 03_hihydrosoil.py")
-logging.info("\n 4: Download data on vegetation cover fractions \n")
-py_functions_module.run_and_log("python 04_vegetation_VCF.py")
-logging.info("\n 5: Downloading auxiliary data from flux towers")
-py_functions_module.run_and_log("python 05_soil_moisture_fluxnet.py")
-logging.info("\n 6: Downloading root depth data from Stocker et al. (2023)")
-py_functions_module.run_and_log("python 06_root_depth_stocker.py")
-logging.info("\n 7: Downloading land cover translation data from GLCC")
-py_functions_module.run_and_log("python 07_land_cover_translation.py")
+    logger.info("Starting data download script")
+    logger.info("1: Downloading eddy covariance data")
+    download_eddy_covariance()
+    logger.info("2: Downloading data from SoilGrids")
+    download_soil_grids()
+    logger.info("3: Download data from HiHydroSoil")
+    download_hihydrosoil()
+    logger.info("4: Download data on vegetation cover fractions")
+    download_vegetation_vcf()
+    logger.info("5: Downloading auxiliary data from flux towers")
+    download_soil_moisture_fluxnet()
+    logger.info("6: Downloading root depth data from Stocker et al. (2023)")
+    download_root_depth_stocker()
+    logger.info("7: Downloading land cover translation data from GLCC")
+    download_land_cover_translation()

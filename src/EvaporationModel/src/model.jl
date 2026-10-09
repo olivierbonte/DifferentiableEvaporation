@@ -1,4 +1,16 @@
 abstract type AbstractModel end
+
+"""
+    ProcessBasedModel{FT}(; forcings, parameters, t_span, u0, saveat, kwargs...)
+
+Process-based model of the water balance of soil and canopy, solved with [`solve!`](@ref)
+after [`initialize!`](@ref).
+
+`solver_kwargs` are passed to `OrdinaryDiffEq.solve` by [`solve!`](@ref). The default
+tolerances, `abstol = reltol = 1e-6`, following SUMMA with SUNDIALS
+[Spiteri et al., 2024](https://doi.org/10.1029/2024MS004256).
+Keyword arguments given to [`solve!`](@ref) take precedence over `solver_kwargs`.
+"""
 @kwdef mutable struct ProcessBasedModel{FT} <: AbstractModel
     forcings::NamedTuple
     parameters::AbstractArray
@@ -13,6 +25,7 @@ abstract type AbstractModel end
     diagnostics = SavedValues(FT, NamedTuple)
     output = nothing
     thresholds::ThresholdTreatment = HardThresholds()
+    solver_kwargs::NamedTuple = (; abstol=1e-6, reltol=1e-6)
 end
 
 function initialize!(model::ProcessBasedModel)
@@ -34,18 +47,41 @@ function create_f_diagnostics(model::ProcessBasedModel)
     end
 end
 
-function solve!(model::ProcessBasedModel; AD=false, kwargs...)
+"""
+    solve!(model::ProcessBasedModel; AD=false, kwargs...)
+
+Solve the model, saving the diagnostics at `model.saveat`. `kwargs` are passed to
+`OrdinaryDiffEq.solve` and take precedence over `model.solver_kwargs`. A `callback` is
+applied before the diagnostics are saved. yaxarray_output=true saves the output in a
+`YAXArray datacube, but is false by default because it interferes with automatic
+differentiation application.
+
+The solver is set with `alg`, e.g. `Tsit5()`, `Euler()`, `Heun()` or `ImplicitEuler()`. The Jacobian of
+an implicit solver is computed with ForwardDiff, `ImplicitEuler(; autodiff=AutoForwardDiff())`,
+or with Enzyme,
+`ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=EvaporationModel.Enzyme.Duplicated))`.
+`Duplicated` is needed because the right-hand side is a closure over the forcings.
+
+Any OrdinaryDiffEq solver can be used, but only the options above are exported by this package.
+For other solvers, the user has to manage installation of required packages.
+"""
+function solve!(model::ProcessBasedModel; yaxarray_output=false, callback=nothing, kwargs...)
     cb = SavingCallback(
         (u, t, integrator) -> model.f_diagnostics(u, integrator.p, t),
         model.diagnostics;
         saveat=model.saveat,
     )
     model.sol = solve(
-        model.prob; callback=cb, saveat=model.saveat, tstops=model.tstops, kwargs...
+        model.prob;
+        callback=isnothing(callback) ? cb : CallbackSet(callback, cb),
+        saveat=model.saveat,
+        tstops=model.tstops,
+        model.solver_kwargs...,
+        kwargs...,
     )
 
     # Save data in datacube
-    if ~AD
+    if yaxarray_output
         df_diagnostics = DataFrame(model.diagnostics.saveval)
         df_prognostics = DataFrame(model.sol)
         cols_prognostics = filter(x -> x != "timestamp", names(df_prognostics))

@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - xee=0.0.19
+  - xee=0.1.*
   - xarray=2026.9.*
   - pandas=3.0.*
   - matplotlib=3.10.*
@@ -15,7 +15,6 @@ dependencies:
   - owslib=0.32.*
   - rioxarray=0.18.*
   - soilgrids=0.1.4 
-  - cubo=2024.8.0
   - sympy=1.14.*
   - tabulate=0.10.*
   - pip
@@ -23,3 +22,5 @@ dependencies:
     - zenodo_get==1.6.*
     - icoscp==0.2.*
     - timezonefinder==6.5.*
+    - loguru==0.7.*
+    - rootutils==1.0.*

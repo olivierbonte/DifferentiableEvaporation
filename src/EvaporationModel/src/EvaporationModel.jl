@@ -1,14 +1,22 @@
 module EvaporationModel
 
+using ADTypes: AutoEnzyme, AutoForwardDiff
 using Bigleaf
 using ComponentArrays
 using Dates
 using DataFrames
 using DiffEqCallbacks
+using Enzyme: Enzyme
 using ForwardDiff
+using LinearSolve
 using OrdinaryDiffEq
+using OrdinaryDiffEqLowOrderRK: Euler, Heun
+using OrdinaryDiffEqSDIRK: ImplicitEuler
 using Parameters
 using YAXArrays
+
+# Solvers and AD backends for the Jacobian of implicit solvers
+export Tsit5, Euler, Heun, ImplicitEuler, AutoForwardDiff, AutoEnzyme
 
 include("thresholds.jl")
 export smooth_min,

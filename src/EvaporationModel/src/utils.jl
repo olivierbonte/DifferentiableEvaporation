@@ -33,8 +33,7 @@ function fit_fourier_coefficients(t::AbstractVector, x::AbstractVector, M::Int, 
         [sin.(n * ω * t) for n in 1:M]...,
     )
     prob = LinearProblem(X, x)
-    linsolve = init(prob)
-    sol = solve(linsolve)
+    sol = solve(prob)
     coeffs = sol.u
     return ComponentArray(; a0=coeffs[1], an=coeffs[2:(M+1)], bn=coeffs[(M+2):end])
 end

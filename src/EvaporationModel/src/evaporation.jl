@@ -1,5 +1,5 @@
 """
-    penman_monteith(Temp, p, VPD, A, r_a, r_s; kwargs...)
+    penman_monteith(Temp, p, VPD, A, r_a, r_s; Esat_formula=Sonntag1990(), constants=BigleafConstants())
 
 Compute evaporation (ET) and latent heat flux (LE)  using the Penman-Monteith equation.
 
@@ -10,7 +10,7 @@ Compute evaporation (ET) and latent heat flux (LE)  using the Penman-Monteith eq
 - `A`: Available energy (``R_n -G``) [W/m²]
 - `r_a`: Aerodynamic resistance [s/m]
 - `r_s`: Surface resistance [s/m]
-- `kwargs`: Additional keyword arguments passed to the `Bigleaf.potential_ET` function.
+- `Esat_formula`, `constants`: as in `Bigleaf.potential_ET`
 
 # Returns
 - `ET`: Potential evapotranspiration [kg/(m² * s)]
@@ -36,20 +36,24 @@ round(λE; digits = 2) ≈ 380.68
 
 true
 ```
+
+# Note
+
+Instead of reusing `Bigleaf.potential_ET`, the function is reimplemented in a resistance
+form, as this behaves better numerically when `r_s = 0` (potential ET)
 """
-function penman_monteith(Temp, p, VPD, A, r_a, r_s; kwargs...)
+function penman_monteith(
+    Temp, p, VPD, A, r_a, r_s; Esat_formula=Sonntag1990(), constants=BigleafConstants()
+)
     T = value_type(r_s)
-    con = Bigleaf.BigleafConstants()
-    ET, λE = Bigleaf.potential_ET(
-        PenmanMonteith(),
-        Temp - T(con.Kelvin),
-        p * T(con.Pa2kPa),
-        A,
-        VPD * T(con.Pa2kPa),
-        1 / r_a;
-        Gs_pot=Bigleaf.ms_to_mol(1 / r_s, Temp - T(con.Kelvin), p * T(con.Pa2kPa)),
-        kwargs...,
-    )
+    T_c = Temp - T(constants.Kelvin) # [°C]
+    p_kPa = p * T(constants.Pa2kPa)
+    γ = Bigleaf.psychrometric_constant(T_c, p_kPa; constants)
+    Δ = Bigleaf.Esat_from_Tair_deriv(T_c; Esat_formula, constants)
+    ρ = Bigleaf.air_density(T_c, p_kPa; constants)
+    λE = (Δ * A + ρ * T(constants.cp) * VPD * T(constants.Pa2kPa) / r_a) /
+        (Δ + γ * (1 + r_s / r_a))
+    ET = Bigleaf.LE_to_ET(λE, T_c)
     return ET, λE
 end
 
@@ -96,7 +100,7 @@ function total_evaporation(
     Δ = Bigleaf.Esat_from_Tair_deriv(T_a - T(con.Kelvin)) * T(con.kPa2Pa) #
     γ =
         Bigleaf.psychrometric_constant(T_a - T(con.Kelvin), p_a * T(con.Pa2kPa)) *
-        T(con.kPa2Pa)
+            T(con.kPa2Pa)
     R_c = r_sc + (1 + Δ / γ) * r_ac
     R_s = r_ss + (1 + Δ / γ) * r_as
     R_a = (1 + Δ / γ) * r_aa
@@ -108,7 +112,7 @@ function total_evaporation(
     ET_p, λE_p = penman_monteith(T_a, p_a, VPD_a, A, r_aa, T(0)) # r_s = 0 -> Penman
     λE =
         (Δ + γ) / γ * (P_c + P_i + P_s) * λE_p +
-        Δ / (γ * r_aa) * (P_c * A_c * r_ac + P_i * A_c * r_ac + P_s * A_s * r_as)
+            Δ / (γ * r_aa) * (P_c * A_c * r_ac + P_i * A_c * r_ac + P_s * A_s * r_as)
     return λE, λE_p
 end
 
