@@ -1,10 +1,10 @@
 # %% Imports
 from datetime import datetime
 from glob import glob
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
-import pytz
 import xarray as xr
 from conf import conf_module, logger
 from timezonefinder import TimezoneFinder
@@ -98,20 +98,19 @@ def main():
             )
         else:
             timezone_tmp = ds_ec_sel.time.attrs["time_zone"]
-        timezone = pytz.timezone(timezone_tmp)
         if ds_ec_sel.latitude.values.flat[0] > 0:  # Norther Hemisphere
-            reference_date = timezone.localize(
-                datetime(2020, 1, 1)
+            reference_date = datetime(
+                2020, 1, 1, tzinfo=ZoneInfo(timezone_tmp)
             )  # Guaranteed no DST
         else:  # Southern Hemisphere
-            reference_date = timezone.localize(datetime(2020, 7, 1))
-        utc_offset_hours = reference_date.utcoffset().seconds / 3600
+            reference_date = datetime(2020, 7, 1, tzinfo=ZoneInfo(timezone_tmp))
+        utc_offset_hours = reference_date.utcoffset().total_seconds() / 3600
         ds_ec_sel.time.attrs["UTC_offset"] = utc_offset_hours
         # !!CAUTION: Etc/GMT-x is equal to UTC+x!!
         if utc_offset_hours >= 0:
             ds_ec_sel.time.attrs["time_zone"] = f"Etc/GMT-{int(utc_offset_hours)}"
         else:
-            ds_ec_sel.time.attrs["time_zone"] = f"Etc/GMT+{int(utc_offset_hours)}"
+            ds_ec_sel.time.attrs["time_zone"] = f"Etc/GMT+{abs(int(utc_offset_hours))}"
 
         # Write to disk
         ds_ec_sel.to_netcdf(conf_module.ec_pro_dir / (site + ".nc"))
