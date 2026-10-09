@@ -44,11 +44,9 @@ def main():
             method="nearest",
         )
 
-        ## Convert to 1 cube: (depth, lon, lat) + crs:ESRI_54052
+        ## Convert to 1 cube: (depth, y, x) + crs:ESRI_54052
         # Order needed for reprojection
-        ds_hihydrosoil = ds_hihydrosoil.transpose("depth", "lat", "lon")
-        # To allow reprojection with rasterio: x,y coordinate names
-        ds_hihydrosoil = ds_hihydrosoil.rename({"lon": "x", "lat": "y"})
+        ds_hihydrosoil = ds_hihydrosoil.transpose("depth", "y", "x")
         ds_hihydrosoil = ds_hihydrosoil.rio.reproject_match(
             ds_soilgrids, resampling=Resampling.bilinear
         )

@@ -3,9 +3,10 @@ import glob
 
 import ee
 import rioxarray  # noqa: F401  (registers the .rio accessor)
+import shapely
 import xarray as xr
 from conf import gee_project_id, hihydrosoil_dir, logger, sites, soilgrids_dir
-from rasterio.enums import Resampling
+from xee import helpers
 
 
 def main():
@@ -51,43 +52,36 @@ def main():
     }
     depth_values = ["0-5cm", "5-15cm", "15-30cm", "30-60cm", "60-100cm", "100-200cm"]
     layer_depths = [0.05, 0.1, 0.15, 0.3, 0.4, 1.0]  # m
-    base_url = "ee://projects/sat-io/open-datasets/HiHydroSoilv2_0/"
+    base_url = "projects/sat-io/open-datasets/HiHydroSoilv2_0/"
 
-    # %% Extract to match with data from soilgrids
-    # NOTE 20/08/2024: consider refactoring to using Cubo later
+    # %% Extract at the native GEE HiHydroSoil resolution (EPSG:4326) covering the
+    # soilgrids data; reprojecting to the soilgrids grid happens in data processing
     for site in sites:
         logger.info(f"site in progress: {site}")
-        # Get bounding box from soilgrids data
         soilgrids_file = glob.glob(str(soilgrids_dir / site / ("*" + site + "*.nc")))
         ds_soilgrids = xr.open_dataset(soilgrids_file[0], decode_coords="all")
-        ds_soilgrids_wgs84 = ds_soilgrids.rio.reproject(
-            dst_crs="EPSG:4326", resampling=Resampling.bilinear
-        )
-        bbox_wgs84 = ds_soilgrids_wgs84.rio.bounds()
-        # spatial spacing in °; xee needs a scalar (the transform below sets the grid)
-        scale = abs(ds_soilgrids_wgs84.rio.resolution()[0])
+        soilgrids_bbox = shapely.box(*ds_soilgrids.rio.bounds())
 
         da_list = []
         for gee_var, var in var_dict.items():
-            # See https://github.com/google/Xee?tab=readme-ov-file#how-to-use
-            ds_temp = xr.open_dataset(
-                base_url + gee_var,
-                engine="ee",
-                geometry=tuple(bbox_wgs84),
-                projection=ee.Projection(
-                    crs=str(ds_soilgrids_wgs84.rio.crs),
-                    transform=ds_soilgrids_wgs84.rio.transform()[:6],
-                ),
-                scale=scale,
+            collection = ee.ImageCollection(base_url + gee_var)
+            native_grid_params = helpers.extract_grid_params(collection)
+            native_scale = native_grid_params["crs_transform"][0]
+            # Buffer of 1 pixel for the bilinear interpolation at the edges in procesing
+            grid_params = helpers.fit_geometry(
+                soilgrids_bbox,
+                geometry_crs=ds_soilgrids.rio.crs.to_wkt(),  # CRS of soilgrids_bbox
+                buffer=native_scale,  # Buffer of 1 pixel (in units of geometry_crs)
+                grid_crs=native_grid_params["crs"],  # CRS of target (GEE grid)
+                grid_scale=(native_scale, -native_scale),  # grid_crs units
             )
-            # save crs
-            crs_temp = ds_temp.crs
+            ds_temp = xr.open_dataset(collection, engine="ee", **grid_params)
             # Convert to correct units by multiplying by 0.0001, see:
             # https://gee-community-catalog.org/projects/hihydro_soil/
             ds_temp = ds_temp * 0.0001
             ds_temp = ds_temp.rename({list(ds_temp.data_vars.keys())[0]: var})
             # write crs with rioxarray
-            ds_temp = ds_temp.rio.write_crs(crs_temp)
+            ds_temp = ds_temp.rio.write_crs(grid_params["crs"])
             ds_temp[var].attrs["GEE_var_name"] = gee_var
             ds_temp[var].attrs["units"] = units_dict[var]
             ds_temp[var].attrs["full_name"] = full_names_dict[var]
