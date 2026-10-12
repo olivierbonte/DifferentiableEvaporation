@@ -64,6 +64,22 @@ function fraction_wet_vegetation(w_r, w_rmax, t=HardThresholds())
 end
 
 """
+    fraction_wet_vegetation_with_condensation(f_wet, λE_pc, t=HardThresholds())
+
+Effective wet fraction of the canopy, ``f_{wet,eff} = f_{wet} + (1 - f_{wet})(1 - g)``, with
+``g`` = [`step_function`](@ref) of the potential canopy latent heat flux `λE_pc` [W m⁻²]
+(Penman-Monteith with zero surface resistance) under the threshold treatment `t`.
+
+When the canopy condenses (``λE_{pc} < 0``, so ``g = 0``), ``f_{wet} = 1``: there
+is no transpiration and the dew goes into the interception store. Otherwise
+``f_{wet,eff} = f_{wet}``.
+"""
+function fraction_wet_vegetation_with_condensation(f_wet, λE_pc, t=HardThresholds())
+    g = step_function(t, λE_pc, zero(λE_pc), flux_scale(t))
+    return f_wet + (1 - f_wet) * (1 - g)
+end
+
+"""
     canopy_input(P, f_veg)
 
 Canopy input ``P_c = f_{veg} P``, the rainfall captured by the canopy (the "canopy input" of the

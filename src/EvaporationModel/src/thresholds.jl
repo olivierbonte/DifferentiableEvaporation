@@ -62,7 +62,7 @@ Exact thresholds.
 struct HardThresholds <: ThresholdTreatment end
 
 """
-    KavetskiSmoothing(; s_w=1e-3, s_r=0.01, s_f=0.01)
+    KavetskiSmoothing(; s_w=1e-3, s_r=0.01, s_f=0.01, s_E=2.0)
 
 Smoothed thresholds, following the rational of [Kavetski & Kuczera (2007)](https://doi.org/10.1029/2006WR005195),
 with scales in the units of the thresholded quantity:
@@ -70,11 +70,13 @@ with scales in the units of the thresholded quantity:
 - `s_w`: soil moisture [m³ m⁻³]
 - `s_r`: canopy storage, as a fraction of `w_rmax` [-]
 - `s_f`: dimensionless factors in ``[0, 1]`` (Jarvis stress factors, `f_wet`) [-]
+- `s_E`: energy fluxes (soil net radiation, potential canopy latent heat flux) [W m⁻²]
 """
 Base.@kwdef struct KavetskiSmoothing{T} <: ThresholdTreatment
     s_w::T = 1e-3
     s_r::T = 0.01
     s_f::T = 0.01
+    s_E::T = 2.0
 end
 
 moisture_scale(t::KavetskiSmoothing) = t.s_w
@@ -83,6 +85,8 @@ storage_scale(t::KavetskiSmoothing, w_rmax) = t.s_r * w_rmax
 storage_scale(::HardThresholds, w_rmax) = false
 factor_scale(t::KavetskiSmoothing) = t.s_f
 factor_scale(::HardThresholds) = false
+flux_scale(t::KavetskiSmoothing) = t.s_E
+flux_scale(::HardThresholds) = false
 
 """
     max(t::ThresholdTreatment, a, b, s)
@@ -108,3 +112,16 @@ smoother of Eq. 8 of [Kavetski & Kuczera (2007)](https://doi.org/10.1029/2006WR0
 """
 lower_bound_kernel(::HardThresholds, x, x_min, s) = one(x)
 lower_bound_kernel(::KavetskiSmoothing, x, x_min, s) = 1 / (1 + exp(-(x - x_min) / s))
+
+"""
+    step_function(t::ThresholdTreatment, x, x_0, s)
+
+Step from 0 (``x < x_0``) to 1 (``x > x_0``). For [`HardThresholds`](@ref) the Heaviside
+step. For [`KavetskiSmoothing`](@ref) the logistic step of Eq. 8 of
+[Kavetski & Kuczera (2007)](https://doi.org/10.1029/2006WR005195), i.e.
+[`lower_bound_kernel`](@ref)
+
+Reuses [`lower_bound_kernel`](@ref), but defines new method [`HardThresholds`](@ref)
+"""
+step_function(::HardThresholds, x, x_0, s) = ifelse(x > x_0, one(x), zero(x))
+step_function(t::KavetskiSmoothing, x, x_0, s) = lower_bound_kernel(t, x, x_0, s)
