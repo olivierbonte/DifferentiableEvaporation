@@ -167,6 +167,16 @@ end
     r_ss = beta_to_r_ss(β, r_as)
 
     # Turbulent fluxes calculations
+    # First solve: detects condensation on the canopy, with the sign of the canopy flux at
+    # zero surface resistance (r_sc only enters the denominator of Penman-Monteith)
+    λE_tot1, _ = total_evaporation(
+        T_a, p_a, VPD_a, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet
+    )
+    VPD_m1 = vpd_veg_source_height(VPD_a, T_a, p_a, A, λE_tot1, r_aa)
+    _, λE_pc1 = penman_monteith(T_a, p_a, VPD_m1, A_c, r_ac, of_value_type(f_wet, 0))
+    g_cond = step_function(thresholds, λE_pc1, zero(λE_pc1), flux_scale(thresholds))
+    f_wet_eff = fraction_wet_vegetation_with_condensation(f_wet, λE_pc1, thresholds)
+    # Second solve, always evaluated (avoid branching): equal to the first when f_wet_eff = f_wet
     λE_tot, λE_tot_p = total_evaporation(
         T_a,
         p_a,
@@ -179,15 +189,15 @@ end
         r_as,
         r_sc,
         r_ss,
-        f_wet,
+        f_wet_eff,
     )
     VPD_m = vpd_veg_source_height(
         VPD_a, T_a, p_a, A, λE_tot, r_aa
     )
     E_t, λE_t = transpiration(
-        T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet
+        T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet_eff
     )
-    E_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet)
+    E_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet_eff)
     E_s, λE_s = soil_evaporation(T_a, p_a, VPD_m, A_s, r_as, r_ss)
 
     P_c = canopy_input(P, f_veg)
