@@ -30,9 +30,11 @@ export smooth_min,
     HardThresholds,
     KavetskiSmoothing,
     lower_bound_kernel,
+    step_function,
     moisture_scale,
     storage_scale,
-    factor_scale
+    factor_scale,
+    flux_scale
 
 include("canopy.jl")
 export fractional_vegetation_cover,
@@ -40,6 +42,7 @@ export fractional_vegetation_cover,
     available_energy_partitioning,
     max_canopy_capacity,
     fraction_wet_vegetation,
+    fraction_wet_vegetation_with_condensation,
     canopy_drainage,
     precip_below_canopy,
     canopy_input,
@@ -96,6 +99,9 @@ export jarvis_stewart,
     SoilEvaporationEfficiencyMethod,
     Martens17,
     Pielke92
+
+include("sensible_heat.jl")
+export sensible_heat, sensible_heat_soil, sensible_heat_canopy
 
 include("soil.jl")
 export c_1,
