@@ -7,12 +7,14 @@ using Dates
 using DataFrames
 using DiffEqCallbacks
 using Enzyme: Enzyme
+using ErrorMetrics: ErrorMetrics, ErrorMetric
 using ForwardDiff
 using LinearSolve
 using OrdinaryDiffEq
 using OrdinaryDiffEqLowOrderRK: Euler, Heun
 using OrdinaryDiffEqSDIRK: ImplicitEuler
 using Parameters
+using StatsBase: cor, mean, std
 using YAXArrays
 
 # Solvers and AD backends for the Jacobian of implicit solvers
@@ -136,6 +138,8 @@ export compute_amplitude_and_phase,
     local_to_solar_time,
     seconds_since_solar_noon,
     value_type,
-    of_value_type
+    of_value_type,
+    KGE,
+    KGEmod
 
 end # module EvaporationModel
