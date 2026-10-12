@@ -1,7 +1,7 @@
 @testset "Mass conservation of tendencies" begin
     forcings = constant_forcings(P)
     for thresholds in treatments,
-        u0 in ([0.2, 0.32, 0.3], [0.05, 0.1, 0.0], [0.4, 0.44, 0.7], [w_sat, w_sat, 0.7])
+        u0 in map(u0_from_fractions, u0_fractions)
 
         du = zeros(3)
         compute_tendencies!(du, u0, p_model, t_unix, forcings, thresholds)
@@ -13,6 +13,32 @@
         lhs = ρ_w * p_model.d_2 * du[2] + du[3]
         rhs = P - d.Q_s - d.E_s - d.E_t - d.E_i - ρ_w * p_model.d_2 * d.K_2
         @test lhs ≈ rhs atol = 1e-12
+    end
+end
+
+@testset "Energy conservation of diagnostics" begin
+    # Daytime (10:00, R_n > 0) and nighttime (02:00, R_n < 0) conditions
+    t_night = datetime2unix(DateTime(2010, 7, 1, 2))
+    for (R_n, t) in ((Rn, t_unix), (-50.0, t_night)),
+        thresholds in treatments,
+        u0 in map(u0_from_fractions, u0_fractions)
+
+        forcings = merge(constant_forcings(P), (; R_n=Returns(R_n)))
+        d = compute_diagnostics(u0, p_model, t, forcings, thresholds)
+        λE_c = d.λE_t + d.λE_i
+        # 1) Total energy balance
+        @test all(isfinite, (d.R_nc, d.R_ns, d.G, d.λE_tot, d.H_tot))
+        @test d.R_nc + d.R_ns ≈ R_n
+        @test abs(d.G) < abs(d.R_ns) # G is a fraction of R_ns
+        @test d.λE_tot + d.H_tot ≈ R_n - d.G
+        # 2) Component balances sum to the total
+        # Soil
+        @test d.λE_s + d.H_s ≈ d.R_ns - d.G
+        # Canopy
+        @test λE_c + d.H_c ≈ d.R_nc
+        # Total
+        @test d.λE_tot ≈ λE_c + d.λE_s
+        @test d.H_tot ≈ d.H_c + d.H_s
     end
 end
 
