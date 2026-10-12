@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "e47b0cdab869534f75a02850d3f5e9d071535a7b"
+project_hash = "d06a5b16e4c38a1ec6672c99ed889ca9a50c4ff7"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -880,8 +880,14 @@ git-tree-sha1 = "6bc12ad81ea905f98e15545882036e0e00f741cf"
 uuid = "7cc45869-7501-5eee-bdea-0790c847d4ef"
 version = "0.0.302+0"
 
+[[deps.ErrorMetrics]]
+deps = ["StatsBase"]
+git-tree-sha1 = "e62d7f011635ad04854772aa9e92101fb8facce3"
+uuid = "c324fbf6-076a-4da5-8ad2-21081a6b285c"
+version = "0.1.0"
+
 [[deps.EvaporationModel]]
-deps = ["ADTypes", "Bigleaf", "ComponentArrays", "DataFrames", "Dates", "DiffEqCallbacks", "Enzyme", "ForwardDiff", "LinearSolve", "OrdinaryDiffEq", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqSDIRK", "Parameters", "YAXArrays"]
+deps = ["ADTypes", "Bigleaf", "ComponentArrays", "DataFrames", "Dates", "DiffEqCallbacks", "Enzyme", "ErrorMetrics", "ForwardDiff", "LinearSolve", "OrdinaryDiffEq", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqSDIRK", "Parameters", "StatsBase", "YAXArrays"]
 path = "src/EvaporationModel"
 uuid = "49da8130-70c8-449e-9091-2395ad2fb07e"
 version = "0.1.0"

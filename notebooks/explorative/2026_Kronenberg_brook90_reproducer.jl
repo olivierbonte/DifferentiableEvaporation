@@ -12,6 +12,7 @@ using CairoMakie
 using ComponentArrays
 using DataInterpolations
 using Dates
+using ErrorMetrics
 using EvaporationModel
 using NetCDF
 using OrdinaryDiffEq
@@ -104,12 +105,11 @@ H_mod = [d.H_tot for d in diagnostics]
 A_mod = [d.R_nc + d.R_ns - d.G for d in diagnostics] # available energy, Rₙ - G
 
 ## Observed energy balance components
-# Note: this script uses the raw values
-# For the table, energy balance corrected terms are added per comparison
-λE_obs = collect(ds_ec.Qle)
-H_obs = collect(ds_ec.Qh)
-λE_obs_cor = collect(ds_ec.Qle_cor)
-H_obs_cor = collect(ds_ec.Qh_cor)
+# Uncorrected (F_MDS) and energy balance corrected (CORR) fluxes
+obs(x) = FT.(collect(x)) # plain Vector, without the time lookup
+λE_obs, H_obs = obs(ds_ec.Qle), obs(ds_ec.Qh)
+λE_obs_cor, H_obs_cor = obs(ds_ec.Qle_cor), obs(ds_ec.Qh_cor)
+λE_qc, H_qc = obs(ds_ec.Qle_qc), obs(ds_ec.Qh_qc)
 A_obs = collect(ds_ec.Rnet .- ds_ec.Qg)
 λE_obs_25, λE_obs_75 = collect(ds_ec.Qle_cor_25), collect(ds_ec.Qle_cor_75)
 H_obs_25, H_obs_75 = collect(ds_ec.Qh_cor_25), collect(ds_ec.Qh_cor_75)
@@ -141,6 +141,7 @@ periods = (
     (DateTime(2024, 12, 4), DateTime(2024, 12, 8)),
 )
 
+# Observed fluxes are energy balance corrected, consistent with their 25-75th quantile band.
 # Time in days since the start of the period, since `band!` does not support `DateTime`.
 # Issue: https://github.com/MakieOrg/Makie.jl/issues/3932
 # `Makie.Axis` since ComponentArrays also exports an `Axis`
@@ -170,7 +171,8 @@ outward to a multiple of `step` [W m⁻²].
 function row_ylim(period; step=50)
     sel, _ = period_selection(period)
     data = (
-        λE_obs_25, λE_obs_75, H_obs_25, H_obs_75, λE_obs, H_obs, A_obs, λE_mod, H_mod, A_mod
+        λE_obs_25, λE_obs_75, H_obs_25, H_obs_75, λE_obs_cor, H_obs_cor, A_obs,
+        λE_mod, H_mod, A_mod,
     )
     y_min = minimum(minimum(x[sel]) for x in data)
     y_max = maximum(maximum(x[sel]) for x in data)
@@ -185,8 +187,8 @@ function plot_observed!(pos, period, ylim)
         label="λE ICOS 25-75th quantile")
     band!(ax, t, H_obs_25[sel], H_obs_75[sel]; color=colors.H, alpha=0.35,
         label="H ICOS 25-75th quantile")
-    lines!(ax, t, λE_obs[sel]; color=colors.λE, label="λE ICOS")
-    lines!(ax, t, H_obs[sel]; color=colors.H, label="H ICOS")
+    lines!(ax, t, λE_obs_cor[sel]; color=colors.λE, label="λE ICOS corrected")
+    lines!(ax, t, H_obs_cor[sel]; color=colors.H, label="H ICOS corrected")
     lines!(ax, t, A_obs[sel]; color=colors.A, label="Rn-G ICOS")
     return ax
 end
@@ -226,3 +228,21 @@ end
 colgap!(fig.layout, 45) # room for the overhanging first and last x tick labels
 save(figdir("2026_Kronenberg_fig4_reproduction.png"), fig)
 fig
+
+## Performance in 2024: NSE, KGE and modified KGE
+# Only measured half-hours (QC = 0), as in Sect. 4.2 of the paper.
+in_2024 = year.(time_ec) .== 2024
+comparisons = (
+    ("λE", λE_mod, λE_obs, λE_qc),
+    ("λE corrected", λE_mod, λE_obs_cor, λE_qc),
+    ("H", H_mod, H_obs, H_qc),
+    ("H corrected", H_mod, H_obs_cor, H_qc),
+)
+for (name, ŷ, y, qc) in comparisons
+    sel = in_2024 .& (qc .== 0)
+    nse, kge, kge_mod = (metric(m, ŷ[sel], y[sel]) for m in (NSE(), KGE(), KGEmod()))
+    println(
+        rpad(name, 13), ": NSE = ", round(nse; digits=2), ", KGE = ", round(kge; digits=2),
+        ", KGE' = ", round(kge_mod; digits=2), " (n = ", count(sel), ")",
+    )
+end
