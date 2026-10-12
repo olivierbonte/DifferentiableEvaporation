@@ -200,6 +200,12 @@ end
     E_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet_eff)
     E_s, λE_s = soil_evaporation(T_a, p_a, VPD_m, A_s, r_as, r_ss)
 
+    # Sensible heat via energy balance
+    H_tot = sensible_heat(A, λE_tot)
+    H_s = sensible_heat_soil(A_s, λE_s)
+    H_c = sensible_heat_canopy(A_c, λE_t + λE_i)
+
+    # Remaining water fluxes
     P_c = canopy_input(P, f_veg)
     D_c = canopy_drainage(P, w_r, f_veg, k_ext)
     P_s = precip_below_canopy(P, P_c, D_c)
@@ -220,6 +226,12 @@ end
         λE_i=λE_i,
         E_s=E_s,
         λE_s=λE_s,
+        H_tot=H_tot,
+        H_s=H_s,
+        H_c=H_c,
+        R_nc=R_nc,
+        R_ns=R_ns,
+        G=G,
         P_c=P_c,
         D_c=D_c,
         P_s=P_s,

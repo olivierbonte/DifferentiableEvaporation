@@ -100,6 +100,9 @@ export jarvis_stewart,
     Martens17,
     Pielke92
 
+include("sensible_heat.jl")
+export sensible_heat, sensible_heat_soil, sensible_heat_canopy
+
 include("soil.jl")
 export c_1,
     c_2,

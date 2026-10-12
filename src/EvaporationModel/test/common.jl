@@ -41,6 +41,9 @@ constant_forcings(P) = (
     P=Returns(P), T_a=Returns(T_a), u_a=Returns(u), p_a=Returns(p_a), VPD_a=Returns(VPD_a),
     SW_in=Returns(SW_in), R_n=Returns(Rn), LAI=Returns(LAI), lon=4.52, utc_offset=1,
 )
+# States [w_1, w_2, w_r] as fractions of their maximum (w_sat, w_sat, w_rmax)
+u0_fractions = ([0.45, 0.7, 0.5], [0.1, 0.2, 0.0], [0.9, 1.0, 1.0], [1.0, 1.0, 1.0])
+u0_from_fractions(f) = f .* [w_sat, w_sat, max_canopy_capacity(LAI)]
 t_unix = datetime2unix(DateTime(2010, 7, 1, 10)) # model time [s since Unix epoch], 10:00 local
 treatments = (HardThresholds(), KavetskiSmoothing())
 
