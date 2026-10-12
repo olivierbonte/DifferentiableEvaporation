@@ -30,9 +30,11 @@ export smooth_min,
     HardThresholds,
     KavetskiSmoothing,
     lower_bound_kernel,
+    step_function,
     moisture_scale,
     storage_scale,
-    factor_scale
+    factor_scale,
+    flux_scale
 
 include("canopy.jl")
 export fractional_vegetation_cover,

@@ -142,7 +142,7 @@ end
 
     t_sol = seconds_since_solar_noon(t, forcings.lon, forcings.utc_offset)
     R_nc, R_ns = net_radiation_partitioning(R_n, f_veg)
-    G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol)
+    G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol, thresholds)
     A, A_c, A_s = available_energy_partitioning(R_nc, R_ns, G)
 
     # Resistances
