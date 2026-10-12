@@ -3,6 +3,9 @@
     @test max(hard, 0.2, 0.3, moisture_scale(hard)) == 0.3
     @test min(hard, 0.2, 0.3, moisture_scale(hard)) == 0.2
     @test clamp(hard, 1.5, 0.0, 1.0, factor_scale(hard)) == 1.0
+    @test step_function(hard, -1.0, 0.0, flux_scale(hard)) == 0
+    @test step_function(hard, 1.0, 0.0, flux_scale(hard)) == 1
+    @test step_function(smooth, 0.0, 0.0, flux_scale(smooth)) == 0.5
     # The smooth clamp never drops below the lower bound, and exceeds the upper by < s/2
     s = factor_scale(smooth)
     for x in (-1.0, 0.0, 0.5, 1.0, 2.0)
@@ -63,4 +66,27 @@ end
     ET_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet)
     ET_s, λE_s = soil_evaporation(T_a, p_a, VPD_m, A_s, r_as, r_ss)
     @test λE_tot ≈ λE_t + λE_i + λE_s
+end
+
+@testset "Night-time ground heat flux" begin
+    # Evening: the Santanello & Friedl cosine is negative, so at night G = p_n R_ns
+    t_sol_ = 40_000
+    r_night_ = 0.5
+    R_ns_ = -50.0
+    for t in treatments
+        @test ground_heat_flux(SantanelloFriedl03(), -50.0, 0.2, w_sat, 40_000.0, t) ≈ r_night_ * R_ns_
+    end
+end
+
+@testset "Canopy condensation" begin
+    # Night with a dry canopy: no transpiration, dew into the interception store
+    night_forcings = merge(
+        constant_forcings(0.0), (R_n=Returns(-60.0), SW_in=Returns(0.0), VPD_a=Returns(50.0))
+    )
+    for t in treatments
+        d = compute_diagnostics([0.2, 0.25, 0.0], p_model, t_unix, night_forcings, t)
+        @test d.λE_t ≈ 0 atol = 1e-6
+        @test d.λE_i < 0
+        @test d.λE_tot ≈ d.λE_t + d.λE_i + d.λE_s
+    end
 end

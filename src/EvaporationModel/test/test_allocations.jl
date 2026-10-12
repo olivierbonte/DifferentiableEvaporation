@@ -7,6 +7,7 @@
         @test isempty(check_allocs(net_radiation_partitioning, (FT, FT)))
         @test isempty(check_allocs(available_energy_partitioning, (FT, FT, FT)))
         @test isempty(check_allocs(fraction_wet_vegetation, (FT, FT)))
+        @test isempty(check_allocs(fraction_wet_vegetation_with_condensation, (FT, FT)))
         @test isempty(check_allocs(canopy_input, (FT, FT)))
         @test isempty(check_allocs(canopy_drainage, (FT, FT, FT, FT)))
         @test isempty(check_allocs(precip_below_canopy, (FT, FT, FT)))
