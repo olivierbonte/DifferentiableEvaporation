@@ -127,8 +127,8 @@ function ustar_from_u(u, z_obs, d, z_0m, ψ_m=of_value_type(z_0m, 0))
 end
 
 """
-    soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc)
-    soil_evaporation_efficiency(approach::Martens17, w_1, w_res, w_c)
+    soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc, t=HardThresholds())
+    soil_evaporation_efficiency(approach::Martens17, w_1, w_res, w_c, t=HardThresholds())
 
 Calculate soil evaporation efficiency β, a factor between 0 and 1 which scales the
 potential soil evaporation
@@ -137,6 +137,8 @@ potential soil evaporation
 - `approach`: The approach to use for calculating soil evaporation efficiency, a subtype of
     `SoilEvaporationEfficiencyMethod`
 - `w_1`: Soil moisture from first layer [m³/m³]
+- `t`: [`ThresholdTreatment`](@ref) for the bounds on `w_1` (Pielke92) or β (Martens17);
+  default [`HardThresholds`](@ref)
 
 With `approach = Pielke92()`, the following inputs are
 
@@ -151,10 +153,11 @@ With `approach = Martens17()`, the following inputs are
 
 With `approach = Pielke92()`, β is calculated using euqation (7) of
 [Lee & Pielke (1992)](https://doi.org/10.1175/1520-0450(1992)031%3C0480:ETSSSH%3E2.0.CO;2),
-with β = 1 for `w_1 ≥ w_fc`.
+with β = 1 for `w_1 ≥ w_fc`: `w_1` is capped at `w_fc` with a `min` under `t`.
 
 With `approach = Martens17()`, β is calculated using equation (6) of
-[Martens et al. (2017)](https://doi.org/10.5194/gmd-10-1903-2017).
+[Martens et al. (2017)](https://doi.org/10.5194/gmd-10-1903-2017): β is clamped to
+``[0, 1]`` under `t`.
 
 # Examples
 
@@ -173,12 +176,15 @@ true
 ```
 
 """
-function soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc)
-    return 1 / 4 * (1 - cos(π * min(w_1, w_fc) / w_fc))^2
+function soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc, t=HardThresholds())
+    return 1 / 4 * (1 - cos(π * min(t, w_1, w_fc, moisture_scale(t)) / w_fc))^2
 end
 
-function soil_evaporation_efficiency(approach::Martens17, w_1, w_res, w_c)
-    return clamp((w_1 - w_res) / (w_c - w_res), 0, 1)
+function soil_evaporation_efficiency(
+    approach::Martens17, w_1, w_res, w_c, t=HardThresholds()
+)
+    β = (w_1 - w_res) / (w_c - w_res)
+    return clamp(t, β, zero(β), one(β), factor_scale(t))
 end
 
 """

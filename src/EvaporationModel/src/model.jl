@@ -163,7 +163,7 @@ end
         r_smin;
         thresholds,
     )
-    β = soil_evaporation_efficiency(Pielke92(), w_1, w_fc)
+    β = soil_evaporation_efficiency(Pielke92(), w_1, w_fc, thresholds)
     r_ss = beta_to_r_ss(β, r_as)
 
     # Turbulent fluxes calculations
