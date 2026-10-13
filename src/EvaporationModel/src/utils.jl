@@ -174,3 +174,31 @@ end
 @inline function of_value_type(x, y)
     return convert(value_type(x), y)
 end
+
+## Error metrics, extending ErrorMetrics.jl
+"Kling-Gupta Efficiency of [Gupta et al. (2009)](https://doi.org/10.1016/j.jhydrol.2009.08.003), combining correlation, variability ratio and bias ratio."
+struct KGE <: ErrorMetric end
+ErrorMetrics.purpose(::Type{KGE}) = "Kling-Gupta Efficiency (Gupta et al., 2009, https://doi.org/10.1016/j.jhydrol.2009.08.003): Combines correlation, variability ratio and bias ratio"
+
+"Modified Kling-Gupta Efficiency of [Kling et al. (2012)](https://doi.org/10.1016/j.jhydrol.2012.01.011), with the ratio of coefficients of variation as variability term."
+struct KGEmod <: ErrorMetric end
+ErrorMetrics.purpose(::Type{KGEmod}) = "Modified Kling-Gupta Efficiency (Kling et al., 2012, https://doi.org/10.1016/j.jhydrol.2012.01.011): KGE with the ratio of coefficients of variation as variability term"
+
+# Correlation ρ, variability ratio α and bias ratio β of simulations ŷ and observations y
+function kge_components(ŷ::AbstractArray, y::AbstractArray)
+    ρ = cor(y, ŷ)
+    α = std(ŷ) / std(y)
+    β = mean(ŷ) / mean(y)
+    return ρ, α, β
+end
+
+function ErrorMetrics.metric(::KGE, ŷ::AbstractArray, y::AbstractArray, yσ::AbstractArray)
+    ρ, α, β = kge_components(ŷ, y)
+    return 1 - √((ρ - 1)^2 + (α - 1)^2 + (β - 1)^2)
+end
+
+function ErrorMetrics.metric(::KGEmod, ŷ::AbstractArray, y::AbstractArray, yσ::AbstractArray)
+    ρ, α, β = kge_components(ŷ, y)
+    γ = α / β # ratio of coefficients of variation
+    return 1 - √((ρ - 1)^2 + (γ - 1)^2 + (β - 1)^2)
+end

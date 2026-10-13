@@ -15,6 +15,7 @@ dependencies:
   - owslib=0.32.*
   - rioxarray=0.18.*
   - soilgrids=0.1.4 
+  - scikit-learn=1.9.*
   - sympy=1.14.*
   - tabulate=0.10.*
   - pip
