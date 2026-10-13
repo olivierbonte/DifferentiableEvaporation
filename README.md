@@ -16,19 +16,19 @@ To (locally) reproduce this project, do the following:
    ```
    git clone https://github.com/olivierbonte/DifferentiableEvaporation
    ```
-1. Make sure you have julia installed on your system. It is recommended to manage different julia versions with juliaup, which you can donwload [here](https://github.com/JuliaLang/juliaup). This project is written in Julia 1.10.9, which you can add in juliaup with the following command:
+1. Make sure you have julia installed on your system. It is recommended to manage different julia versions with juliaup, which you can donwload [here](https://github.com/JuliaLang/juliaup). This project is written in Julia 1.12.7, which you can add in juliaup with the following command:
 
    ```
-   juliaup add 1.10.9
+   juliaup add 1.12.7
    ```
 
 2. Next, navigate to the folder DifferentiableEvaporation and open Julia by running
    ```
    julia
    ```
-   or specifically the 1.10.9 version if you're using juliaup:
+   or specifically the 1.12.7 version if you're using juliaup:
    ```
-   julia +1.10.9
+   julia +1.12.7
    ```
    and then do the following:
    ```

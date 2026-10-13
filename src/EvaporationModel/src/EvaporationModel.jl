@@ -1,14 +1,24 @@
 module EvaporationModel
 
+using ADTypes: AutoEnzyme, AutoForwardDiff
 using Bigleaf
 using ComponentArrays
 using Dates
 using DataFrames
 using DiffEqCallbacks
+using Enzyme: Enzyme
+using ErrorMetrics: ErrorMetrics, ErrorMetric
 using ForwardDiff
+using LinearSolve
 using OrdinaryDiffEq
+using OrdinaryDiffEqLowOrderRK: Euler, Heun
+using OrdinaryDiffEqSDIRK: ImplicitEuler
 using Parameters
+using StatsBase: cor, mean, std
 using YAXArrays
+
+# Solvers and AD backends for the Jacobian of implicit solvers
+export Tsit5, Euler, Heun, ImplicitEuler, AutoForwardDiff, AutoEnzyme
 
 include("thresholds.jl")
 export smooth_min,
@@ -22,9 +32,11 @@ export smooth_min,
     HardThresholds,
     KavetskiSmoothing,
     lower_bound_kernel,
+    step_function,
     moisture_scale,
     storage_scale,
-    factor_scale
+    factor_scale,
+    flux_scale
 
 include("canopy.jl")
 export fractional_vegetation_cover,
@@ -32,6 +44,7 @@ export fractional_vegetation_cover,
     available_energy_partitioning,
     max_canopy_capacity,
     fraction_wet_vegetation,
+    fraction_wet_vegetation_with_condensation,
     canopy_drainage,
     precip_below_canopy,
     canopy_input,
@@ -73,9 +86,7 @@ export AbstractModel,
     ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!
 
 include("resistances.jl")
-export jarvis_stewart,
-    aerodynamic_resistance,
-    soil_aerodynamic_resistance,
+export soil_aerodynamic_resistance,
     ustar_from_u,
     surface_resistance,
     soil_evaporation_efficiency,
@@ -88,6 +99,9 @@ export jarvis_stewart,
     SoilEvaporationEfficiencyMethod,
     Martens17,
     Pielke92
+
+include("sensible_heat.jl")
+export sensible_heat, sensible_heat_soil, sensible_heat_canopy
 
 include("soil.jl")
 export c_1,
@@ -122,6 +136,8 @@ export compute_amplitude_and_phase,
     local_to_solar_time,
     seconds_since_solar_noon,
     value_type,
-    of_value_type
+    of_value_type,
+    KGE,
+    KGEmod
 
 end # module EvaporationModel

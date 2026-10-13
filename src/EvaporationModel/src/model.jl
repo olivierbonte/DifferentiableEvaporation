@@ -1,4 +1,16 @@
 abstract type AbstractModel end
+
+"""
+    ProcessBasedModel{FT}(; forcings, parameters, t_span, u0, saveat, kwargs...)
+
+Process-based model of the water balance of soil and canopy, solved with [`solve!`](@ref)
+after [`initialize!`](@ref).
+
+`solver_kwargs` are passed to `OrdinaryDiffEq.solve` by [`solve!`](@ref). The default
+tolerances, `abstol = reltol = 1e-6`, following SUMMA with SUNDIALS
+[Spiteri et al., 2024](https://doi.org/10.1029/2024MS004256).
+Keyword arguments given to [`solve!`](@ref) take precedence over `solver_kwargs`.
+"""
 @kwdef mutable struct ProcessBasedModel{FT} <: AbstractModel
     forcings::NamedTuple
     parameters::AbstractArray
@@ -13,6 +25,7 @@ abstract type AbstractModel end
     diagnostics = SavedValues(FT, NamedTuple)
     output = nothing
     thresholds::ThresholdTreatment = HardThresholds()
+    solver_kwargs::NamedTuple = (; abstol=1e-6, reltol=1e-6)
 end
 
 function initialize!(model::ProcessBasedModel)
@@ -34,18 +47,41 @@ function create_f_diagnostics(model::ProcessBasedModel)
     end
 end
 
-function solve!(model::ProcessBasedModel; AD=false, kwargs...)
+"""
+    solve!(model::ProcessBasedModel; AD=false, kwargs...)
+
+Solve the model, saving the diagnostics at `model.saveat`. `kwargs` are passed to
+`OrdinaryDiffEq.solve` and take precedence over `model.solver_kwargs`. A `callback` is
+applied before the diagnostics are saved. yaxarray_output=true saves the output in a
+`YAXArray datacube, but is false by default because it interferes with automatic
+differentiation application.
+
+The solver is set with `alg`, e.g. `Tsit5()`, `Euler()`, `Heun()` or `ImplicitEuler()`. The Jacobian of
+an implicit solver is computed with ForwardDiff, `ImplicitEuler(; autodiff=AutoForwardDiff())`,
+or with Enzyme,
+`ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=EvaporationModel.Enzyme.Duplicated))`.
+`Duplicated` is needed because the right-hand side is a closure over the forcings.
+
+Any OrdinaryDiffEq solver can be used, but only the options above are exported by this package.
+For other solvers, the user has to manage installation of required packages.
+"""
+function solve!(model::ProcessBasedModel; yaxarray_output=false, callback=nothing, kwargs...)
     cb = SavingCallback(
         (u, t, integrator) -> model.f_diagnostics(u, integrator.p, t),
         model.diagnostics;
         saveat=model.saveat,
     )
     model.sol = solve(
-        model.prob; callback=cb, saveat=model.saveat, tstops=model.tstops, kwargs...
+        model.prob;
+        callback=isnothing(callback) ? cb : CallbackSet(callback, cb),
+        saveat=model.saveat,
+        tstops=model.tstops,
+        model.solver_kwargs...,
+        kwargs...,
     )
 
     # Save data in datacube
-    if ~AD
+    if yaxarray_output
         df_diagnostics = DataFrame(model.diagnostics.saveval)
         df_prognostics = DataFrame(model.sol)
         cols_prognostics = filter(x -> x != "timestamp", names(df_prognostics))
@@ -106,7 +142,7 @@ end
 
     t_sol = seconds_since_solar_noon(t, forcings.lon, forcings.utc_offset)
     R_nc, R_ns = net_radiation_partitioning(R_n, f_veg)
-    G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol)
+    G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol, thresholds)
     A, A_c, A_s = available_energy_partitioning(R_nc, R_ns, G)
 
     # Resistances
@@ -131,6 +167,16 @@ end
     r_ss = beta_to_r_ss(β, r_as)
 
     # Turbulent fluxes calculations
+    # First solve: detects condensation on the canopy, with the sign of the canopy flux at
+    # zero surface resistance (r_sc only enters the denominator of Penman-Monteith)
+    λE_tot1, _ = total_evaporation(
+        T_a, p_a, VPD_a, A, A_c, A_s, r_aa, r_ac, r_as, r_sc, r_ss, f_wet
+    )
+    VPD_m1 = vpd_veg_source_height(VPD_a, T_a, p_a, A, λE_tot1, r_aa)
+    _, λE_pc1 = penman_monteith(T_a, p_a, VPD_m1, A_c, r_ac, of_value_type(f_wet, 0))
+    g_cond = step_function(thresholds, λE_pc1, zero(λE_pc1), flux_scale(thresholds))
+    f_wet_eff = fraction_wet_vegetation_with_condensation(f_wet, λE_pc1, thresholds)
+    # Second solve, always evaluated (avoid branching): equal to the first when f_wet_eff = f_wet
     λE_tot, λE_tot_p = total_evaporation(
         T_a,
         p_a,
@@ -143,17 +189,23 @@ end
         r_as,
         r_sc,
         r_ss,
-        f_wet,
+        f_wet_eff,
     )
     VPD_m = vpd_veg_source_height(
         VPD_a, T_a, p_a, A, λE_tot, r_aa
     )
     E_t, λE_t = transpiration(
-        T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet
+        T_a, p_a, VPD_m, A_c, r_ac, r_sc, f_wet_eff
     )
-    E_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet)
+    E_i, λE_i = interception_loss(T_a, p_a, VPD_m, A_c, r_ac, f_wet_eff)
     E_s, λE_s = soil_evaporation(T_a, p_a, VPD_m, A_s, r_as, r_ss)
 
+    # Sensible heat via energy balance
+    H_tot = sensible_heat(A, λE_tot)
+    H_s = sensible_heat_soil(A_s, λE_s)
+    H_c = sensible_heat_canopy(A_c, λE_t + λE_i)
+
+    # Remaining water fluxes
     P_c = canopy_input(P, f_veg)
     D_c = canopy_drainage(P, w_r, f_veg, k_ext)
     P_s = precip_below_canopy(P, P_c, D_c)
@@ -174,6 +226,12 @@ end
         λE_i=λE_i,
         E_s=E_s,
         λE_s=λE_s,
+        H_tot=H_tot,
+        H_s=H_s,
+        H_c=H_c,
+        R_nc=R_nc,
+        R_ns=R_ns,
+        G=G,
         P_c=P_c,
         D_c=D_c,
         P_s=P_s,
