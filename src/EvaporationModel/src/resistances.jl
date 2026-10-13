@@ -98,18 +98,6 @@ function soil_aerodynamic_resistance(
     return r_as
 end
 
-function aerodynamic_resistance(u::AbstractArray, parameters::ComponentArray)
-    @unpack d, z0m, z0h, z_measur = parameters
-    return aerodynamic_resistance.(u, d, z0m, z0h, z_measur)
-end
-
-function aerodynamic_resistance(u, d, z0m, z0h, z_measur)
-    u = max(u, 0.1)
-    #I use 0.1 instead of 1 here to allow higher values! https://doi.org/10.1016/S0168-1923(00)00164-7
-    r_a = (log((z_measur - d) / z0m) * log((z_measur - d) / z0h)) ./ (0.41^2 * u)
-    return r_a
-end
-
 @doc raw"""
     ustar_from_u(u, z_obs, d, z_0m, ψ_m=0)
 

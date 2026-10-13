@@ -86,8 +86,7 @@ export AbstractModel,
     ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!
 
 include("resistances.jl")
-export aerodynamic_resistance,
-    soil_aerodynamic_resistance,
+export soil_aerodynamic_resistance,
     ustar_from_u,
     surface_resistance,
     soil_evaporation_efficiency,
