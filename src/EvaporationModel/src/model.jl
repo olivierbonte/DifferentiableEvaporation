@@ -41,6 +41,12 @@ used by [`solve!`](@ref); keyword arguments of `solve!` take precedence.
     solver_kwargs::NamedTuple = (; abstol=1e-6, reltol=1e-6)
 end
 
+"""
+    initialize!(model::ProcessBasedModel)
+
+Build the right-hand side, the diagnostics function and the `ODEProblem` (with the
+accumulators appended to `u0`) of `model`.
+"""
 function initialize!(model::ProcessBasedModel)
     length(model.u0) == N_STATES ||
         throw(ArgumentError("`u0` must hold the $N_STATES physical states `[w_1, w_2, w_r]`"))
