@@ -1,10 +1,14 @@
 # Gradients of a toy loss through the ODE solve. The solver kwargs (tolerances) are passed to
 # `solve`, so that the adjoint solves use them as well.
 
-function toy_loss(p, prob, saveat, y_obs, sensealg, solver_kwargs)
+# `observe` maps the solution to the observed quantity (default: all states)
+function toy_loss(p, prob, saveat, y_obs, sensealg, solver_kwargs, observe=Array)
     sol = solve(remake(prob; p=p), Tsit5(); saveat, sensealg, solver_kwargs...)
-    return sum(abs2, Array(sol) .- y_obs) / length(y_obs)
+    return sum(abs2, observe(sol) .- y_obs) / length(y_obs)
 end
+
+# Window means of λE_tot, from the accumulator states of the default model
+λE_means(sol) = window_means(sol, (:λE_tot, :H_tot, :G)).λE_tot
 
 # For differentiating directly through the solver with Enzyme: the problem is built inside the
 # loss, with `FullSpecialize` (no FunctionWrappers around `f`), instead of a `remake` of a
@@ -20,9 +24,9 @@ end
 # treated as constants (as ForwardDiff does)
 inactive_norm(u, t) = Enzyme.ignore_derivatives(DiffEqBase.ODE_DEFAULT_NORM(u, t))
 
-@testset "Sensitivities of a toy loss" verbose = true begin
+@testset "Sensitivities of a toy loss on the states" verbose = true begin
     # Reference = slightly perturbed parameters
-    model = toy_model()
+    model = toy_model(; accumulated=())
     p_obs = copy(p_model)
     p_obs.r_smin *= 1.2
     y_obs = Array(
@@ -78,4 +82,23 @@ inactive_norm(u, t) = Enzyme.ignore_derivatives(DiffEqBase.ODE_DEFAULT_NORM(u, t
         )
         @test isapprox(g, g_ref; rtol=1e-3)
     end
+end
+
+# Loss on the window means of an accumulated flux: the accumulators are states, so the same
+# AD paths apply as for a loss on the physical states
+@testset "Sensitivities of a diagnostics loss" verbose = true begin
+    model = toy_model()
+    p_obs = copy(p_model)
+    p_obs.r_smin *= 1.2
+    tol = state_tolerances(model, (; abstol=1e-10, reltol=1e-10))
+    y_obs = λE_means(solve(remake(model.prob; p=p_obs), Tsit5(); saveat=saveat_toy, tol...))
+    context(sensealg) = (
+        Constant(remake(model.prob; u0=copy(model.prob.u0))), Constant(saveat_toy),
+        Constant(y_obs), Constant(sensealg), Constant(tol), Constant(λE_means),
+    )
+    g_ref = gradient(toy_loss, AutoForwardDiff(), p_model, context(ForwardDiffSensitivity())...)
+    @test all(isfinite, g_ref) && any(!iszero, g_ref)
+    enzyme_reverse = AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse))
+    sensealg = GaussAdjoint(; autojacvec=EnzymeVJP())
+    @test isapprox(gradient(toy_loss, enzyme_reverse, p_model, context(sensealg)...), g_ref; rtol=1e-3)
 end

@@ -57,6 +57,20 @@
             @test (@ballocations compute_tendencies!(
                 $du, $u0, $p_model, $t_unix, $forcings, $thresholds
             )) == 0
+            # With accumulators of the main energy fluxes
+            acc = Val((:λE_tot, :H_tot, :G))
+            u0_acc, du_acc = [u0; zeros(3)], zeros(6)
+            @test (@ballocations compute_tendencies!(
+                $du_acc, $u0_acc, $p_model, $t_unix, $forcings, $thresholds, $acc
+            )) == 0
+            # Dual states (as in the ForwardDiff Jacobian of an implicit solver): diagnostics
+            # of the forcing only (P_c) stay Float64, the fluxes are Dual
+            water = Val((:P_c, :E_i, :D_c, :E_s, :E_t, :K_2))
+            dual(x) = ForwardDiff.Dual{Nothing}(x, one(x))
+            u_dual, du_dual = dual.([u0; zeros(6)]), dual.(zeros(9))
+            @test (@ballocations compute_tendencies!(
+                $du_dual, $u_dual, $p_model, $t_unix, $forcings, $thresholds, $water
+            )) == 0
         end
     end
 
