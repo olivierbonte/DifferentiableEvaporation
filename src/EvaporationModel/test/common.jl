@@ -54,7 +54,7 @@ t_span_toy = (t_unix, t_unix + 86400.0)
 saveat_toy = collect(t_span_toy[1]:1800.0:t_span_toy[2])
 forcings_toy = constant_forcings(5e-6) # kg/(m² * s)
 
-function toy_model(; thresholds=HardThresholds(), parameters=p_model, u0=u0_toy)
+function toy_model(; thresholds=HardThresholds(), parameters=p_model, u0=u0_toy, kwargs...)
     model = ProcessBasedModel{Float64}(;
         forcings=forcings_toy,
         parameters=parameters,
@@ -62,6 +62,7 @@ function toy_model(; thresholds=HardThresholds(), parameters=p_model, u0=u0_toy)
         u0=copy(u0),
         saveat=saveat_toy,
         thresholds=thresholds,
+        kwargs...,
     )
     initialize!(model)
     return model

@@ -4,8 +4,6 @@ using ADTypes: AutoEnzyme, AutoForwardDiff
 using Bigleaf
 using ComponentArrays
 using Dates
-using DataFrames
-using DiffEqCallbacks
 using Enzyme: Enzyme
 using ErrorMetrics: ErrorMetrics, ErrorMetric
 using ForwardDiff
@@ -83,7 +81,9 @@ export ground_heat_flux,
 
 include("model.jl")
 export AbstractModel,
-    ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!
+    ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!,
+    window_means,
+    state_tolerances
 
 include("resistances.jl")
 export soil_aerodynamic_resistance,

@@ -14,18 +14,28 @@ site_soil_file(site) = datadir("exp_pro", "soil", site * "_total_agg.nc")
 """
     site_forcing(file, start_date=typemin(DateTime), end_date=typemax(DateTime); FT=Float64)
 
-Forcing of an eddy-covariance `file` between `start_date` and `end_date` (inclusive; the
-whole file by default), with constant piecewise interpolation (`ConstantInterpolation`,
-`dir=:left`: the value stamped `t_k` holds on ``[t_k, t_{k+1})``). Returns `(forcings, t, ds)`:
-the forcing NamedTuple, the forcing timestamps (local standard time, unix seconds) and the
-selected dataset (for observations).
+Forcing of an eddy-covariance `file` at the time stamps ``t_1, …, t_n`` between `start_date`
+and `end_date` (inclusive; the whole file by default), with constant piecewise interpolation
+(`ConstantInterpolation`, `dir=:left`: the value stamped ``t_k`` holds on ``[t_k, t_{k+1})``).
+The last value holds on ``[t_n, t_n + Δt]``, with ``Δt = t_n - t_{n-1}`` the (regular) time
+step of the forcing. Returns `(forcings, times, ds)`: the forcing NamedTuple, the times
+(local standard time, unix seconds) and the selected dataset (for observations), with `times`
+a NamedTuple of
+- `stamps`: the time stamps ``t_1, …, t_n`` of `ds`, the starts of the windows;
+- `bounds`: the window bounds ``t_1, …, t_n, t_n + Δt``, for `saveat`;
+- `span`: ``(t_1, t_n + Δt)``, for `t_span`.
+With `t_span = times.span` and `saveat = times.bounds`, the window means of the model are on
+the time stamps of `ds`.
 """
 function site_forcing(
     file, start_date=typemin(DateTime), end_date=typemax(DateTime); FT=Float64
 )
     ds = readcubedata(open_dataset(file)[time=start_date..end_date])
-    t = datetime2unix.(collect(ds.time))
-    forcing(x) = ConstantInterpolation(FT.(vec(x)), t; dir=:left)
+    t = datetime2unix.(collect(ds.time.val)) # plain Vector, without the time lookup
+    t_end = t[end] + (t[end] - t[end-1]) # end of the last window
+    times = (; stamps=t, bounds=[t; t_end], span=(t[1], t_end))
+    # Extra knot at the end of the last window, with the last value
+    forcing(x) = ConstantInterpolation([FT.(vec(x)); FT(x[end])], times.bounds; dir=:left)
     forcings = (
         R_n=forcing(ds.Rnet[:]),
         T_a=forcing(ds.Tair[:]),
@@ -38,7 +48,7 @@ function site_forcing(
         lon=FT(ds.longitude[1]),
         utc_offset=FT(NetCDF.ncgetatt(file, "time", "UTC_offset")),
     )
-    return forcings, t, ds
+    return forcings, times, ds
 end
 
 """

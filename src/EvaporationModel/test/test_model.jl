@@ -56,7 +56,6 @@ end
         EvaporationModel.solve!(model; alg=alg)
         @test OrdinaryDiffEq.SciMLBase.successful_retcode(model.sol)
         @test model.sol.t == saveat_toy
-        @test length(model.diagnostics.saveval) == length(saveat_toy)
         @test all(u -> all(isfinite, u), model.sol.u)
     end
     # Keyword arguments of solve! take precedence over solver_kwargs
@@ -65,4 +64,46 @@ end
     EvaporationModel.solve!(model_tight; alg=Tsit5(), abstol=1e-10, reltol=1e-10)
     # tighter tolerances require more accepted steps
     @test model_tight.sol.stats.naccept > model_default.sol.stats.naccept
+end
+
+@testset "Accumulated diagnostics" begin
+    # Any diagnostic can be accumulated: the window means close the water balances of the
+    # canopy and of the column, also with the (backward Euler consistent) ImplicitEuler
+    water = (:P_c, :E_i, :D_c, :I_s, :E_s, :E_t, :K_2)
+    tight = (; abstol=1e-10, reltol=1e-10)
+    solvers = ((Tsit5(), tight), (ImplicitEuler(; autodiff=AutoForwardDiff()), (;)))
+    for thresholds in treatments, (alg, tol) in solvers
+        model = toy_model(; thresholds, accumulated=water)
+        EvaporationModel.solve!(model; alg, tol...)
+        m = model.diagnostics
+        Δt = diff(saveat_toy)
+        dw_r_dt = diff(model.sol[3, :]) ./ Δt
+        dw_2_dt = diff(model.sol[2, :]) ./ Δt
+        @test dw_r_dt ≈ m.P_c .- m.E_i .- m.D_c rtol = 1e-6 atol = 1e-12
+        @test dw_2_dt ≈ (m.I_s .- m.E_s .- m.E_t) ./ (ρ_w * p_model.d_2) .- m.K_2 rtol = 1e-6 atol =
+            1e-14
+    end
+
+    # Accumulators do not change the time steps or the physical states (implicit solvers: up
+    # to the Newton tolerance, as the Newton solve includes the accumulators)
+    for (alg, rtol) in ((Tsit5(), 1e-12), (ImplicitEuler(; autodiff=AutoForwardDiff()), 1e-5))
+        with, without = toy_model(), toy_model(; accumulated=())
+        EvaporationModel.solve!(with; alg)
+        EvaporationModel.solve!(without; alg)
+        @test with.sol.stats.naccept == without.sol.stats.naccept
+        @test with.sol[1:3, :] ≈ Array(without.sol) rtol = rtol
+        @test without.diagnostics == NamedTuple()
+    end
+
+    # Invalid input
+    @test_throws ArgumentError toy_model(; accumulated=(:not_a_diagnostic,))
+    @test_throws ArgumentError toy_model(; u0=[u0_toy; 0.0])
+    @test_throws ArgumentError EvaporationModel.solve!(toy_model(); abstol=fill(1e-6, 6))
+
+    # Datacube: states at all saved times, window means at all but the last
+    model = toy_model()
+    EvaporationModel.solve!(model; alg=Tsit5(), yaxarray_output=true)
+    @test all(v -> length(v) == length(saveat_toy), values(model.output.cubes))
+    @test all(isfinite, model.output.w_1)
+    @test all(isfinite, model.output.λE_tot[1:(end - 1)]) && isnan(model.output.λE_tot[end])
 end

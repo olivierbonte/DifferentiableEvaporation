@@ -24,8 +24,8 @@ FT = Float64
 site = "DE-Tha"
 file_ec = datadir("exp_pro", "eddy_covariance", "experimental", site * "_ICOS_HH_2023-2024.nc")
 # Forcings: constant piecewise interpolation
-forcings, t_unix, ds_ec = site_forcing(file_ec; FT=FT) # t_unix: local standard time
-time_ec = ds_ec.time.val
+forcings, times, ds_ec = site_forcing(file_ec; FT=FT) # local standard time
+time_ec = ds_ec.time.val # start of the half-hours windows
 
 ## Simulation of 2023 (spin-up) and 2024 with adaptive implicit Euler
 param = site_parameters(site)
@@ -33,9 +33,9 @@ u0 = [param.w_fc, param.w_fc, 0.0] # w_1, w_2, w_r: wet soil on 1 January, spin-
 model = ProcessBasedModel{FT}(;
     forcings=forcings,
     parameters=param,
-    t_span=(t_unix[1], t_unix[end]),
+    t_span=times.span,
     u0=u0,
-    saveat=t_unix,
+    saveat=times.bounds,
     thresholds=KavetskiSmoothing(),
 )
 initialize!(model)
@@ -47,11 +47,11 @@ println(model.sol.retcode, ", number of steps: ", length(model.sol.t), " saved, 
     model.sol.stats.naccept, " accepted")
 @assert SciMLBase.successful_retcode(model.sol) "Solver failed: $(model.sol.retcode)"
 
-## Energy balance components of the model
-diagnostics = model.diagnostics.saveval
-λE_mod = [d.λE_tot for d in diagnostics]
-H_mod = [d.H_tot for d in diagnostics]
-A_mod = [d.R_nc + d.R_ns - d.G for d in diagnostics] # available energy, Rₙ - G
+## Energy balance components of the model: means over the half-hours
+λE_mod = model.diagnostics.λE_tot
+H_mod = model.diagnostics.H_tot
+# Available energy Rₙ - G, with Rₙ constant over each half-hour
+A_mod = forcings.R_n.(times.stamps) .- model.diagnostics.G
 
 ## Observed energy balance components
 # Uncorrected (F_MDS) and energy balance corrected (CORR) fluxes
