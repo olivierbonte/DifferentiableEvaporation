@@ -10,73 +10,22 @@ using DrWatson
 using ADTypes
 using CairoMakie
 using ComponentArrays
-using DataInterpolations
 using Dates
 using ErrorMetrics
 using EvaporationModel
-using NetCDF
 using OrdinaryDiffEq
 using OrdinaryDiffEq: SciMLBase
 using Statistics
 using YAXArrays
 
+include(srcdir("site_data.jl")) # site_forcing, site_parameters
+
 FT = Float64
 site = "DE-Tha"
 file_ec = datadir("exp_pro", "eddy_covariance", "experimental", site * "_ICOS_HH_2023-2024.nc")
-ds_ec = readcubedata(open_dataset(file_ec))
+# Forcings: constant piecewise interpolation
+forcings, t_unix, ds_ec = site_forcing(file_ec; FT=FT) # t_unix: local standard time
 time_ec = ds_ec.time.val
-t_unix = datetime2unix.(time_ec) # local standard time, as `seconds_since_solar_noon` expects
-
-## Forcings: constant piecewise interpolation
-forcing(x) = ConstantInterpolation(FT.(collect(x)), t_unix; dir=:left)
-forcings = (
-    R_n=forcing(ds_ec.Rnet),
-    T_a=forcing(ds_ec.Tair),
-    p_a=forcing(ds_ec.Psurf),
-    u_a=forcing(ds_ec.Wind),
-    VPD_a=forcing(ds_ec.VPD .* 100), # hPa -> Pa
-    P=forcing(ds_ec.Precip),
-    SW_in=forcing(ds_ec.SWdown),
-    LAI=forcing(ds_ec.LAI),
-    lon=ds_ec.longitude[1],
-    utc_offset=FT(NetCDF.ncgetatt(file_ec, "time", "UTC_offset")),
-)
-
-"""
-    site_parameters(site; vegtype)
-
-Model parameters of a site, with ISBA coefficients from the clay pedotransfer functions
-(as in `2025_egu_figures.jl`).
-"""
-function site_parameters(site; vegtype=EvergreenNeedleleafTrees(), FT=Float64)
-    ds_soil = open_dataset(datadir("exp_pro", "soil", site * "_total_agg.nc"))
-    soil = Dict(v => FT(ds_soil[v][1]) for v in propertynames(ds_soil))
-    ds_ec = open_dataset(datadir("exp_pro", "eddy_covariance", site * ".nc"))
-    veg = VegetationParameters(; vegtype=vegtype)
-    clay = soil[:mean_clay_percentage]
-    d_1 = FT(0.01) # normalization depth of the surface layer [m]
-    return ComponentArray(;
-        h=FT(ds_ec.canopy_height[1]),
-        z_0ms=FT(0.01),
-        w_sat=soil[:w_sat],
-        a=compute_a(clay),
-        p_soil=compute_p(clay),
-        b=compute_b(Clay(), clay),
-        C_1sat=c_1sat(NoilhanMahfouf96(), clay, d_1),
-        C_2ref=c_2ref(clay),
-        C_3=c_3(clay),
-        d_1=d_1,
-        d_2=soil[:root_depth],
-        w_res=soil[:w_res],
-        w_wp=soil[:w_wp],
-        w_fc=soil[:w_fc],
-        z_obs=FT(ds_ec.reference_height[1]),
-        kB⁻¹=FT(log(10)),
-        g_d=FT(veg.g_d),
-        r_smin=FT(veg.r_smin),
-        k_ext=FT(0.5),
-    )
-end
 
 ## Simulation of 2023 (spin-up) and 2024 with adaptive implicit Euler
 param = site_parameters(site)

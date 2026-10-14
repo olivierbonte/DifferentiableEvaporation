@@ -11,42 +11,13 @@ using OrdinaryDiffEq
 using Statistics
 using YAXArrays
 
-include(projectdir("notebooks", "explorative", "real_forcings.jl")) # forcings_real, t_unix, ds_ec_sel
+include(srcdir("site_data.jl")) # site_forcing, site_parameters
 
-"""
-    site_parameters(site; vegtype)
-
-Model parameters of a site, with ISBA coefficients from the clay pedotransfer functions.
-"""
-function site_parameters(site; vegtype=EvergreenNeedleleafTrees(), FT=Float64)
-    ds_soil = open_dataset(datadir("exp_pro", "soil", site * "_total_agg.nc"))
-    soil = Dict(v => FT(ds_soil[v][1]) for v in propertynames(ds_soil))
-    ds_ec = open_dataset(datadir("exp_pro", "eddy_covariance", site * ".nc"))
-    veg = VegetationParameters(; vegtype=vegtype)
-    clay = soil[:mean_clay_percentage]
-    d_1 = FT(0.01) # normalization depth of the surface layer [m]
-    return ComponentArray(;
-        h=FT(ds_ec.canopy_height[1]),
-        z_0ms=FT(0.01),
-        w_sat=soil[:w_sat],
-        a=compute_a(clay),
-        p_soil=compute_p(clay),
-        b=compute_b(Clay(), clay),
-        C_1sat=c_1sat(NoilhanMahfouf96(), clay, d_1),
-        C_2ref=c_2ref(clay),
-        C_3=c_3(clay),
-        d_1=d_1,
-        d_2=soil[:root_depth],
-        w_res=soil[:w_res],
-        w_wp=soil[:w_wp],
-        w_fc=soil[:w_fc],
-        z_obs=FT(ds_ec.reference_height[1]),
-        kB⁻¹=FT(log(10)),
-        g_d=FT(veg.g_d),
-        r_smin=FT(veg.r_smin),
-        k_ext=FT(0.5),
-    )
-end
+FT = Float64
+site = "BE-Bra"
+forcings_real, t_unix, ds_ec_sel = site_forcing(
+    site_ec_file(site), DateTime(2010, 3, 15), DateTime(2010, 3, 25)
+)
 
 ## Simulations
 param = site_parameters(site)
@@ -110,7 +81,7 @@ println("cor(λE IEₐ, λE observed) = ", cor(λE_ie, λE_obs))
 figdir(args...) = projectdir("figures", args...)
 mkpath(figdir())
 cm = 37.8 #1cm = 37.8 px
-time_plot = collect(unix2datetime.(t_unix)) # plain Vector: t_unix is a DimVector
+time_plot = collect(unix2datetime.(t_unix))
 precip_plot_mm_h = collect(forcings_real.P.(t_unix)) * 3600 #kg/(m²s) -> mm/h
 state_labels = ["w₁ [-]", "w₂ [-]", "wᵣ [kg/m²]"]
 state_ylims = (0, maximum(model_ie.sol[1, :]) * 1.5)
