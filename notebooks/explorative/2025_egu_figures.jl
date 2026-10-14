@@ -81,7 +81,7 @@ println("cor(λE IEₐ, λE observed) = ", cor(λE_ie, λE_obs))
 figdir(args...) = projectdir("figures", args...)
 mkpath(figdir())
 cm = 37.8 #1cm = 37.8 px
-time_plot = unix2datetime.(t_unix)
+time_plot = collect(unix2datetime.(t_unix))
 precip_plot_mm_h = collect(forcings_real.P.(t_unix)) * 3600 #kg/(m²s) -> mm/h
 state_labels = ["w₁ [-]", "w₂ [-]", "wᵣ [kg/m²]"]
 state_ylims = (0, maximum(model_ie.sol[1, :]) * 1.5)
