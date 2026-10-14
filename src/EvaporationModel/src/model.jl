@@ -14,6 +14,11 @@ The ODE state is `u0 = [w_1, w_2, w_r]` plus one accumulator per diagnostic in `
 [CVODES](https://sundials.readthedocs.io/en/latest/cvodes/Mathematics_link.html#pure-quadrature-integration),
 left out of the error control (see [`state_tolerances`](@ref)).
 
+The states are saved at ``t_k = `` `saveat[k]`, ``k = 1, …, n + 1``, and the accumulated
+diagnostics are averaged over the windows ``[t_k, t_{k+1}]``, ``k = 1, …, n``: no window
+starts at the last time ``t_{n+1}`` (e.g. one forcing time step after the last forcing time
+stamp).
+
 `solver_kwargs` (default `abstol = reltol = 1e-6`, as SUMMA-SUNDIALS,
 [Spiteri et al., 2024](https://doi.org/10.1029/2024MS004256)) are stored in `model.prob` and
 used by [`solve!`](@ref); keyword arguments of `solve!` take precedence.
@@ -124,10 +129,11 @@ end
 """
     solve!(model::ProcessBasedModel; yaxarray_output=false, kwargs...)
 
-Solve the model and store the [`window_means`](@ref) of the accumulated diagnostics in
-`model.diagnostics`. `kwargs` (e.g. `alg`, `callback`, `d_discontinuities`) are passed to
-`OrdinaryDiffEq.solve`. `yaxarray_output=true` stores states and window means (stamped at the
-window start) in a YAXArrays `Dataset` in `model.output`; off by default as it interferes with AD.
+Solve the model, saving the states at `model.saveat`, and store the [`window_means`](@ref)
+of the accumulated diagnostics in `model.diagnostics`. `kwargs` (e.g. `alg`, `callback`,
+`d_discontinuities`) are passed to `OrdinaryDiffEq.solve`. `yaxarray_output=true` stores the
+states and window means in a YAXArrays `Dataset` in `model.output`; off by default as it
+interferes with AD.
 
 Implicit solvers take their Jacobian from ForwardDiff, `ImplicitEuler(; autodiff=AutoForwardDiff())`,
 or Enzyme, `ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=EvaporationModel.Enzyme.Duplicated))`
@@ -148,8 +154,8 @@ end
     output_dataset(model::ProcessBasedModel)
 
 Datacube (YAXArrays `Dataset`) of the solution: one variable per physical state and
-accumulated diagnostic, on the time axis of the saved times ``t_k``. Each variable has a
-`description` property of how it relates to ``t_k``.
+accumulated diagnostic, on the time axis of the saved times ``t_k`` (`model.saveat`). Each
+variable has a `description` property of how it relates to ``t_k``.
 """
 function output_dataset(model::ProcessBasedModel)
     time_axis = YAXArrays.time(unix2datetime.(model.sol.t))
@@ -162,8 +168,8 @@ function output_dataset(model::ProcessBasedModel)
         push!(variables, name => YAXArray((time_axis,), values, properties))
     end
 
-    # Accumulated diagnostics: means over the window that starts at the time stamp, as for
-    # eddy covariance data. No window starts at the last time stamp, hence a NaN there.
+    # Accumulated diagnostics: means over the window that starts at the time stamp. No
+    # window starts at the last time stamp, hence a NaN there.
     for (name, means) in pairs(model.diagnostics)
         values = vcat(means, NaN)
         properties = Dict{String,Any}(
@@ -182,7 +188,8 @@ end
     window_means(model::ProcessBasedModel)
 
 Means of the `accumulated` diagnostics (the last states of `sol`) over the windows between
-consecutive saved times: entry `k` is the mean over `[sol.t[k], sol.t[k+1]]`.
+consecutive saved times: entry `k`, for `k = 1, …, length(sol.t) - 1`, is the mean over
+`[sol.t[k], sol.t[k+1]]`.
 """
 function window_means(sol, accumulated::Tuple{Vararg{Symbol}})
     first_state = sol.u[1] # all saved states have the same length

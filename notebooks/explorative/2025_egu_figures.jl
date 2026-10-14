@@ -15,7 +15,7 @@ include(srcdir("site_data.jl")) # site_forcing, site_parameters
 
 FT = Float64
 site = "BE-Bra"
-forcings_real, t_unix, ds_ec_sel = site_forcing(
+forcings_real, times, ds_ec_sel = site_forcing(
     site_ec_file(site), DateTime(2010, 3, 15), DateTime(2010, 3, 25)
 )
 
@@ -26,9 +26,9 @@ function site_model()
     model = ProcessBasedModel{FT}(;
         forcings=forcings_real,
         parameters=param,
-        t_span=(t_unix[1], t_unix[end]),
+        t_span=times.span,
         u0=u0,
-        saveat=t_unix,
+        saveat=times.bounds,
         thresholds=KavetskiSmoothing()
     )
     initialize!(model)
@@ -63,7 +63,7 @@ function clipping_callback(model)
     end
     return DiscreteCallback(Returns(true), affect!; save_positions=(false, false))
 end
-dt = t_unix[2] - t_unix[1]
+dt = times.stamps[2] - times.stamps[1]
 model_ee = site_model()
 EvaporationModel.solve!(
     model_ee; alg=Euler(), dt=dt, adaptive=false, callback=clipping_callback(model_ee)
@@ -72,8 +72,9 @@ for model in (model_ie, model_ee)
     println(model.sol.alg, ": ", model.sol.retcode)
 end
 
-λE_ie = [d.λE_tot for d in model_ie.diagnostics.saveval]
-λE_ee = [d.λE_tot for d in model_ee.diagnostics.saveval]
+# Mean λE over the windows [t_k, t_k+1], stamped at the window start as the observations
+λE_ie = model_ie.diagnostics.λE_tot
+λE_ee = model_ee.diagnostics.λE_tot
 λE_obs = collect(ds_ec_sel.Qle_cor[:])
 println("cor(λE IEₐ, λE observed) = ", cor(λE_ie, λE_obs))
 
@@ -81,8 +82,8 @@ println("cor(λE IEₐ, λE observed) = ", cor(λE_ie, λE_obs))
 figdir(args...) = projectdir("figures", args...)
 mkpath(figdir())
 cm = 37.8 #1cm = 37.8 px
-time_plot = collect(unix2datetime.(t_unix))
-precip_plot_mm_h = collect(forcings_real.P.(t_unix)) * 3600 #kg/(m²s) -> mm/h
+time_plot = unix2datetime.(times.stamps)
+precip_plot_mm_h = forcings_real.P.(times.stamps) * 3600 #kg/(m²s) -> mm/h
 state_labels = ["w₁ [-]", "w₂ [-]", "wᵣ [kg/m²]"]
 state_ylims = (0, maximum(model_ie.sol[1, :]) * 1.5)
 colors = Makie.wong_colors()
@@ -91,8 +92,10 @@ colors = Makie.wong_colors()
 # `Makie.Axis` since ComponentArrays also exports an `Axis`.
 function plot_states!(pos, sol, title; legend=true)
     ax = Makie.Axis(pos; title=title, xlabel="Time", limits=(nothing, state_ylims))
+    # States at the window bounds, including the end of the last window
+    time_states = unix2datetime.(sol.t)
     for (i, label) in enumerate(state_labels)
-        lines!(ax, time_plot, sol[i, :]; label=label)
+        lines!(ax, time_states, sol[i, :]; label=label)
     end
     legend && axislegend(ax)
     ax_precip = Makie.Axis(

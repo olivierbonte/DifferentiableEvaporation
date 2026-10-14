@@ -99,4 +99,11 @@ end
     @test_throws ArgumentError toy_model(; accumulated=(:not_a_diagnostic,))
     @test_throws ArgumentError toy_model(; u0=[u0_toy; 0.0])
     @test_throws ArgumentError EvaporationModel.solve!(toy_model(); abstol=fill(1e-6, 6))
+
+    # Datacube: states at all saved times, window means at all but the last
+    model = toy_model()
+    EvaporationModel.solve!(model; alg=Tsit5(), yaxarray_output=true)
+    @test all(v -> length(v) == length(saveat_toy), values(model.output.cubes))
+    @test all(isfinite, model.output.w_1)
+    @test all(isfinite, model.output.λE_tot[1:(end - 1)]) && isnan(model.output.λE_tot[end])
 end
