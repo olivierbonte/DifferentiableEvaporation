@@ -8,6 +8,7 @@ import pandas as pd
 import xarray as xr
 from conf import conf_module, logger
 from timezonefinder import TimezoneFinder
+from utils import knn_gapfill
 
 
 def main():
@@ -38,7 +39,36 @@ def main():
             files,
             compat="no_conflicts",
         )
-        ds_ec_sel = ds_ec.sel(time=slice(str(start_year), str(end_year)))
+        ds_ec_sel = ds_ec.sel(time=slice(str(start_year), str(end_year))).load()
+
+        # Gap fill net radiation as in FluxDataKit (KNN on temperature and radiation)
+        # Deviation from FluxDataKit: SWdown instead of PPFD as radiation predictor, since
+        # PPFD is not available in the FluxDataKit LSM data. SWdown as proxy for PPFD.
+        logger.info(
+            f"Missing net radiation data fraction: {float(ds_ec_sel.Rnet.isnull().mean()):.3f}"
+        )
+        df_rnet = ds_ec_sel[["Rnet", "Tair", "SWdown"]].isel(x=0, y=0).to_pandas()
+        rnet_filled, rnet_to_fill = knn_gapfill(df_rnet, "Rnet", ["Tair", "SWdown"], k=5)
+        rnet_attrs = ds_ec_sel.Rnet.attrs
+        rnet_qc_attrs = ds_ec_sel.Rnet_qc.attrs
+        ds_ec_sel["Rnet"] = ds_ec_sel.Rnet.copy(
+            data=rnet_filled.values.astype(ds_ec_sel.Rnet.dtype).reshape(
+                ds_ec_sel.Rnet.shape
+            )
+        )
+        ds_ec_sel["Rnet_qc"] = ds_ec_sel.Rnet_qc.where(
+            ~rnet_to_fill.values.reshape(ds_ec_sel.Rnet_qc.shape), 6
+        )
+        ds_ec_sel["Rnet"].attrs = rnet_attrs | {
+            "Missing_%": round(100 * float(ds_ec_sel.Rnet.isnull().mean()), 1),
+            "Gap-filled_%": round(100 * float((ds_ec_sel.Rnet_qc > 0).mean()), 1),
+            "Gapfilling_method": rnet_attrs.get("Gapfilling_method", "")
+            + "; KNN (k=5) based on SWdown, Tair (fill_netrad of FluxDataKit, "
+            "with SWdown instead of PPFD)",
+        }
+        ds_ec_sel["Rnet_qc"].attrs = rnet_qc_attrs | {
+            "long_name": "Rnet quality control flag (6 = KNN gap-filled)",
+        }
 
         # Quality of input variable to model check
         for var in conf_module.input_variables:
