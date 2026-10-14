@@ -37,11 +37,11 @@ Target: backward Euler with 8–16 sub-steps per 30-min window (SUMMA uses 8–3
 - `active_thresholds` needs `λE_pc`: either return `λE_pc1` from `compute_diagnostics` or recompute it in the script.
 - `dt_study.jl`: add adaptive `Heun()` at 1e-4 and 1e-6 to `ADAPTIVE`.
 - Add `LineSearches`, `OrdinaryDiffEqNonlinearSolve` and `OrdinaryDiffEqSDIRK` to the root `Project.toml`.
-- Commit `scripts/reference/` and `docs/` so `git_info()` points at a clean commit.
+- Don't commit anything yet: run on the uncommitted working tree. `git_info()` only flags uncommitted changes in `src`, so the report's hash doesn't cover the uncommitted script changes.
 
 ### 2. Run the baseline
 
-`julia --project=. scripts/reference/dt_study.jl`. Use the BE-8 diagnostic to see where Newton fails (state, iterations, nearby thresholds).
+`julia --project=. scripts/reference/dt_study.jl`. Use the BE-8 diagnostic to see where Newton fails (state, iterations, nearby thresholds). Present the results for review before going on to step 3.
 
 ### 3. Fix BE-N failures, if any
 
@@ -68,7 +68,7 @@ Goal: BE-N accurate at N ≤ 16, ideally at N = 8.
 ## Verification
 
 - `julia --project=src/EvaporationModel -e 'using Pkg; Pkg.test()'` passes after any `src` change, including the allocation tests.
-- `dt_study.jl` runs end to end from a clean commit.
+- `dt_study.jl` runs end to end on the uncommitted working tree.
 - The smoothing bias stays within the accuracy criterion, and BE-N at N ≤ 16 meets it on all cases, or the report says why not.
 
 ## References
