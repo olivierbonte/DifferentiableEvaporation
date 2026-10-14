@@ -14,6 +14,8 @@ This is a DrWatson research project (Julia 1.12) with a nested Julia package:
 
 ## Commands
 
+On the HPC cluster, run the `loadjuliaup` alias (defined in the user's `.bashrc`) first to make `julia` available.
+
 Tests (from repo root; mirrors CI `julia-runtest` on `src/EvaporationModel`):
 
 ```bash
