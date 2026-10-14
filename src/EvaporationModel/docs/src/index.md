@@ -6,6 +6,18 @@ CurrentModule = EvaporationModel
 ```@contents
 Pages = ["index.md",]
 ```
+## Model
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["model.jl"]
+```
+
+## Canopy
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["canopy.jl"]
+```
+
 ## Config
 
 ```@autodocs
@@ -25,10 +37,28 @@ Modules = [EvaporationModel]
 Pages = ["ground_heat_flux.jl"]
 ```
 
+## Sensible heat
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["sensible_heat.jl"]
+```
+
 ## Soil
 ```@autodocs
 Modules = [EvaporationModel]
 Pages = ["soil.jl"]
+```
+
+## Soil fluxes
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["soil_fluxes.jl"]
+```
+
+## Threshold treatment
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["thresholds.jl"]
 ```
 
 ## Resistances
