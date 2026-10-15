@@ -1,8 +1,5 @@
 abstract type AbstractModel end
 
-"Number of physical states: `w_1`, `w_2`, `w_r`"
-const N_STATES = 3
-
 """
     ProcessBasedModel{FT}(; forcings, parameters, t_span, u0, saveat, kwargs...)
 
@@ -252,6 +249,8 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
         forcings.R_n(t),
         forcings.LAI(t),
     )
+    # A floor on a forcing, not on a state, hence a plain max (no threshold treatment)
+    u_a = max(u_a, of_value_type(u_a, U_MIN))
     d_c, z_0mc = Bigleaf.roughness_parameters(
         RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms
     )

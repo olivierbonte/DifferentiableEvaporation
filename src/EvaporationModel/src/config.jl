@@ -1,7 +1,20 @@
+## Model settings
+"Number of physical states: `w_1`, `w_2`, `w_r`"
+const N_STATES = 3
+
+"""
+Minimum wind speed [m s⁻¹], as in CLM5
+([Lawrence et al., 2020](https://www2.cesm.ucar.edu/models/cesm2/land/CLM50_Tech_Note.pdf),
+Eq. 5.24). 0 windspeed gives a friction velocity of 0 [@ref ustar_min], which then gives 0/0
+in the aerodynamic resistance calculation (see [`Bigleaf.compute_Ram`](
+https://earthyscience.github.io/Bigleaf.jl/stable/aerodynamic_conductance/#Bigleaf.compute_Ram))
+"""
+const U_MIN = 1.0
+
 ## Vegetation parameters
 # Define vegeteation types as Julia structs
 """
-    VegetationType 
+    VegetationType
 
 Abstract type defined to represent different types of vegetation.
 
@@ -32,10 +45,10 @@ struct WaterAndLandMixtures <: VegetationType end
 """
     get_default_value(vegtype::VegetationType)
 
-Assign default values for minimal stomatal resistance (`r_smin`) and coefficient relating 
-vapour pressure deficit to stomatal resistance (`g_d`) based on vegetation type. 
+Assign default values for minimal stomatal resistance (`r_smin`) and coefficient relating
+vapour pressure deficit to stomatal resistance (`g_d`) based on vegetation type.
 
-The values come from Table 8.1 of the 
+The values come from Table 8.1 of the
 [IFS Cy49r1 documentation Part IV: Phyiscal processes](https://doi.org/10.21957/c731ee1102).
 Not part of public API, only used in [`VegetationParameters`](@ref VegetationParameters).
 """
@@ -77,7 +90,7 @@ The fields are:
 - `r_smin`: Minimum stomatal resistance [s/m]
 - `g_d`: Coefficient relating vapour pressure deficit to stomatal resistance [Pa⁻¹]
 
-Based on [`get_default_value`](@ref get_default_value) function, values of `r_smin` and `g_d` 
+Based on [`get_default_value`](@ref get_default_value) function, values of `r_smin` and `g_d`
 are set based on `vegtype`. Default values can be overridden by passing them as keyword arguments.
 
 ## Examples
@@ -86,7 +99,7 @@ using EvaporationModel
 # Get default parameters
 params_default = VegetationParameters(vegtype=Crops())
 # Adapt a default value
-params = VegetationParameters(vegtype=Crops(), r_smin=300.0) 
+params = VegetationParameters(vegtype=Crops(), r_smin=300.0)
 params.r_smin == 300.0
 
 # output
