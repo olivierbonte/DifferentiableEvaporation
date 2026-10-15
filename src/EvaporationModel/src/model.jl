@@ -296,8 +296,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     )
     VPD_m1 = vpd_veg_source_height(VPD_a, T_a, p_a, A, λE_tot1, r_aa)
     _, λE_pc1 = penman_monteith(T_a, p_a, VPD_m1, A_c, r_ac, of_value_type(f_wet, 0))
-    g_cond = step_function(thresholds, λE_pc1, zero(λE_pc1), flux_scale(thresholds))
-    f_wet_eff = fraction_wet_vegetation_with_condensation(f_wet, λE_pc1, thresholds)
+    f_wet_eff = fraction_wet_vegetation_with_condensation(f_wet, λE_pc1)
     # Second solve, always evaluated (avoid branching): equal to the first when f_wet_eff = f_wet
     λE_tot, λE_tot_p = total_evaporation(
         T_a,

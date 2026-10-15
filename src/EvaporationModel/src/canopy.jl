@@ -63,18 +63,22 @@ function fraction_wet_vegetation(w_r, w_rmax, t=HardThresholds())
 end
 
 """
-    fraction_wet_vegetation_with_condensation(f_wet, λE_pc, t=HardThresholds())
+    fraction_wet_vegetation_with_condensation(f_wet, λE_pc)
 
 Effective wet fraction of the canopy, ``f_{wet,eff} = f_{wet} + (1 - f_{wet})(1 - g)``, with
-``g`` = [`step_function`](@ref) of the potential canopy latent heat flux `λE_pc` [W m⁻²]
-(Penman-Monteith with zero surface resistance) under the threshold treatment `t`.
+``g`` the Heaviside step of the potential canopy latent heat flux `λE_pc` [W m⁻²]
+(Penman-Monteith with zero surface resistance).
 
 When the canopy condenses (``λE_{pc} < 0``, so ``g = 0``), ``f_{wet} = 1``: there
 is no transpiration and the dew goes into the interception store. Otherwise
 ``f_{wet,eff} = f_{wet}``.
+
+The step is hard for every threshold treatment. A smoothed step would leave
+``f_{wet,eff} > f_{wet}`` while the canopy evaporates (``λE_{pc} > 0``), an interception loss
+that is not bounded by the canopy store, which then drains below zero.
 """
-function fraction_wet_vegetation_with_condensation(f_wet, λE_pc, t=HardThresholds())
-    g = step_function(t, λE_pc, zero(λE_pc), flux_scale(t))
+function fraction_wet_vegetation_with_condensation(f_wet, λE_pc)
+    g = step_function(HardThresholds(), λE_pc, zero(λE_pc), false)
     return f_wet + (1 - f_wet) * (1 - g)
 end
 
