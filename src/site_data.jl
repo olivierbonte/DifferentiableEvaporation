@@ -18,7 +18,7 @@ Forcing of an eddy-covariance `file` at the time stamps ``t_1, …, t_n`` betwee
 and `end_date` (inclusive; the whole file by default), with constant piecewise interpolation
 (`ConstantInterpolation`, `dir=:left`: the value stamped ``t_k`` holds on ``[t_k, t_{k+1})``).
 The last value holds on ``[t_n, t_n + Δt]``, with ``Δt = t_n - t_{n-1}`` the (regular) time
-step of the forcing. Returns `(forcings, times, ds)`: the forcing NamedTuple, the times
+step of the forcing, and beyond. Returns `(forcings, times, ds)`: the forcing NamedTuple, the times
 (local standard time, unix seconds) and the selected dataset (for observations), with `times`
 a NamedTuple of
 - `stamps`: the time stamps ``t_1, …, t_n`` of `ds`, the starts of the windows;
@@ -34,8 +34,12 @@ function site_forcing(
     t = datetime2unix.(collect(ds.time.val)) # plain Vector, without the time lookup
     t_end = t[end] + (t[end] - t[end-1]) # end of the last window
     times = (; stamps=t, bounds=[t; t_end], span=(t[1], t_end))
-    # Extra knot at the end of the last window, with the last value
-    forcing(x) = ConstantInterpolation([FT.(vec(x)); FT(x[end])], times.bounds; dir=:left)
+    # Extra knot at the end of the last window, with the last value.
+    # Extrapolate last value beyond end of last window (needed for some adaptive timesteppers)
+    forcing(x) = ConstantInterpolation(
+        [FT.(vec(x)); FT(x[end])], times.bounds;
+        dir=:left, extrapolation_right=ExtrapolationType.Constant,
+    )
     forcings = (
         R_n=forcing(ds.Rnet[:]),
         T_a=forcing(ds.Tair[:]),
