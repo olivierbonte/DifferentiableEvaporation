@@ -1,0 +1,37 @@
+---
+title: "Differentiable Evaporation Model: draft structure for paper"
+author:
+    - name: Olivier Bonte
+      corresponding: true
+      affiliations:
+        - name: Ghent University
+          department: Department of Environment, Hydro-Climate Extremes Lab
+    - name: Brian Groenke
+    - name: Maximilian Gelbrecht
+    - name: Diego G. Miralles
+    - name: Niko E. C. Verhoest
+format:
+    pdf:
+        documentclass: article 
+        toc: true
+        number-sections: true
+editor: 
+    render-on-save: true
+abstract: |
+    This is a draft structure for the paper on the differentiable evaporation model.
+---
+
+# Introduction
+
+# Methods
+
+## Model description
+
+
+# Results
+
+# Discussion
+
+# Conclusion
+
+# Appendix {.unnumbered}
