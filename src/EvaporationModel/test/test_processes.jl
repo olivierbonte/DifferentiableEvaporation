@@ -20,6 +20,18 @@
     for x in (-1.0, 0.0, 0.5, 1.0, 2.0)
         @test 0 <= clamp(smooth, x, 0.0, 1.0, s) <= 1 + s / 2
     end
+    # nonneg_pow: zero below zero when hard, finite slope at zero when smoothed
+    @test nonneg_pow(hard, -0.1, 2 / 3, moisture_scale(hard)) == 0
+    @test nonneg_pow(hard, 0.5, 2 / 3, moisture_scale(hard)) == 0.5^(2 / 3)
+    @test 0 < nonneg_pow(smooth, -0.1, 2 / 3, moisture_scale(smooth)) < 1e-3
+    @test isfinite(
+        derivative(x -> nonneg_pow(smooth, x, 2 / 3, moisture_scale(smooth)), AutoForwardDiff(), 0.0)
+    )
+    # Unphysical negative w_2: no runoff, and w_geq stays w_2 (both powers vanish)
+    for t in treatments
+        @test surface_runoff(StaticInfiltration(), P_s, -0.01, w_sat, t) < 1e-3 * P_s
+        @test w_geq(-0.01, w_sat, 0.15, 6.0, t) ≈ -0.01 atol = 1e-6
+    end
     # Smoothed f_wet has a finite slope at w_r = 0 (the hard 2/3 power does not)
     w_rmax = 0.6
     @test isfinite(

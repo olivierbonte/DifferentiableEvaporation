@@ -49,18 +49,16 @@ end
     fraction_wet_vegetation(w_r, w_rmax, t=HardThresholds())
 
 Fraction of the foliage covered with water ``f_{wet} = (w_r / w_{rmax})^{2/3}`` [-], from
-[Deardorff (1978)](https://doi.org/10.1029/JC083iC04p01889), with `w_r` clipped at zero and
-``f_{wet}`` at one.
+[Deardorff (1978)](https://doi.org/10.1029/JC083iC04p01889), with the power taken by
+[`nonneg_pow`](@ref) (zero for ``w_r < 0``) and ``f_{wet}`` capped at one.
 
-With [`KavetskiSmoothing`](@ref), the clip at zero is a smooth maximum (so the 2/3 power
-stays defined, with a finite slope) times the [`bound_kernel`](@ref) at zero, and the
-cap at one is a smooth minimum. The kernel makes ``f_{wet} = 0`` at ``w_r = 0``.
+With [`KavetskiSmoothing`](@ref), the power is multiplied by the [`bound_kernel`](@ref) at
+zero, so ``f_{wet} = 0`` at ``w_r = 0``, and the cap at one is a smooth minimum.
 """
 function fraction_wet_vegetation(w_r, w_rmax, t=HardThresholds())
     s = storage_scale(t, w_rmax)
-    w_r⁺ = max(t, w_r, zero(w_r), s)
     kernel = bound_kernel(t, LowerBound(), w_r, zero(w_r), s) # f_wet = 0 at w_r = 0
-    f_wet = (w_r⁺ / w_rmax)^of_value_type(w_r, 2 / 3) * kernel
+    f_wet = nonneg_pow(t, w_r / w_rmax, of_value_type(w_r, 2 / 3), s / w_rmax) * kernel
     return min(t, f_wet, one(f_wet), factor_scale(t))
 end
 

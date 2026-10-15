@@ -3,25 +3,37 @@ struct StaticInfiltration <: InfiltrationMethod end
 struct VegetationInfiltration <: InfiltrationMethod end
 
 """
-    surface_runoff(::StaticInfiltration, P_s, w_2, w_sat, p_inf=2)
-    surface_runoff(::VegetationInfiltration, P_s, w_2, w_sat, f_veg, s_inf=3)
+    surface_runoff(::StaticInfiltration, P_s, w_2, w_sat, t=HardThresholds(); p_inf=2)
+    surface_runoff(::VegetationInfiltration, P_s, w_2, w_sat, f_veg, t=HardThresholds(); s_inf=3)
 
 Bergström β-function surface runoff ``Q_s = (w_2 / w_{sat})^{p} P_s`` on the precipitation
 reaching the soil `P_s`, see Eq. 1 of [Trautmann et al. (2022)](https://doi.org/10.5194/hess-26-1089-2022).
-With `VegetationInfiltration`, ``p = s_{inf} f_{veg}``.
+With `VegetationInfiltration`, ``p = s_{inf} f_{veg}``. An unphysical negative `w_2` gives no
+runoff, through [`nonneg_pow`](@ref) under the threshold treatment `t`.
 """
 function surface_runoff(
-    approach::StaticInfiltration, P_s, w_2, w_sat, p_inf=of_value_type(w_sat, 2)
+    approach::StaticInfiltration,
+    P_s,
+    w_2,
+    w_sat,
+    t=HardThresholds();
+    p_inf=of_value_type(w_sat, 2),
 )
-    Q_s = (w_2 / w_sat)^p_inf * P_s
+    Q_s = nonneg_pow(t, w_2 / w_sat, p_inf, moisture_scale(t) / w_sat) * P_s
     return Q_s
 end
 
 function surface_runoff(
-    approach::VegetationInfiltration, P_s, w_2, w_sat, f_veg, s_inf=of_value_type(f_veg, 3)
+    approach::VegetationInfiltration,
+    P_s,
+    w_2,
+    w_sat,
+    f_veg,
+    t=HardThresholds();
+    s_inf=of_value_type(f_veg, 3),
 )
     p_inf = f_veg * s_inf
-    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat, p_inf)
+    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat, t; p_inf)
     return Q_s
 end
 

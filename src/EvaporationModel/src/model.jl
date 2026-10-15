@@ -258,7 +258,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     w_rmax = max_canopy_capacity(LAI)
     f_wet = fraction_wet_vegetation(w_r, w_rmax, thresholds)
 
-    w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
+    w_1eq = w_geq(w_2, w_sat, a, p_soil, thresholds) #no allocs
     C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp, thresholds) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
@@ -331,7 +331,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     P_c = canopy_input(P, f_veg)
     D_c = canopy_drainage(P, w_r, f_veg, k_ext)
     P_s = precip_below_canopy(P, P_c, D_c)
-    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat)
+    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat, thresholds)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2, thresholds)
     I_s = P_s - Q_s

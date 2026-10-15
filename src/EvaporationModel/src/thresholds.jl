@@ -139,6 +139,16 @@ step_function(::HardThresholds, x, x_0, s) = ifelse(x > x_0, one(x), zero(x))
 step_function(::KavetskiSmoothing, x, x_0, s) = logistic_step(x, x_0, s)
 
 """
+    nonneg_pow(t::ThresholdTreatment, x, exponent, s)
+
+``\\max(x, 0)^{exponent}`` for `exponent > 0`, so an unphysical negative `x` (e.g. a
+negative soil moisture ratio) gives zero instead of a `DomainError`. The clip at zero is a
+[`smooth_max`](@ref) with scale `s` for [`KavetskiSmoothing`](@ref), which keeps the power
+defined with a finite slope, and is ``(s/2)^{exponent}`` at ``x = 0``.
+"""
+nonneg_pow(t::ThresholdTreatment, x, exponent, s) = max(t, x, zero(x), s)^exponent
+
+"""
     bound_kernel(t::ThresholdTreatment, side::BoundSide, x, bound, s)
 
 Factor on the outflux of a store `x` that keeps it on the `side` of `bound`

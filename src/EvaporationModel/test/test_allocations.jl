@@ -36,11 +36,13 @@
     end
 
     @testset "soil_fluxes.jl" begin
-        @test (@ballocations surface_runoff(StaticInfiltration(), $P_s, $w_2, $w_fc)) == 0
-        @test (@ballocations surface_runoff(
-            VegetationInfiltration(), $P_s, $w_2, $w_fc, $f_veg
-        )) == 0
-        @test isempty(check_allocs(c_1, (FT, FT, FT, FT, FT)))
+        for t in treatments
+            @test (@ballocations surface_runoff(StaticInfiltration(), $P_s, $w_2, $w_sat, $t)) ==
+                0
+            @test (@ballocations surface_runoff(
+                VegetationInfiltration(), $P_s, $w_2, $w_sat, $f_veg, $t
+            )) == 0
+        end
         @test isempty(check_allocs(surface_infiltration_factor, (FT, FT)))
         @test isempty(check_allocs(diffusion_layer_1, (FT, FT, FT)))
         @test isempty(check_allocs(vertical_drainage_layer_2, (FT, FT, FT, FT)))
