@@ -37,11 +37,12 @@ This is the continuous counterpart of the clip of `w_g` at `w_sat` in SURFEX
 which produces no runoff: `w_1` is not a water store, it only represent as thin surface layer.
 `w_2` still receives all of `I_s`and the water balance is unchanged.
 The kernel is the exponential smoothing kernel of Eq. 20 in
-[Kavetski & Kuczera (2007)](https://doi.org/10.1029/2006WR005195) (see [`smoothing_kernel`](@ref))
+[Kavetski & Kuczera (2007)](https://doi.org/10.1029/2006WR005195) (see [`exponential_kernel`](@ref)).
+It is always smooth, whatever the threshold treatment: a model formulation, not a threshold.
 `m_1` [m³ m⁻³] sets the width of the transition.
 """
 function surface_infiltration_factor(w_1, w_sat, m_1=of_value_type(w_1, 0.01))
-    return smoothing_kernel(UpperBound(), w_1, w_sat, m_1)
+    return exponential_kernel(UpperBound(), w_1, w_sat, m_1)
 end
 
 function diffusion_layer_1(w_1, w_1eq, C_2)

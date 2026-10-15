@@ -6,6 +6,15 @@
     @test step_function(hard, -1.0, 0.0, flux_scale(hard)) == 0
     @test step_function(hard, 1.0, 0.0, flux_scale(hard)) == 1
     @test step_function(smooth, 0.0, 0.0, flux_scale(smooth)) == 0.5
+    # Bound kernel: one when hard; zero at the bound, close to one inside, negative beyond
+    for side in (LowerBound(), UpperBound())
+        @test bound_kernel(hard, side, -1.0, 0.0, 0.1) == 1
+        @test bound_kernel(smooth, side, 0.0, 0.0, 0.1) == 0
+    end
+    @test bound_kernel(smooth, LowerBound(), 1.0, 0.0, 0.1) > 0.99
+    @test bound_kernel(smooth, LowerBound(), -0.1, 0.0, 0.1) < 0
+    @test bound_kernel(smooth, UpperBound(), -1.0, 0.0, 0.1) > 0.99
+    @test bound_kernel(smooth, UpperBound(), 0.1, 0.0, 0.1) < 0
     # The smooth clamp never drops below the lower bound, and exceeds the upper by < s/2
     s = factor_scale(smooth)
     for x in (-1.0, 0.0, 0.5, 1.0, 2.0)

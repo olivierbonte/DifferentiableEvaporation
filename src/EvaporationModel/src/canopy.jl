@@ -52,14 +52,15 @@ Fraction of the foliage covered with water ``f_{wet} = (w_r / w_{rmax})^{2/3}`` 
 [Deardorff (1978)](https://doi.org/10.1029/JC083iC04p01889), with `w_r` clipped at zero and
 ``f_{wet}`` at one.
 
-With [`KavetskiSmoothing`](@ref), the clip at zero is a smooth maximum (so the slope of the
-2/3 power stays finite) times a logistic lower-bound kernel that brings ``f_{wet}`` to zero
-below ``w_r = 0``, and the cap at one is a smooth minimum.
+With [`KavetskiSmoothing`](@ref), the clip at zero is a smooth maximum (so the 2/3 power
+stays defined, with a finite slope) times the [`bound_kernel`](@ref) at zero, and the
+cap at one is a smooth minimum. The kernel makes ``f_{wet} = 0`` at ``w_r = 0``.
 """
 function fraction_wet_vegetation(w_r, w_rmax, t=HardThresholds())
     s = storage_scale(t, w_rmax)
     w_r⁺ = max(t, w_r, zero(w_r), s)
-    f_wet = (w_r⁺ / w_rmax)^of_value_type(w_r, 2 / 3) * lower_bound_kernel(t, w_r, zero(w_r), s)
+    kernel = bound_kernel(t, LowerBound(), w_r, zero(w_r), s) # f_wet = 0 at w_r = 0
+    f_wet = (w_r⁺ / w_rmax)^of_value_type(w_r, 2 / 3) * kernel
     return min(t, f_wet, one(f_wet), factor_scale(t))
 end
 

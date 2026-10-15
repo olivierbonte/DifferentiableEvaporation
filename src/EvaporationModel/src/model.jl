@@ -341,6 +341,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
         C_1=C_1,
         f_veg=f_veg,
         λE_tot=λE_tot,
+        λE_pc=λE_pc1, # potential canopy flux of the condensation detection
         VPD_m=VPD_m,
         E_t=E_t,
         λE_t=λE_t,
