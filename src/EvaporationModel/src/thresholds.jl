@@ -60,11 +60,23 @@ logistic_step(x, x_0, m) = 1 / (1 + exp(-(x - x_0) / m))
     exponential_kernel(::UpperBound, x, bound, m)
 
 Exponential smoothing kernel, Eq. 20 of [Kavetski & Kuczera (2007)](https://doi.org/10.1029/2006WR005195).
-Zero at the bound, close to one more than a few `m` inside it and
+0 at the bound, close to 1 more than a few `m` inside the bound, and
 negative beyond it. Multiplying the outflux of a store by it bounds the store (Eq. 19).
 """
 exponential_kernel(::LowerBound, x, bound, m) = 1 - exp(-(x - bound) / m)
 exponential_kernel(::UpperBound, x, bound, m) = 1 - exp((x - bound) / m)
+
+
+"""
+    tanh_kernel(::LowerBound, x, bound, m)
+    tanh_kernel(::UpperBound, x, bound, m)
+
+Bounded smoothing kernel: 0 at the bound with slope ``1/m``, as the
+[`exponential_kernel`](@ref), close to 1 more than a few `m` inside the bound,
+and negative beyond it (but at most -1).
+"""
+tanh_kernel(::LowerBound, x, bound, m) = tanh((x - bound) / m)
+tanh_kernel(::UpperBound, x, bound, m) = tanh((bound - x) / m)
 
 ## 2. Threshold treatments and their scales
 
@@ -92,7 +104,7 @@ with scales in the units of the thresholded quantity:
 - `s_w`: soil moisture [m³ m⁻³]
 - `s_r`: canopy storage, as a fraction of `w_rmax` [-]
 - `s_f`: dimensionless factors in ``[0, 1]`` (Jarvis stress factors, `f_wet`) [-]
-- `s_E`: energy fluxes (soil net radiation, potential canopy latent heat flux) [W m⁻²]
+- `s_E`: energy fluxes [W m⁻²]
 """
 Base.@kwdef struct KavetskiSmoothing{T} <: ThresholdTreatment
     s_w::T = 1e-3
@@ -153,11 +165,11 @@ nonneg_pow(t::ThresholdTreatment, x, exponent, s) = max(t, x, zero(x), s)^expone
 
 Factor on the outflux of a store `x` that keeps it on the `side` of `bound`
 ([Kavetski & Kuczera, 2007](https://doi.org/10.1029/2006WR005195), Eq. 19): one for
-[`HardThresholds`](@ref) (the hard model bounds the store itself), the
-[`exponential_kernel`](@ref) with ``m = s`` for [`KavetskiSmoothing`](@ref), which is zero at
-the bound, so the outflux stops there. Unlike the [`logistic_step`](@ref), which is 1/2 at
-its threshold.
+[`HardThresholds`](@ref) (the hard model bounds the store itself), the [`tanh_kernel`](@ref)
+with ``m = s`` for [`KavetskiSmoothing`](@ref), which is zero at the bound, so the outflux stops
+there. Unlike the [`logistic_step`](@ref), which is 1/2 at its threshold.
+Adaptation compared to Kvaetski & Kuczera (2007): use [`tanh_kernel`](@ref) instead of
+[`exponential_kernel`](@ref).
 """
 bound_kernel(::HardThresholds, side::BoundSide, x, bound, s) = one(x)
-bound_kernel(::KavetskiSmoothing, side::BoundSide, x, bound, s) =
-    exponential_kernel(side, x, bound, s)
+bound_kernel(::KavetskiSmoothing, side::BoundSide, x, bound, s) = tanh_kernel(side, x, bound, s)

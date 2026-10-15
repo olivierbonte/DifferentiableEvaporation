@@ -15,6 +15,12 @@
     @test bound_kernel(smooth, LowerBound(), -0.1, 0.0, 0.1) < 0
     @test bound_kernel(smooth, UpperBound(), -1.0, 0.0, 0.1) > 0.99
     @test bound_kernel(smooth, UpperBound(), 0.1, 0.0, 0.1) < 0
+    # ... and bounded far beyond it (no exponential blow-up of an overshooting store)
+    @test bound_kernel(smooth, LowerBound(), -100.0, 0.0, 0.1) >= -1
+    @test bound_kernel(smooth, UpperBound(), 100.0, 0.0, 0.1) >= -1
+    # Pielke β: no soil evaporation below w_1 = 0, and NaN rather than an error for w_1 = -Inf
+    @test soil_evaporation_efficiency(Pielke92(), -0.1, 0.3, hard) == 0
+    @test isnan(soil_evaporation_efficiency(Pielke92(), -Inf, 0.3, smooth))
     # The smooth clamp never drops below the lower bound, and exceeds the upper by < s/2
     s = factor_scale(smooth)
     for x in (-1.0, 0.0, 0.5, 1.0, 2.0)
@@ -109,5 +115,14 @@ end
         @test d.λE_t ≈ 0 atol = 1e-6
         @test d.λE_i < 0
         @test d.λE_tot ≈ d.λE_t + d.λE_i + d.λE_s
+    end
+    # Day with an empty canopy store: no interception loss, also when smoothed (hard switch)
+    day_forcings = merge(
+        constant_forcings(0.0), (R_n=Returns(400.0), SW_in=Returns(600.0), VPD_a=Returns(1500.0))
+    )
+    for t in treatments
+        d = compute_diagnostics([0.2, 0.25, 0.0], p_model, t_unix, day_forcings, t)
+        @test d.λE_pc > 0
+        @test d.λE_i <= 0
     end
 end
