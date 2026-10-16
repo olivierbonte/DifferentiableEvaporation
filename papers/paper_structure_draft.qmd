@@ -15,17 +15,63 @@ format:
         documentclass: article 
         toc: true
         number-sections: true
+bibliography: references.bib
 editor: 
     render-on-save: true
 abstract: |
     This is a draft structure for the paper on the differentiable evaporation model.
 ---
 
+Open question on scope: potential split in 2 papers:
+
+1. This paper:
+    - model description
+    - numerical choices (timestepper, smoothing): goal = compare to advice of @clark2010, initial results seem to point out that higher-order adaptive explicit timestepping methods (Tsit5) offer better accuracy to cost ratio than their adaptive Heun suggestion. 
+    - calibration of Jarvis-Stewart with (forward-mode) AD at 1 site (DE-Tha/BE-Bra):
+        - Determine whether or not smoothing the model (combined with proper numerical scheme) actually helps in calibrating using a method based on Hessian + gradient info. Novelty compared to @kavetski2007: use of AD
+        - More fundamental on the use of AD for classic explicit euler with capping: is this even compatible with AD? If not, strong case for proper numerical treatment 
+    - calibration of ML model of surface resistance with reverse mode AD:
+        - Minimum: showcase that a form of reverse mode AD works, so "hybrid ready". In Julia SciML = GaussAdjoint with checkpointing most likely. Focus is not on performance/generalisability across sites... (would be paper 2). 
+2. Follow-up paper:
+    - Use inside on training strategies from paper 1: 1 timestepper, 1 smoothing strategy, 1 AD option.
+    - Goal: showing predictive performance advantage of hybrid modelling. 
+    - Use Terrarium.jl for this in any case. Advantages:
+        - Well suited for running multiple sites
+        - Learned results can be upscaled to global simulations
+        - Discretise-then-optimise AD with Reactant.jl (own checkpoiting)/ vanilla Enzyme.jl  (use Checkpointing.jl). 
+
 # Introduction
+
+*Importance of modelling/understanding land surface* 
+
+By regulating the energy, water, and biogeochemical cycles, the land surface plays a fundamental role in shaping the Earth’s climate [*Add source*]. Understanding these cycles and their corresponding feedbacks is therefore paramount, both for future climate predictions and for climate change mitigation through nature-based solutions [@bonan2024]. 
+
+*Challenges in land surface modelling*
+
+Many challenges lie in the use and development of models of land surface models (LSMs) however, two critical ones being managing process complexity and accurate parametrisation [@fisher2020]. Whilst some of the processes in LSMs are based on physical laws, others, especially those representing biogeochemical processes, are represented more empirically and often suffer from poorly constrained parameterisations. Given the ever-increasing amount of observational data in the geosciences, both in situ and from remote sensing, a highly promising research avenue is to use machine learning (ML) to represent processes that lack a strong theoretical basis. When these ML models are embedded within a process-based LSM, the result is a so-called hybrid model. 
+
+*Text above comes from FWO exchange proposal, mostly a placeholder. Sources are missing in places*
+
+
+
+One of these uncertain processes = the effect of environmental stressors on plan transpiration (stomatal / surface resistance in LSM terminology). Idea = keep physical processes related to energy / water balances (bulk-surface formulae / potential evaporation), 
 
 # Methods
 
 ## Model description
+
+## Numerical implementation
+
+ordinary differential equation (ODE) warrants choice of a solver. Importance of choice of numerical solver: 
+
+- Simple explicit Euler scheme can have numerical errors larger than conceptual errors [@clark2010]
+- Robust timestepping schemes lead to better behaved (less geometrically complex) objective functions which allow for better optimisation using gradient and hessian based optimisation methods [@kavetski2010]
+
+Additional challenge for numerical treatment = threshold-type behaviour of a lot of environmental processes introduces discontinuities of objective function. Smoothing of of these thresholds to ensure differentiability of model [@kavetski2007]. 
+
+Relevance to automatic differentation and hybrid modelling (*maybe this part is better suited for introduction*?):
+
+- The accurate and efficient calculation of gradients underpins hybrid/differentiable modelling 
 
 
 # Results
@@ -35,3 +81,8 @@ abstract: |
 # Conclusion
 
 # Appendix {.unnumbered}
+
+# References {.unnumbered}
+
+::: {#refs}
+:::
