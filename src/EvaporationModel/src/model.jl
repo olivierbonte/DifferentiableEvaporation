@@ -1,8 +1,5 @@
 abstract type AbstractModel end
 
-"Number of physical states: `w_1`, `w_2`, `w_r`"
-const N_STATES = 3
-
 """
     ProcessBasedModel{FT}(; forcings, parameters, t_span, u0, saveat, kwargs...)
 
@@ -252,6 +249,8 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
         forcings.R_n(t),
         forcings.LAI(t),
     )
+    # A floor on a forcing, not on a state, hence a plain max (no threshold treatment)
+    u_a = max(u_a, of_value_type(u_a, U_MIN))
     d_c, z_0mc = Bigleaf.roughness_parameters(
         RoughnessCanopyHeightLAI(), h, LAI; hs=z_0ms
     )
@@ -259,7 +258,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     w_rmax = max_canopy_capacity(LAI)
     f_wet = fraction_wet_vegetation(w_r, w_rmax, thresholds)
 
-    w_1eq = w_geq(w_2, w_sat, a, p_soil) #no allocs
+    w_1eq = w_geq(w_2, w_sat, a, p_soil, thresholds) #no allocs
     C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp, thresholds) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
@@ -297,8 +296,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     )
     VPD_m1 = vpd_veg_source_height(VPD_a, T_a, p_a, A, λE_tot1, r_aa)
     _, λE_pc1 = penman_monteith(T_a, p_a, VPD_m1, A_c, r_ac, of_value_type(f_wet, 0))
-    g_cond = step_function(thresholds, λE_pc1, zero(λE_pc1), flux_scale(thresholds))
-    f_wet_eff = fraction_wet_vegetation_with_condensation(f_wet, λE_pc1, thresholds)
+    f_wet_eff = fraction_wet_vegetation_with_condensation(f_wet, λE_pc1)
     # Second solve, always evaluated (avoid branching): equal to the first when f_wet_eff = f_wet
     λE_tot, λE_tot_p = total_evaporation(
         T_a,
@@ -332,7 +330,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     P_c = canopy_input(P, f_veg)
     D_c = canopy_drainage(P, w_r, f_veg, k_ext)
     P_s = precip_below_canopy(P, P_c, D_c)
-    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat)
+    Q_s = surface_runoff(StaticInfiltration(), P_s, w_2, w_sat, thresholds)
     D_1 = diffusion_layer_1(w_1, w_1eq, C_2)
     K_2 = vertical_drainage_layer_2(w_2, w_fc, C_3, d_2, thresholds)
     I_s = P_s - Q_s
@@ -342,6 +340,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
         C_1=C_1,
         f_veg=f_veg,
         λE_tot=λE_tot,
+        λE_pc=λE_pc1, # potential canopy flux of the condensation detection
         VPD_m=VPD_m,
         E_t=E_t,
         λE_t=λE_t,
