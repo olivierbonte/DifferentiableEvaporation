@@ -70,6 +70,15 @@ ordinary differential equation (ODE) warrants choice of a solver. Importance of 
 
 Additional challenge for numerical treatment = threshold-type behaviour of a lot of environmental processes introduces discontinuities of objective function. Smoothing of of these thresholds to ensure differentiability of model [@kavetski2007]. 
 
+Examples of codes where clamping to states is applied in combination with explicit time stepping:
+
+- HBV model implementations in [Hy2DL](https://github.com/eduardoAcunaEspinoza/Hy2DL/blob/d328bcb973c4234d56fbce6c2ac9077f9734b27f/src/hy2dl/modelzoo/hbv.py#L124), [hydrodl2](https://github.com/mhpi/hydrodl2/blob/b163a3c0125c5188f730f379643437d83b4e5d35/src/hydrodl2/models/hbv/hbv_2_1_hourly.py#L500)
+- DALEC implementation of @fang2024 (see e.g. [here](https://github.com/JianingFang/DifferLand_Global/blob/02f4668bbb191093b79546230f4e239b552b20d7/DifferLand/model/DALEC993.py#L408))
+
+
+
+As mentioned in @huite2025, this is often combined with manually limiting fluxes to avoid overshoot ([code example](https://github.com/Huite/HydroDaemonDemo/blob/2e5a445052064b55862d97a0078dfaab2f6da71a/src/fuse/fuse.jl#L120)). 
+
 <!-- Relevance to automatic differentation and hybrid modelling (*maybe this part is better suited for introduction*?):
 
 - The accurate and efficient calculation of gradients underpins hybrid/differentiable modelling  -->
