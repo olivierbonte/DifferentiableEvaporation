@@ -26,12 +26,8 @@ Open question on scope: potential split in 2 papers:
 
 1. This paper:
     - model description
-    - numerical choices (timestepper, smoothing): goal = compare to advice of @clark2010, initial results seem to point out that higher-order adaptive explicit timestepping methods (Tsit5) offer better accuracy to cost ratio than their adaptive Heun suggestion. 
-    - calibration of Jarvis-Stewart with (forward-mode) AD at 1 site (DE-Tha/BE-Bra):
-        - Determine whether or not smoothing the model (combined with proper numerical scheme) actually helps in calibrating using a method based on Hessian + gradient info. Novelty compared to @kavetski2007: use of AD
-        - More fundamental on the use of AD for classic explicit euler with capping: is this even compatible with AD? If not, strong case for proper numerical treatment 
-    - calibration of ML model of surface resistance with reverse mode AD:
-        - Minimum: showcase that a form of reverse mode AD works, so "hybrid ready". In Julia SciML = GaussAdjoint with checkpointing most likely. Focus is not on performance/generalisability across sites... (would be paper 2). 
+    - numerical choices (timestepper, smoothing)
+    - Gradient fidelity: both for process-based and ML   
 2. Follow-up paper:
     - Use inside on training strategies from paper 1: 1 timestepper, 1 smoothing strategy, 1 AD option.
     - Goal: showing predictive performance advantage of hybrid modelling. 
@@ -60,7 +56,12 @@ One of these uncertain processes = the effect of environmental stressors on plan
 
 ## Model description
 
+Keeping it fairly compact, move details to Appendix.
+The novelty here = how the model needs to be adapted to behave well in an ODE framework
+
 ## Numerical implementation
+
+*Goal = compare to advice of @clark2010, adaptive explicit (Tsit5, Heun) en implicit (Euler) vs fixed (Heun (Terrarium), Impiclit Euler)* 
 
 ordinary differential equation (ODE) warrants choice of a solver. Importance of choice of numerical solver: 
 
@@ -69,10 +70,23 @@ ordinary differential equation (ODE) warrants choice of a solver. Importance of 
 
 Additional challenge for numerical treatment = threshold-type behaviour of a lot of environmental processes introduces discontinuities of objective function. Smoothing of of these thresholds to ensure differentiability of model [@kavetski2007]. 
 
-Relevance to automatic differentation and hybrid modelling (*maybe this part is better suited for introduction*?):
+<!-- Relevance to automatic differentation and hybrid modelling (*maybe this part is better suited for introduction*?):
 
-- The accurate and efficient calculation of gradients underpins hybrid/differentiable modelling 
+- The accurate and efficient calculation of gradients underpins hybrid/differentiable modelling  -->
 
+## Differentiation
+
+*Gradient fidelity*. Data to test this on: 1 site (DE-Tha/BE-Bra).
+Start with full process-based.
+
+  1. Compare gradients of explicit euler with clipping those of an error controlled scheme. $\partial \lambda E / \partial \theta$. 
+        - Smoothing: does this lead to more meaningful losses? 
+        - Timestepper: different parameter sensitivity for different timestepper? 
+  2. Synthetic truth from known parameter for Jarvis-Stewart (for a converged model with strict tolerance). Add noise, calibrate models to retrieve known parameters.
+        - For badly behaving numerics, the parameters can be distorted because they try to compensate for this
+  3. Same as above, but now try to learn a NN to represent Jarvis. 
+  4. Real calibration of process-based model 
+        - Hypothesis based on @kavetski2007 and @kavetski2010 of easiest optimisation when smoothing and stable numerics
 
 # Results
 
