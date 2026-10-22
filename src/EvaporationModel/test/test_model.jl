@@ -66,6 +66,19 @@ end
     @test model_tight.sol.stats.naccept > model_default.sol.stats.naccept
 end
 
+@testset "Explicit Euler with state clamping" begin
+    # Wet start and a step of one hour: without clamping, a state becomes negative
+    for thresholds in treatments
+        model = toy_model(; thresholds, u0=u0_from_fractions([1.0, 1.0, 1.0]))
+        EvaporationModel.solve!(
+            model; alg=Euler(), dt=3600.0, adaptive=false, clamp_states=true
+        )
+        @test OrdinaryDiffEq.SciMLBase.successful_retcode(model.sol)
+        @test all(0 .<= model.sol[1:2, :] .<= p_model.w_sat)
+        @test all(0 .<= model.sol[3, :] .<= max_canopy_capacity(LAI))
+    end
+end
+
 @testset "Accumulated diagnostics" begin
     # Any diagnostic can be accumulated: the window means close the water balances of the
     # canopy and of the column, also with the (backward Euler consistent) ImplicitEuler

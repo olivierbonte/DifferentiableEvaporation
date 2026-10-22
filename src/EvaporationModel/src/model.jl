@@ -130,7 +130,36 @@ function state_tolerances(model::ProcessBasedModel, solver_kwargs::NamedTuple)
 end
 
 """
-    solve!(model::ProcessBasedModel; yaxarray_output=false, kwargs...)
+    state_clamping_callback(model::ProcessBasedModel)
+
+Callback clamping the physical states to their range after every step,
+``0 ≤ w_1, w_2 ≤ w_{sat}`` and ``0 ≤ w_r ≤ w_{r,max}(t)`` ([`max_canopy_capacity`](@ref) of
+the LAI forcing), as in classic fixed-step hydrological models. Meant for explicit Euler at
+a fixed time step, see [`solve!`](@ref) with `clamp_states=true`.
+
+Hard clamps: not mass conserving (the clipped water is not accounted for in the accumulated
+diagnostics) and with a zero derivative with respect to the state while a bound is active.
+"""
+function state_clamping_callback(model::ProcessBasedModel)
+    affect! = let forcings = model.forcings
+        function (integrator)
+            u, p, t = integrator.u, integrator.p, integrator.t
+            u[1] = clamp(u[1], zero(u[1]), p.w_sat)
+            u[2] = clamp(u[2], zero(u[2]), p.w_sat)
+            u[3] = clamp(u[3], zero(u[3]), max_canopy_capacity(forcings.LAI(t)))
+            # `saveat` values are stored before the callbacks are applied
+            sol = integrator.sol
+            if !isempty(sol.t) && sol.t[end] == t
+                sol.u[end][1:N_STATES] .= @view u[1:N_STATES]
+            end
+            return nothing
+        end
+    end
+    return DiscreteCallback(Returns(true), affect!; save_positions=(false, false))
+end
+
+"""
+    solve!(model::ProcessBasedModel; yaxarray_output=false, clamp_states=false, kwargs...)
 
 Solve the model, saving the states at `model.saveat`, and store the [`window_means`](@ref)
 of the accumulated diagnostics in `model.diagnostics`. `kwargs` (e.g. `alg`, `callback`,
@@ -141,9 +170,22 @@ interferes with AD.
 Implicit solvers take their Jacobian from ForwardDiff, `ImplicitEuler(; autodiff=AutoForwardDiff())`,
 or Enzyme, `ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=EvaporationModel.Enzyme.Duplicated))`
 (`Duplicated` because the right-hand side is a closure over the forcings).
+
+`clamp_states=true` clamps the states to their physical range after every step with
+[`state_clamping_callback`](@ref) (applied after a user `callback`). Meant to be combined
+with fixed-step explicit Euler:
+`solve!(model; alg=Euler(), dt, adaptive=false, clamp_states=true)`.
 """
-function solve!(model::ProcessBasedModel; yaxarray_output=false, kwargs...)
-    solver_kwargs = state_tolerances(model, merge(model.solver_kwargs, NamedTuple(kwargs)))
+function solve!(
+    model::ProcessBasedModel; yaxarray_output=false, clamp_states=false, kwargs...
+)
+    kwargs = NamedTuple(kwargs)
+    if clamp_states
+        clamping = state_clamping_callback(model)
+        callback = haskey(kwargs, :callback) ? CallbackSet(kwargs.callback, clamping) : clamping
+        kwargs = merge(kwargs, (; callback))
+    end
+    solver_kwargs = state_tolerances(model, merge(model.solver_kwargs, kwargs))
     model.sol = solve(model.prob; saveat=model.saveat, tstops=model.tstops, solver_kwargs...)
     model.diagnostics = window_means(model)
 

@@ -86,7 +86,8 @@ include("model.jl")
 export AbstractModel,
     ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!,
     window_means,
-    state_tolerances
+    state_tolerances,
+    state_clamping_callback
 
 include("resistances.jl")
 export soil_aerodynamic_resistance,
