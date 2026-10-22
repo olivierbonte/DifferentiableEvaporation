@@ -1,0 +1,111 @@
+---
+title: "Differentiable Evaporation Model: draft structure for paper"
+author:
+    - name: Olivier Bonte
+      corresponding: true
+      affiliations:
+        - name: Ghent University
+          department: Department of Environment, Hydro-Climate Extremes Lab
+    - name: Brian Groenke
+    - name: Maximilian Gelbrecht
+    - name: Diego G. Miralles
+    - name: Niko E. C. Verhoest
+format:
+    pdf:
+        documentclass: article 
+        toc: true
+        number-sections: true
+bibliography: references.bib
+editor: 
+    render-on-save: true
+abstract: |
+    This is a draft structure for the paper on the differentiable evaporation model.
+---
+
+Open question on scope: potential split in 2 papers:
+
+1. This paper:
+    - model description
+    - numerical choices (timestepper, smoothing)
+    - Gradient fidelity: both for process-based and ML   
+2. Follow-up paper:
+    - Use inside on training strategies from paper 1: 1 timestepper, 1 smoothing strategy, 1 AD option.
+    - Goal: showing predictive performance advantage of hybrid modelling. 
+    - Use Terrarium.jl for this in any case. Advantages:
+        - Well suited for running multiple sites
+        - Learned results can be upscaled to global simulations
+        - Discretise-then-optimise AD with Reactant.jl (own checkpoiting)/ vanilla Enzyme.jl  (use Checkpointing.jl). 
+
+# Introduction
+
+*Importance of modelling/understanding land surface* 
+
+By regulating the energy, water, and biogeochemical cycles, the land surface plays a fundamental role in shaping the Earth’s climate [*Add source*]. Understanding these cycles and their corresponding feedbacks is therefore paramount, both for future climate predictions and for climate change mitigation through nature-based solutions [@bonan2024]. 
+
+*Challenges in land surface modelling*
+
+Many challenges lie in the use and development of models of land surface models (LSMs) however, two critical ones being managing process complexity and accurate parametrisation [@fisher2020]. Whilst some of the processes in LSMs are based on physical laws, others, especially those representing biogeochemical processes, are represented more empirically and often suffer from poorly constrained parameterisations. Given the ever-increasing amount of observational data in the geosciences, both in situ and from remote sensing, a highly promising research avenue is to use machine learning (ML) to represent processes that lack a strong theoretical basis. When these ML models are embedded within a process-based LSM, the result is a so-called hybrid model. 
+
+*Text above comes from FWO exchange proposal, mostly a placeholder. Sources are missing in places*
+
+
+
+One of these uncertain processes = the effect of environmental stressors on plan transpiration (stomatal / surface resistance in LSM terminology). Idea = keep physical processes related to energy / water balances (bulk-surface formulae / potential evaporation), 
+
+# Methods
+
+## Model description
+
+Keeping it fairly compact, move details to Appendix.
+The novelty here = how the model needs to be adapted to behave well in an ODE framework
+
+## Numerical implementation
+
+*Goal = compare to advice of @clark2010, adaptive explicit (Tsit5, Heun) en implicit (Euler) vs fixed (Heun (Terrarium), Impiclit Euler)* 
+
+ordinary differential equation (ODE) warrants choice of a solver. Importance of choice of numerical solver: 
+
+- Simple explicit Euler scheme can have numerical errors larger than conceptual errors [@clark2010]
+- Robust timestepping schemes lead to better behaved (less geometrically complex) objective functions which allow for better optimisation using gradient and hessian based optimisation methods [@kavetski2010]
+
+Additional challenge for numerical treatment = threshold-type behaviour of a lot of environmental processes introduces discontinuities of objective function. Smoothing of of these thresholds to ensure differentiability of model [@kavetski2007]. 
+
+Examples of codes where clamping to states is applied in combination with explicit time stepping:
+
+- HBV model implementations in [Hy2DL](https://github.com/eduardoAcunaEspinoza/Hy2DL/blob/d328bcb973c4234d56fbce6c2ac9077f9734b27f/src/hy2dl/modelzoo/hbv.py#L124), [hydrodl2](https://github.com/mhpi/hydrodl2/blob/b163a3c0125c5188f730f379643437d83b4e5d35/src/hydrodl2/models/hbv/hbv_2_1_hourly.py#L500)
+- DALEC implementation of @fang2024 (see e.g. [here](https://github.com/JianingFang/DifferLand_Global/blob/02f4668bbb191093b79546230f4e239b552b20d7/DifferLand/model/DALEC993.py#L408))
+
+
+
+As mentioned in @huite2025, this is often combined with manually limiting fluxes to avoid overshoot ([code example](https://github.com/Huite/HydroDaemonDemo/blob/2e5a445052064b55862d97a0078dfaab2f6da71a/src/fuse/fuse.jl#L120)). 
+
+<!-- Relevance to automatic differentation and hybrid modelling (*maybe this part is better suited for introduction*?):
+
+- The accurate and efficient calculation of gradients underpins hybrid/differentiable modelling  -->
+
+## Differentiation
+
+*Gradient fidelity*. Data to test this on: 1 site (DE-Tha/BE-Bra).
+Start with full process-based.
+
+  1. Compare gradients of explicit euler with clipping those of an error controlled scheme. $\partial \lambda E / \partial \theta$. 
+        - Smoothing: does this lead to more meaningful losses? 
+        - Timestepper: different parameter sensitivity for different timestepper? 
+  2. Synthetic truth from known parameter for Jarvis-Stewart (for a converged model with strict tolerance). Add noise, calibrate models to retrieve known parameters.
+        - For badly behaving numerics, the parameters can be distorted because they try to compensate for this
+  3. Same as above, but now try to learn a NN to represent Jarvis. 
+  4. Real calibration of process-based model 
+        - Hypothesis based on @kavetski2007 and @kavetski2010 of easiest optimisation when smoothing and stable numerics
+
+# Results
+
+# Discussion
+
+# Conclusion
+
+# Appendix {.unnumbered}
+
+# References {.unnumbered}
+
+::: {#refs}
+:::

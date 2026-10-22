@@ -49,33 +49,36 @@ end
     fraction_wet_vegetation(w_r, w_rmax, t=HardThresholds())
 
 Fraction of the foliage covered with water ``f_{wet} = (w_r / w_{rmax})^{2/3}`` [-], from
-[Deardorff (1978)](https://doi.org/10.1029/JC083iC04p01889), with `w_r` clipped at zero and
-``f_{wet}`` at one.
+[Deardorff (1978)](https://doi.org/10.1029/JC083iC04p01889), with the power taken by
+[`nonneg_pow`](@ref) (zero for ``w_r < 0``) and ``f_{wet}`` capped at one.
 
-With [`KavetskiSmoothing`](@ref), the clip at zero is a smooth maximum (so the slope of the
-2/3 power stays finite) times a logistic lower-bound kernel that brings ``f_{wet}`` to zero
-below ``w_r = 0``, and the cap at one is a smooth minimum.
+With [`KavetskiSmoothing`](@ref), the power is multiplied by the [`bound_kernel`](@ref) at
+zero, so ``f_{wet} = 0`` at ``w_r = 0``, and the cap at one is a smooth minimum.
 """
 function fraction_wet_vegetation(w_r, w_rmax, t=HardThresholds())
     s = storage_scale(t, w_rmax)
-    w_r⁺ = max(t, w_r, zero(w_r), s)
-    f_wet = (w_r⁺ / w_rmax)^of_value_type(w_r, 2 / 3) * lower_bound_kernel(t, w_r, zero(w_r), s)
+    kernel = bound_kernel(t, LowerBound(), w_r, zero(w_r), s) # f_wet = 0 at w_r = 0
+    f_wet = nonneg_pow(t, w_r / w_rmax, of_value_type(w_r, 2 / 3), s / w_rmax) * kernel
     return min(t, f_wet, one(f_wet), factor_scale(t))
 end
 
 """
-    fraction_wet_vegetation_with_condensation(f_wet, λE_pc, t=HardThresholds())
+    fraction_wet_vegetation_with_condensation(f_wet, λE_pc)
 
 Effective wet fraction of the canopy, ``f_{wet,eff} = f_{wet} + (1 - f_{wet})(1 - g)``, with
-``g`` = [`step_function`](@ref) of the potential canopy latent heat flux `λE_pc` [W m⁻²]
-(Penman-Monteith with zero surface resistance) under the threshold treatment `t`.
+``g`` the Heaviside step of the potential canopy latent heat flux `λE_pc` [W m⁻²]
+(Penman-Monteith with zero surface resistance).
 
 When the canopy condenses (``λE_{pc} < 0``, so ``g = 0``), ``f_{wet} = 1``: there
 is no transpiration and the dew goes into the interception store. Otherwise
 ``f_{wet,eff} = f_{wet}``.
+
+The step is hard for every threshold treatment. A smoothed step would leave
+``f_{wet,eff} > f_{wet}`` while the canopy evaporates (``λE_{pc} > 0``), an interception loss
+that is not bounded by the canopy store, which then drains below zero.
 """
-function fraction_wet_vegetation_with_condensation(f_wet, λE_pc, t=HardThresholds())
-    g = step_function(t, λE_pc, zero(λE_pc), flux_scale(t))
+function fraction_wet_vegetation_with_condensation(f_wet, λE_pc)
+    g = step_function(HardThresholds(), λE_pc, zero(λE_pc), false)
     return f_wet + (1 - f_wet) * (1 - g)
 end
 
