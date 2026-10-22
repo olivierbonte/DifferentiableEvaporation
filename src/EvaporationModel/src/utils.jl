@@ -184,8 +184,8 @@ ErrorMetrics.purpose(::Type{KGE}) = "Kling-Gupta Efficiency (Gupta et al., 2009,
 struct KGEmod <: ErrorMetric end
 ErrorMetrics.purpose(::Type{KGEmod}) = "Modified Kling-Gupta Efficiency (Kling et al., 2012, https://doi.org/10.1016/j.jhydrol.2012.01.011): KGE with the ratio of coefficients of variation as variability term"
 
-struct RMSE <: ErroMetric end
-purpose(::Type{RMSE}) = "Root Mean Squared Error: Square root of the average squared difference between predicted and observed values"
+struct RMSE <: ErrorMetric end
+ErrorMetrics.purpose(::Type{RMSE}) = "Root Mean Squared Error: Square root of the average squared difference between predicted and observed values"
 
 # Correlation ρ, variability ratio α and bias ratio β of simulations ŷ and observations y
 function kge_components(ŷ::AbstractArray, y::AbstractArray)
