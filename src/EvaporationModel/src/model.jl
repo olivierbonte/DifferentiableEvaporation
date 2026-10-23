@@ -159,6 +159,27 @@ function state_clamping_callback(model::ProcessBasedModel)
 end
 
 """
+    solve_kwargs(model::ProcessBasedModel; clamp_states=false, kwargs...)
+
+Keyword arguments of `OrdinaryDiffEq.solve` used by [`solve!`](@ref): `model.saveat`,
+`model.tstops`, `model.solver_kwargs` merged with `kwargs` with the per-state tolerances of
+[`state_tolerances`](@ref), and the [`state_clamping_callback`](@ref) if `clamp_states`. For
+solving `model.prob` (or a `remake` of it, e.g. in an `EnsembleProblem`) without `solve!`.
+"""
+function solve_kwargs(model::ProcessBasedModel; clamp_states=false, kwargs...)
+    kwargs = NamedTuple(kwargs)
+    if clamp_states
+        clamping = state_clamping_callback(model)
+        callback = haskey(kwargs, :callback) ? CallbackSet(kwargs.callback, clamping) : clamping
+        kwargs = merge(kwargs, (; callback))
+    end
+    return merge(
+        (; saveat=model.saveat, tstops=model.tstops),
+        state_tolerances(model, merge(model.solver_kwargs, kwargs)),
+    )
+end
+
+"""
     solve!(model::ProcessBasedModel; yaxarray_output=false, clamp_states=false, kwargs...)
 
 Solve the model, saving the states at `model.saveat`, and store the [`window_means`](@ref)
@@ -179,14 +200,7 @@ with fixed-step explicit Euler:
 function solve!(
     model::ProcessBasedModel; yaxarray_output=false, clamp_states=false, kwargs...
 )
-    kwargs = NamedTuple(kwargs)
-    if clamp_states
-        clamping = state_clamping_callback(model)
-        callback = haskey(kwargs, :callback) ? CallbackSet(kwargs.callback, clamping) : clamping
-        kwargs = merge(kwargs, (; callback))
-    end
-    solver_kwargs = state_tolerances(model, merge(model.solver_kwargs, kwargs))
-    model.sol = solve(model.prob; saveat=model.saveat, tstops=model.tstops, solver_kwargs...)
+    model.sol = solve(model.prob; solve_kwargs(model; clamp_states, kwargs...)...)
     model.diagnostics = window_means(model)
 
     if yaxarray_output
