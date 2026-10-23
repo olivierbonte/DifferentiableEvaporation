@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "d06a5b16e4c38a1ec6672c99ed889ca9a50c4ff7"
+project_hash = "a1af418fd9c02d2a23ccb003de6f4abe79a36b69"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -197,8 +197,8 @@ version = "1.4.0"
 [[deps.Bigleaf]]
 deps = ["AstroLib", "DataFrames", "Dates", "FillArrays", "LabelledArrays", "Missings", "Optim", "PaddedViews", "Parameters", "Pipe", "RecursiveArrayTools", "StaticArrays", "Statistics", "StatsBase", "Suppressor", "Tables", "TimeZones"]
 git-tree-sha1 = "667e53bc75f18a0dfde1f8f9c4769492811cc8cb"
-repo-rev = "e12bd652d5406c150bee6f7539e24c512d3b68e4"
-repo-url = "https://github.com/EarthyScience/Bigleaf.jl.git"
+repo-rev = "fix/roughness"
+repo-url = "https://github.com/olivierbonte/Bigleaf.jl.git"
 uuid = "e2ae9153-b66f-47c5-85f1-c6d65380123f"
 version = "0.3.2-DEV"
 

@@ -13,8 +13,11 @@ using ComponentArrays
 using Dates
 using ErrorMetrics
 using EvaporationModel
+using LineSearches: BackTracking
+using Optim
 using OrdinaryDiffEq
 using OrdinaryDiffEq: SciMLBase
+using OrdinaryDiffEqNonlinearSolve: NLNewton
 using Statistics
 using YAXArrays
 
@@ -81,7 +84,7 @@ end
 # Based on figures from this Table: paper uses energy balance corrected values.
 
 ## Figure 4 of Kronenberg et al. (2026)
-figdir(args...) = projectdir("figures", args...)
+figdir(args...) = plotsdir("2026kronenberg", args...)
 mkpath(figdir())
 cm = 37.8 # 1cm = 37.8 px
 colors = (λE=:blue, H=:chocolate2, A=:seagreen) # as in the paper
@@ -187,11 +190,79 @@ comparisons = (
     ("H", H_mod, H_obs, H_qc),
     ("H corrected", H_mod, H_obs_cor, H_qc),
 )
-for (name, ŷ, y, qc) in comparisons
-    sel = in_2024 .& (qc .== 0)
-    nse, kge, kge_mod = (metric(m, ŷ[sel], y[sel]) for m in (NSE(), KGE(), KGEmod()))
-    println(
-        rpad(name, 13), ": NSE = ", round(nse; digits=2), ", KGE = ", round(kge; digits=2),
-        ", KGE' = ", round(kge_mod; digits=2), " (n = ", count(sel), ")",
-    )
+function print_metrics(comparisons)
+    for (name, ŷ, y, qc) in comparisons
+        sel = in_2024 .& (qc .== 0)
+        nse, kge, kge_mod = (metric(m, ŷ[sel], y[sel]) for m in (NSE(), KGE(), KGEmod()))
+        println(
+            rpad(name, 13), ": NSE = ", round(nse; digits=2), ", KGE = ",
+            round(kge; digits=2), ", KGE' = ", round(kge_mod; digits=2),
+            " (n = ", count(sel), ")",
+        )
+    end
+end
+print_metrics(comparisons)
+
+##
+
+## Calibration of `calibrated`: BFGS on the RMSE of λE in 2024 (no validation data)
+# Loss on the energy balance corrected λE of the measured half-hours of 2024, with 2023 as
+# spin-up, as for the metrics above. Gradients with ForwardDiff through the solver.
+sel_cal = in_2024 .& (λE_qc .== 0)
+# Fixed-step implicit Euler (Δt = 30/8 min): a smooth loss it seems, because unlike adaptive
+# time stepping with ImplicitEuler (tried before) accepted/rejected steps
+# change with the parameters. Newton settings as in scripts/calibration/synthetic.jl.
+solver = ImplicitEuler(;
+    nlsolve=NLNewton(; max_iter=50, always_new=true, relax=BackTracking(), check_div=false),
+    autodiff=AutoForwardDiff(),
+)
+options = solve_kwargs(model; dt=1800 / 8, adaptive=false, maxiters=10^7)
+calibrated = (:r_smin, :kB⁻¹) # names in `param` of the calibrated parameters
+θ_default = [param[name] for name in calibrated]
+
+# x = log(θ / θ_default): positive parameters of order 1 for BFGS, default values at x = 0
+function calibration_parameters(x)
+    p = similar(param, eltype(x)) .= param
+    for (name, θ) in zip(calibrated, θ_default .* exp.(x))
+        setproperty!(p, name, θ)
+    end
+    return p
+end
+
+# Window means of the accumulated diagnostics, nothing if the solve failed
+function simulate(x)
+    prob = remake(model.prob; p=calibration_parameters(x))
+    sol = solve(prob, solver; options...)
+    return SciMLBase.successful_retcode(sol) ? window_means(sol, model.accumulated) : nothing
+end
+
+rmse_λE(means) = metric(RMSE(), means.λE_tot[sel_cal], λE_obs_cor[sel_cal])
+
+function loss(x)
+    means = simulate(x)
+    return isnothing(means) ? convert(eltype(x), Inf) : rmse_λE(means)
+end
+
+x_default = zeros(length(calibrated))
+@time result = optimize(
+    loss,
+    x_default,
+    BFGS(),
+    Optim.Options(; g_tol=1e-3, iterations=30, show_trace=true);
+    autodiff=AutoForwardDiff(),
+)
+x_cal = Optim.minimizer(result)
+println(result)
+for (name, θ_0, θ) in zip(calibrated, θ_default, θ_default .* exp.(x_cal))
+    println(name, ": ", round(θ_0; sigdigits=3), " → ", round(θ; sigdigits=3))
+end
+
+# Performance in 2024 of the default and calibrated parameters, with the calibration solver
+for (label, x) in (("default", x_default), ("calibrated", x_cal))
+    means = simulate(x)
+    println(label, ": RMSE λE corrected = ", round(rmse_λE(means); digits=2), " W m⁻²")
+    print_metrics((
+        ("λE corrected", means.λE_tot, λE_obs_cor, λE_qc),
+        ("H corrected", means.H_tot, H_obs_cor, H_qc),
+    ))
 end

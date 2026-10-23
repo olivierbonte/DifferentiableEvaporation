@@ -20,7 +20,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 YAXArrays = "c21b50f5-aa40-41ea-b809-c0f5e47bfa5c"
 
 [sources]
-Bigleaf = {rev = "e12bd652d5406c150bee6f7539e24c512d3b68e4", url = "https://github.com/EarthyScience/Bigleaf.jl.git"}
+Bigleaf = {rev = "fix/roughness", url = "https://github.com/olivierbonte/Bigleaf.jl.git"}
 
 [compat]
 ADTypes = "1"
