@@ -207,5 +207,5 @@ function ErrorMetrics.metric(::KGEmod, ŷ::AbstractArray, y::AbstractArray, yσ:
 end
 
 function ErrorMetrics.metric(::RMSE, ŷ::AbstractArray, y::AbstractArray, yσ::AbstractArray)
-    return √(ErrorMetrics.metric(MSE(), ŷ, y, yσ))
+    return √(ErrorMetrics.metric(ErrorMetrics.MSE(), ŷ, y, yσ))
 end
