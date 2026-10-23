@@ -29,7 +29,7 @@ model = ProcessBasedModel{FT}(;
     t_span=times.span,
     u0=u0,
     saveat=times.bounds,
-    thresholds=KavetskiSmoothing(),
+    #thresholds=KavetskiSmoothing(),
 )
 initialize!(model)
 ## Spin-up testing: How long until initial effect wears out
@@ -81,7 +81,7 @@ p_true = copy(model.parameters)
 # Conceptually as Fig. 1 of Kavetski & Clark (2010)
 
 # Solvers to compare
-# Newton fix for fixed-step implicit Euler, see ../2007_kavetski_reproduce/README.md
+# Newton fix for fixed-step implicit Euler, see https://github.com/SciML/OrdinaryDiffEq.jl/issues/4905
 OrdinaryDiffEq.OrdinaryDiffEqCore.isadaptive(::ImplicitEuler) = false
 backward_euler = ImplicitEuler(;
     nlsolve=NLNewton(; max_iter=50, always_new=true, relax=BackTracking(), check_div=false),
@@ -137,11 +137,12 @@ ensemble = EnsembleProblem(
     model.prob; prob_func=set_parameters, output_func=compute_rmses, safetycopy=false
 )
 
-# Only runs the ensembles if `rerun` or if no saved results exist for this grid size and
-# noise level (set `rerun = true` after changing e.g. the solvers)
+# Only runs the ensembles if `rerun` or if no saved results exist for this grid size, noise
+# level and threshold treatment (set `rerun = true` after changing e.g. the solvers)
 rerun = false
+thresholds = nameof(typeof(model.thresholds))
 landscape_data, _ = produce_or_load(
-    (; n_grid, σ_noise), datadir("sims", "calibration");
+    (; n_grid, σ_noise, thresholds), datadir("sims", "calibration");
     prefix="loss_landscape_kB⁻¹_r_smin", force=rerun,
 ) do _
     solver_names = String[]
@@ -208,3 +209,8 @@ fig_noisy = plot_landscapes(
     rmse_noisy, "Calibration on the synthetic truth + Gaussian noise (σ = $σ_noise W m⁻²)"
 )
 safesave(plotsdir("calibration", "loss_landscape_kB⁻¹_r_smin_noisy.png"), fig_noisy)
+
+# Most important conclusion here for now is that Tsit5 is most noisy because changing
+# a parameter changes a low how stepsize is chosen (which steps rejected or not) and this give
+# the most noisy landscape. This is not the case for adaptive Kvaerno5. Suprisingy,
+# fixed-step explicit Euler is smooth here.
