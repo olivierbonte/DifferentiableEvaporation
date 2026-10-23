@@ -81,7 +81,7 @@ end
 # Based on figures from this Table: paper uses energy balance corrected values.
 
 ## Figure 4 of Kronenberg et al. (2026)
-figdir(args...) = projectdir("figures", args...)
+figdir(args...) = plotsdir("2026kronenberg", args...)
 mkpath(figdir())
 cm = 37.8 # 1cm = 37.8 px
 colors = (λE=:blue, H=:chocolate2, A=:seagreen) # as in the paper

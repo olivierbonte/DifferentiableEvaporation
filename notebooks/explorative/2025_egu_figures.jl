@@ -54,7 +54,7 @@ end
 println("cor(λE IEₐ, λE observed) = ", cor(λE_ie, λE_obs))
 
 ## PLOTS FOR EGU 2025
-figdir(args...) = projectdir("figures", args...)
+figdir(args...) = plotsdir("2025egu", args...)
 mkpath(figdir())
 cm = 37.8 #1cm = 37.8 px
 time_plot = unix2datetime.(times.stamps)
