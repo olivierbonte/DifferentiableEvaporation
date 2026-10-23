@@ -29,7 +29,7 @@ model = ProcessBasedModel{FT}(;
     t_span=times.span,
     u0=u0,
     saveat=times.bounds,
-    #thresholds=KavetskiSmoothing(),
+    thresholds=KavetskiSmoothing(),
 )
 initialize!(model)
 ## Spin-up testing: How long until initial effect wears out
@@ -201,12 +201,12 @@ function plot_landscapes(rmse_per_solver, title; colorscale=identity)
 end
 
 fig_truth = plot_landscapes(
-    rmse_truth, "Calibration on the noise-free synthetic truth"; colorscale=log10
+    rmse_truth, "Loss-landscapes of the noise-free synthetic truth"; colorscale=log10
 )
 safesave(plotsdir("calibration", "loss_landscape_kB⁻¹_r_smin.png"), fig_truth)
 
 fig_noisy = plot_landscapes(
-    rmse_noisy, "Calibration on the synthetic truth + Gaussian noise (σ = $σ_noise W m⁻²)"
+    rmse_noisy, "Loss-landscapes of the synthetic truth + Gaussian noise (σ = $σ_noise W m⁻²)"
 )
 safesave(plotsdir("calibration", "loss_landscape_kB⁻¹_r_smin_noisy.png"), fig_noisy)
 
