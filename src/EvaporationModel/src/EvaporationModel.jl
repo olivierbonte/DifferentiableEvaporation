@@ -86,7 +86,9 @@ include("model.jl")
 export AbstractModel,
     ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!,
     window_means,
-    state_tolerances
+    state_tolerances,
+    solve_kwargs,
+    state_clamping_callback
 
 include("resistances.jl")
 export soil_aerodynamic_resistance,
@@ -141,6 +143,7 @@ export compute_amplitude_and_phase,
     value_type,
     of_value_type,
     KGE,
-    KGEmod
+    KGEmod,
+    RMSE
 
 end # module EvaporationModel
