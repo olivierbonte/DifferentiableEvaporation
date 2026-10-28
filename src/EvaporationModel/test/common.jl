@@ -35,11 +35,10 @@ p_model = ComponentArray(;
     w_wp=w_wp, w_fc=w_fc, C_1sat=0.019, C_2ref=0.83, C_3=0.25, d_1=0.01, d_2=1.3,
     z_obs=z_obs, kB⁻¹=log(10), g_d=3e-4, r_smin=395.0, k_ext=0.5,
 )
-# `Returns` captures the values: closures over (non-const) globals give silently wrong
-# Enzyme derivatives unless runtime activity is enabled
+# Constant forcing values: usable both in `compute_diagnostics` and in a `ProcessBasedModel`
 constant_forcings(P) = (
-    P=Returns(P), T_a=Returns(T_a), u_a=Returns(u), p_a=Returns(p_a), VPD_a=Returns(VPD_a),
-    SW_in=Returns(SW_in), R_n=Returns(Rn), LAI=Returns(LAI), lon=4.52, utc_offset=1,
+    P=P, T_a=T_a, u_a=u, p_a=p_a, VPD_a=VPD_a, SW_in=SW_in, R_n=Rn, LAI=LAI, lon=4.52,
+    utc_offset=1,
 )
 # States [w_1, w_2, w_r] as fractions of their maximum (w_sat, w_sat, w_rmax)
 u0_fractions = ([0.45, 0.7, 0.5], [0.1, 0.2, 0.0], [0.9, 1.0, 1.0], [1.0, 1.0, 1.0])

@@ -103,17 +103,18 @@ end
 """
     forcing_table(forcings, window_starts)
 
-Value of each forcing in each window. A vector must hold one value per window, a function
-of time (e.g. `Returns(x)`) is evaluated at the window starts and scalars (`lon`,
-`utc_offset`) are kept.
+Value of each forcing in each window: a vector with one value per window, or a number for
+a constant forcing (and `lon`, `utc_offset`).
 """
 function forcing_table(forcings::NamedTuple, window_starts)
     return map(forcing -> window_values(forcing, window_starts), forcings)
 end
 
 # The values of one forcing in all windows
-window_values(scalar::Number, window_starts) = scalar
-window_values(forcing_of_time, window_starts) = forcing_of_time.(window_starts)
+window_values(constant::Number, window_starts) = constant
+function window_values(forcing, window_starts)
+    throw(ArgumentError("a forcing must be a vector or a number, not $(typeof(forcing))"))
+end
 function window_values(forcing::AbstractVector, window_starts)
     n_values = length(forcing)
     n_windows = length(window_starts)
@@ -136,21 +137,20 @@ function window_index(window_starts, t)
 end
 
 """
-    window_forcings(forcing_table, window)
+    window_forcing(forcing_table, window)
 
-Forcings of window number `window`, as the `NamedTuple` of functions of time that
-[`compute_diagnostics`](@ref) expects.
+Forcing values of window number `window`, as passed to [`compute_diagnostics`](@ref).
 """
-function window_forcings(forcing_table::NamedTuple, window)
-    return map(values -> forcing_in_window(values, window), forcing_table)
+function window_forcing(forcing_table::NamedTuple, window)
+    return map(values -> value_in_window(values, window), forcing_table)
 end
 
 # One forcing in window number `window`
-forcing_in_window(scalar::Number, window) = scalar
-forcing_in_window(values::AbstractVector, window) = Returns(values[window])
+value_in_window(constant::Number, window) = constant
+value_in_window(values::AbstractVector, window) = values[window]
 
-# The forcings of the current window of `p`, used by the right-hand side
-current_forcings(p::ModelParameters) = window_forcings(p.forcing_table, p.window)
+# The forcing of the current window of `p`, used by the right-hand side
+current_forcing(p::ModelParameters) = window_forcing(p.forcing_table, p.window)
 
 """
     window_callback()

@@ -108,7 +108,7 @@ end
 @testset "Canopy condensation" begin
     # Night with a dry canopy: no transpiration, dew into the interception store
     night_forcings = merge(
-        constant_forcings(0.0), (R_n=Returns(-60.0), SW_in=Returns(0.0), VPD_a=Returns(50.0))
+        constant_forcings(0.0), (R_n=-60.0, SW_in=0.0, VPD_a=50.0)
     )
     for t in treatments
         d = compute_diagnostics([0.2, 0.25, 0.0], p_model, t_unix, night_forcings, t)
@@ -118,7 +118,7 @@ end
     end
     # Day with an empty canopy store: no interception loss, also when smoothed (hard switch)
     day_forcings = merge(
-        constant_forcings(0.0), (R_n=Returns(400.0), SW_in=Returns(600.0), VPD_a=Returns(1500.0))
+        constant_forcings(0.0), (R_n=400.0, SW_in=600.0, VPD_a=1500.0)
     )
     for t in treatments
         d = compute_diagnostics([0.2, 0.25, 0.0], p_model, t_unix, day_forcings, t)

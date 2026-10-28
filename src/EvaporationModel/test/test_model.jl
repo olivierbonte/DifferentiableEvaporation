@@ -23,7 +23,7 @@ end
         thresholds in treatments,
         u0 in map(u0_from_fractions, u0_fractions)
 
-        forcings = merge(constant_forcings(P), (; R_n=Returns(R_n)))
+        forcings = merge(constant_forcings(P), (; R_n))
         d = compute_diagnostics(u0, p_model, t, forcings, thresholds)
         λE_c = d.λE_t + d.λE_i
         # 1) Total energy balance
@@ -73,15 +73,15 @@ end
     # A window bound belongs to the window starting there
     window_index(t) = EvaporationModel.window_index(window_starts, t)
     @test window_index.([t_0, t_1 - 1, t_1, t_2]) == [1, 1, 2, 2]
-    # Vectors hold one value per window, functions are taken at the window starts
-    table = forcing_table((; P=[1.0, 2.0], T_a=t -> t, lon=4.5), window_starts)
-    @test table == (; P=[1.0, 2.0], T_a=window_starts, lon=4.5)
+    # A vector holds one value per window, a number is constant
+    table = forcing_table((; P=[1.0, 2.0], T_a=290.0, lon=4.5), window_starts)
+    @test table == (; P=[1.0, 2.0], T_a=290.0, lon=4.5)
     @test_throws ArgumentError forcing_table((; P=[1.0, 2.0, 3.0]), window_starts)
+    @test_throws ArgumentError forcing_table((; P=t -> 1.0), window_starts)
 
-    # Rain in the first window only
+    # Rain in the given windows
     P_rain = 1e-3 # kg/(m² s), 3.6 mm/h
-    rain_until(t_jump) = merge(constant_forcings(0.0), (P=t -> t < t_jump ? P_rain : 0.0,))
-    @test forcing_table(rain_until(t_1), window_starts).P == [P_rain, 0.0]
+    rain(P_values) = merge(constant_forcings(0.0), (; P=P_values))
     function run_windows(forcings, alg; kwargs...)
         model = ProcessBasedModel{Float64}(;
             forcings, parameters=p_model, t_span=(t_0, t_2), u0=copy(u0_toy),
@@ -102,9 +102,9 @@ end
         (Tsit5(), (; abstol=1e-10, reltol=1e-10)), # first stage reused from the last (FSAL)
     )
         # The first window has the rain until its end, the second none
-        stepped = run_windows(rain_until(t_1), alg; kwargs...)
-        rain_throughout = run_windows(rain_until(Inf), alg; kwargs...)
-        rain_never = run_windows(rain_until(-Inf), alg; kwargs...)
+        stepped = run_windows(rain([P_rain, 0.0]), alg; kwargs...)
+        rain_throughout = run_windows(rain(P_rain), alg; kwargs...)
+        rain_never = run_windows(rain(0.0), alg; kwargs...)
         @test stepped.sol.u[2][1:3] ≈ rain_throughout.sol.u[2][1:3] # the states at t_1
         @test stepped.diagnostics.λE_tot[1] ≈ rain_throughout.diagnostics.λE_tot[1]
         # The canopy drains in the second window, as without any rain from the same state

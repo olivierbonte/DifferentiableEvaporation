@@ -21,8 +21,8 @@ stamp).
 used by [`solve!`](@ref); keyword arguments of `solve!` take precedence.
 
 The forcing is constant within each window between the `tstops` (by default `saveat`).
-Each forcing in `forcings` is a vector with one value per window or a function of time
-(see [`forcing_table`](@ref)); `lon` and `utc_offset` are scalars. Every evaluation within a
+Each forcing in `forcings` is a vector with one value per window or a number for a constant
+forcing (see [`forcing_table`](@ref)); `lon` and `utc_offset` are numbers. Every evaluation within a
 window, also at its end, uses that window's forcing (see [`ModelParameters`](@ref) and
 [`window_callback`](@ref)). Change the parameters of `model.prob` with
 [`with_parameters`](@ref). `model.f_diagnostics(u, θ, t)` gives the diagnostics at any `t`.
@@ -90,9 +90,9 @@ end
 function create_rhs(model::ProcessBasedModel)
     return let thresholds = model.thresholds, accumulated = Val(model.accumulated)
         function rhs!(du, u, p, t)
-            forcings = current_forcings(p)
+            forcing = current_forcing(p)
             θ = p.tunable
-            return compute_tendencies!(du, u, θ, t, forcings, thresholds, accumulated)
+            return compute_tendencies!(du, u, θ, t, forcing, thresholds, accumulated)
         end
     end
 end
@@ -100,13 +100,12 @@ end
 # `f_diagnostics(u, θ, t)`: diagnostics at any time `t`, with the forcing of the window
 # containing `t`
 function create_f_diagnostics(model::ProcessBasedModel, p::ModelParameters)
-    return let thresholds = model.thresholds, table = p.forcing_table,
-        window_starts = p.window_starts
+    return let thresholds = model.thresholds, table = p.forcing_table, window_starts = p.window_starts
 
         function f_diagnostics(u, θ, t)
             window = window_index(window_starts, t)
-            forcings = window_forcings(table, window)
-            return compute_diagnostics(u, θ, t, forcings, thresholds)
+            forcing = window_forcing(table, window)
+            return compute_diagnostics(u, θ, t, forcing, thresholds)
         end
     end
 end
@@ -173,7 +172,7 @@ diagnostics) and with a zero derivative with respect to the state while a bound 
 function state_clamping_callback(model::ProcessBasedModel)
     function affect!(integrator)
         u, p, t = integrator.u, integrator.p, integrator.t
-        LAI = p.forcing_table.LAI[p.window]
+        LAI = current_forcing(p).LAI
         w_sat = p.tunable.w_sat
         u[1] = clamp(u[1], zero(u[1]), w_sat)
         u[2] = clamp(u[2], zero(u[2]), w_sat)
@@ -304,8 +303,15 @@ function window_means(sol, accumulated::Tuple{Vararg{Symbol}})
 end
 window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulated)
 
+"""
+    compute_diagnostics(u, p, t, forcing, thresholds=HardThresholds())
+
+All fluxes and other diagnostics for the state `u`, parameters `p` and the `forcing` values
+(`P, T_a, u_a, p_a, VPD_a, SW_in, R_n, LAI, lon, utc_offset`) at time `t`. `t` only sets the
+solar time of the ground heat flux.
+"""
 @inline function compute_diagnostics(
-    u, p::AbstractArray, t, forcings::NamedTuple, thresholds::ThresholdTreatment=HardThresholds()
+    u, p::AbstractArray, t, forcing::NamedTuple, thresholds::ThresholdTreatment=HardThresholds()
 )
     w_1, w_2, w_r = u
     @unpack h,
@@ -327,16 +333,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     g_d,
     r_smin,
     k_ext = p
-    P, T_a, u_a, p_a, VPD_a, SW_in, R_n, LAI = (
-        forcings.P(t),
-        forcings.T_a(t),
-        forcings.u_a(t),
-        forcings.p_a(t),
-        forcings.VPD_a(t),
-        forcings.SW_in(t),
-        forcings.R_n(t),
-        forcings.LAI(t),
-    )
+    @unpack P, T_a, u_a, p_a, VPD_a, SW_in, R_n, LAI, lon, utc_offset = forcing
     # A floor on a forcing, not on a state, hence a plain max (no threshold treatment)
     u_a = max(u_a, of_value_type(u_a, U_MIN))
     d_c, z_0mc = Bigleaf.roughness_parameters(
@@ -350,7 +347,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp, thresholds) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
-    t_sol = seconds_since_solar_noon(t, forcings.lon, forcings.utc_offset)
+    t_sol = seconds_since_solar_noon(t, lon, utc_offset)
     R_nc, R_ns = net_radiation_partitioning(R_n, f_veg)
     G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol, thresholds)
     A, A_c, A_s = available_energy_partitioning(R_nc, R_ns, G)
@@ -454,7 +451,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
 end
 
 """
-    compute_tendencies!(du, u, p, t, forcings, thresholds=HardThresholds(), accumulated=Val(()))
+    compute_tendencies!(du, u, p, t, forcing, thresholds=HardThresholds(), accumulated=Val(()))
 
 Tendencies of `[w_1, w_2, w_r]`, followed by the `accumulated` diagnostics (a `Val` of names).
 """
@@ -463,11 +460,11 @@ function compute_tendencies!(
     u,
     p::AbstractArray,
     t,
-    forcings::NamedTuple,
+    forcing::NamedTuple,
     thresholds::ThresholdTreatment=HardThresholds(),
     accumulated::Val=Val(()),
 )
-    diagnostics = compute_diagnostics(u, p, t, forcings, thresholds)
+    diagnostics = compute_diagnostics(u, p, t, forcing, thresholds)
     @unpack d_1, d_2 = p
     @unpack P_c, D_c, I_s, f_1, D_1, K_2, E_s, E_t, E_i, C_1 = diagnostics
     du[1] = C_1 / (ρ_w * d_1) * (f_1 * I_s - E_s) - D_1
