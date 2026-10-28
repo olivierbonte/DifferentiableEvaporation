@@ -1,4 +1,4 @@
-# Shared setup for the Δt study (PR 0 of the Terrarium port): reference cases and runs.
+# Shared setup for the Δt study (PR 0 of the Terrarium port): the reference case and its runs.
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using CSV
@@ -8,86 +8,59 @@ using EvaporationModel
 using OrdinaryDiffEq
 
 include(srcdir("site_data.jl")) # site_forcing, site_parameters
-include(joinpath(@__DIR__, "synthetic_forcing.jl"))
 
-const REFERENCE_DIR = datadir("reference")
-const SAVE_DT = 1800.0 # s
-
-site_u0(p) = [0.6 * p.w_fc, 0.6 * p.w_fc, 1e-4]
+const SITE = "DE-Tha"
+const EVAL_YEAR = 2018 # drought year: exercises the soil moisture stress thresholds
+const SPINUP = Day(14) # simulated before EVAL_YEAR and left out of the error metrics
+# Diagnostic integrated by the model, for its window means
+const ACCUMULATED = (:λE_tot,)
 
 """
-    reference_cases()
+    reference_case()
 
-The reference runs: name => (forcings, parameters, u0, tspan, tstops). The `tstops` lie just
-before each jump of the piecewise-constant forcing (see `tstops_before`).
+One year of `SITE` forcing (`EVAL_YEAR`) after a `SPINUP`, as `(forcings, p, u0, tspan, saveat)`.
+The states are saved at the 30-min window bounds `saveat`, which are also the bounds of the
+forcing windows: every evaluation within a window, also at its end (where backward Euler
+evaluates the forcing), uses that window's forcing (`EvaporationModel.window_callback`).
 """
-function reference_cases()
-    cases = Dict{String,Any}("synthetic_1day" => synthetic_case())
-    p = site_parameters("BE-Bra")
-    for start_date in (DateTime(2010, 3, 15), DateTime(2010, 7, 7))
-        # piecewise constant over each 30-min forcing window
-        forcings, t = site_forcing(site_ec_file("BE-Bra"), start_date, start_date + Day(10))
-        name = "BE-Bra_$(Date(start_date))_10day"
-        cases[name] = (
-            forcings=forcings, p=p, u0=site_u0(p), tspan=(t[1], t[end]),
-            tstops=tstops_before(t[2:end]),
-        )
-    end
-    return cases
-end
-
-save_times(case) = collect(case.tspan[1]:SAVE_DT:case.tspan[2])
-
-function build_model(case; thresholds=HardThresholds())
-    model = ProcessBasedModel{Float64}(;
-        forcings=case.forcings,
-        parameters=case.p,
-        t_span=case.tspan,
-        u0=copy(case.u0),
-        saveat=save_times(case),
-        tstops=case.tstops,
-        thresholds=thresholds,
+function reference_case()
+    p = site_parameters(SITE)
+    eval_start = DateTime(EVAL_YEAR, 1, 1)
+    # piecewise constant over each 30-min forcing window
+    forcings, times, _ = site_forcing(
+        site_ec_file(SITE), eval_start - SPINUP, DateTime(EVAL_YEAR, 12, 31, 23, 30)
     )
-    EvaporationModel.initialize!(model)
-    return model
+    w_init = 0.6 * p.w_fc # both soil layers start at 60% of field capacity
+    u0 = [w_init, w_init, 1e-4] # w_1, w_2 [m³ m⁻³], w_r [kg m⁻²]: a nearly dry canopy
+    return (forcings=forcings, p=p, u0=u0, tspan=times.span, saveat=times.bounds)
 end
 
 """
     run_case(case, alg; thresholds=HardThresholds(), kwargs...)
 
-Solve one reference case with `alg` and the threshold treatment `thresholds`, saving states
-and diagnostics every `SAVE_DT`. Returns the solved model; `kwargs` are passed to `solve`.
+Solve `case` with `alg` and the threshold treatment `thresholds`, saving the states at
+`case.saveat` and the window means of the `ACCUMULATED` diagnostics between them, both also in
+the YAXArrays `Dataset` `model.output`. Returns the solved model; `kwargs` are passed to `solve`.
 """
 function run_case(case, alg; thresholds=HardThresholds(), kwargs...)
-    model = build_model(case; thresholds)
-    EvaporationModel.solve!(model; alg=alg, maxiters=10^8, kwargs...)
+    model = ProcessBasedModel{Float64}(;
+        forcings=case.forcings,
+        parameters=case.p,
+        t_span=case.tspan,
+        u0=copy(case.u0),
+        saveat=case.saveat,
+        accumulated=ACCUMULATED,
+        thresholds=thresholds,
+    )
+    EvaporationModel.initialize!(model)
+    EvaporationModel.solve!(model; alg=alg, maxiters=10^8, yaxarray_output=true, kwargs...)
     return model
 end
 
 """
-    to_dataframe(model)
+    evaluation_period(model)
 
-States, diagnostics and forcings at the save times.
+The output `Dataset` of the solved `model` (the states at the window bounds and the window means
+of λE_tot, see `EvaporationModel.output_dataset`) over `EVAL_YEAR`, without the `SPINUP`.
 """
-function to_dataframe(model)
-    sol = model.sol
-    t = sol.t
-    f = model.forcings
-    df = DataFrame(; time=unix2datetime.(t), t_unix=t)
-    df.w_1 = sol[1, :]
-    df.w_2 = sol[2, :]
-    df.w_r = sol[3, :]
-    diag = DataFrame(model.diagnostics.saveval)
-    df = hcat(df, diag)
-    for name in (:P, :T_a, :u_a, :p_a, :VPD_a, :SW_in, :R_n, :LAI)
-        df[!, Symbol("forcing_", name)] = getproperty(f, name).(t)
-    end
-    return df
-end
-
-function git_info()
-    root = projectdir()
-    hash = readchomp(`git -C $root rev-parse HEAD`)
-    dirty = !isempty(readchomp(`git -C $root status --porcelain -- src`))
-    return hash, dirty
-end
+evaluation_period(model) = model.output[time=DateTime(EVAL_YEAR, 1, 1) .. DateTime(EVAL_YEAR + 1, 1, 1)]
