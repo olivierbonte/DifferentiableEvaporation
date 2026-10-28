@@ -61,7 +61,8 @@ in_shower(t) = 14 <= hour_of_day(t) < 15
 diurnal_toy = diurnal_cycle.(window_starts_toy)
 SW_in_toy = max.(800.0 .* diurnal_toy, 0.0)
 forcings_toy = (
-    P=ifelse.(in_shower.(window_starts_toy), 5e-5, 0.0), # kg/(m² s), 0.18 mm/h
+    # Drizzle (0.018 mm/h) with a shower (0.18 mm/h), in kg/(m² s)
+    P=ifelse.(in_shower.(window_starts_toy), 5e-5, 5e-6),
     T_a=293.0 .+ 5.0 .* diurnal_toy,
     u_a=u,
     p_a=p_a,

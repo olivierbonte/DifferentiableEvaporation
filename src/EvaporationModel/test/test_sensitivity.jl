@@ -41,8 +41,10 @@ inactive_norm(u, t) = Enzyme.ignore_derivatives(DiffEqBase.ODE_DEFAULT_NORM(u, t
             model.solver_kwargs...,
         )
     )
-    # The hard thresholds have a finite Jacobian below field capacity
+    # Away from the hard thresholds: below field capacity, and a canopy that never dries out
+    # (see "Sensitivities of a diagnostics loss" below)
     @test maximum(y_obs[1, :]) < p_model.w_fc
+    @test minimum(y_obs[3, :]) > 0
     # Every gradient call gets its own copy of the problem, so that a gradient cannot change
     # the problem used by the next one (see the `prob.u0` test below)
     fresh_prob() = remake(model.prob; u0=copy(model.u0))
@@ -111,6 +113,10 @@ end
     )
     g_ref = gradient(toy_loss, AutoForwardDiff(), p_model, context(ForwardDiffSensitivity())...)
     @test all(isfinite, g_ref) && any(!iszero, g_ref)
+    # Known deficiency: with HardThresholds, the adjoint (backward) solve fails (dt below
+    # epsilon) where the canopy dries out (w_r = 0) and gives a wrong gradient, while
+    # ForwardDiff is fine. The drizzle in `forcings_toy` keeps the canopy wet; without it,
+    # this happens after the shower.
     enzyme_reverse = AutoEnzyme(; mode=Enzyme.set_runtime_activity(Enzyme.Reverse))
     sensealg = GaussAdjoint(; autojacvec=EnzymeVJP())
     @test isapprox(gradient(toy_loss, enzyme_reverse, p_model, context(sensealg)...), g_ref; rtol=1e-3)
