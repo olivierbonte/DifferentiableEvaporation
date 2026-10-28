@@ -15,6 +15,12 @@ format:
         documentclass: article 
         toc: true
         number-sections: true
+        papersize: a4
+        geometry:
+            - left=25mm
+            - right=25mm
+            - top=25mm
+            - bottom=25mm
 bibliography: references.bib
 editor: 
     render-on-save: true
@@ -98,6 +104,16 @@ Start with full process-based.
         - Hypothesis based on @kavetski2007 and @kavetski2010 of easiest optimisation when smoothing and stable numerics
 
 # Results
+
+## Numerical implementation
+
+![Relative RMSE compared to the computational cost, as quantified by the amount of RHS evaluations per 30 minute forcing window](../plots/reference/dt_study_rrmse_cost.png){#fig-rrmse-numerics}
+
+Main conclusions from @fig-rrmse-numerics:
+
+- The default `Tsit5` solver has low error while being computationally cheap (small amount of RHS evaluations)
+- In general, adaptive time stepping schemes are more efficient: lower error per amount of RHS evaluations. Exception = adaptive implicit Euler.
+- If limited to simple numerics (e.g. Terrarium.jl): use fixed-step Heun at e.g. $\Delta t/ 16$ ($\Delta t = 30$ min)
 
 # Discussion
 

@@ -13,6 +13,8 @@ src/EvaporationModel/Manifest.toml
 #/notebooks
 /_research
 /figures
+# Exception: if used within paper!
+!/plots/reference/dt_study_rrmse_cost.png
 
 ################################################################################
 #                                    Julia                                     #
