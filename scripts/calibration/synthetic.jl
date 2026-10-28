@@ -116,7 +116,7 @@ function set_parameters(prob, ctx)
     p = copy(p_true)
     p.kB⁻¹ = kB⁻¹_values[i]
     p.r_smin = r_smin_values[j]
-    return remake(prob; p)
+    return with_parameters(prob, p)
 end
 
 # Keep only the RMSEs of a run (NaN if the solve failed), not the full solution
@@ -132,7 +132,7 @@ function compute_rmses(sol, ctx)
 end
 
 # safetycopy=false: `set_parameters` does not change `prob`, so no need to copy it (and the
-# forcings) for every run
+# forcings) for every run; `with_parameters` gives every run its own current forcing window
 ensemble = EnsembleProblem(
     model.prob; prob_func=set_parameters, output_func=compute_rmses, safetycopy=false
 )

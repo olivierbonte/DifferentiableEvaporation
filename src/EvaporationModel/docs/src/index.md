@@ -12,6 +12,12 @@ Modules = [EvaporationModel]
 Pages = ["model.jl"]
 ```
 
+## Parameters and forcing windows
+```@autodocs
+Modules = [EvaporationModel]
+Pages = ["parameters.jl"]
+```
+
 ## Canopy
 ```@autodocs
 Modules = [EvaporationModel]

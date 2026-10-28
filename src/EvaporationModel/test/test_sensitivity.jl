@@ -1,9 +1,10 @@
 # Gradients of a toy loss through the ODE solve. The solver kwargs (tolerances) are passed to
-# `solve`, so that the adjoint solves use them as well.
+# `solve`, so that the adjoint solves use them as well. `p` are the model parameters, set in
+# the problem's `ModelParameters` with `with_parameters`.
 
 # `observe` maps the solution to the observed quantity (default: all states)
 function toy_loss(p, prob, saveat, y_obs, sensealg, solver_kwargs, observe=Array)
-    sol = solve(remake(prob; p=p), Tsit5(); saveat, sensealg, solver_kwargs...)
+    sol = solve(with_parameters(prob, p), Tsit5(); saveat, sensealg, solver_kwargs...)
     return sum(abs2, observe(sol) .- y_obs) / length(y_obs)
 end
 
@@ -12,9 +13,12 @@ end
 
 # For differentiating directly through the solver with Enzyme: the problem is built inside the
 # loss, with `FullSpecialize` (no FunctionWrappers around `f`), instead of a `remake` of a
-# `Constant` problem, and `SensitivityADPassThrough` skips the SciMLSensitivity adjoint rules
-function toy_loss_direct(p, f, u0, tspan, saveat, y_obs, solver_kwargs)
-    prob = ODEProblem{true,SciMLBase.FullSpecialize}(f, copy(u0), tspan, p)
+# `Constant` problem, and `SensitivityADPassThrough` skips the SciMLSensitivity adjoint rules.
+# `p_template` is the `ModelParameters` of the model; the forcing is constant, so the problem
+# needs no window callback.
+function toy_loss_direct(p, f, p_template, u0, tspan, saveat, y_obs, solver_kwargs)
+    model_parameters = SciMLStructures.replace(SciMLStructures.Tunable(), p_template, p)
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(f, copy(u0), tspan, model_parameters)
     sensealg = DiffEqBase.SensitivityADPassThrough()
     sol = solve(prob, Tsit5(); saveat, sensealg, solver_kwargs...)
     return sum(abs2, Array(sol) .- y_obs) / length(y_obs)
@@ -30,7 +34,10 @@ inactive_norm(u, t) = Enzyme.ignore_derivatives(DiffEqBase.ODE_DEFAULT_NORM(u, t
     p_obs = copy(p_model)
     p_obs.r_smin *= 1.2
     y_obs = Array(
-        solve(remake(model.prob; p=p_obs), Tsit5(); saveat=saveat_toy, model.solver_kwargs...)
+        solve(
+            with_parameters(model.prob, p_obs), Tsit5(); saveat=saveat_toy,
+            model.solver_kwargs...,
+        )
     )
     # Every gradient call gets its own copy of the problem, so that a gradient cannot change
     # the problem used by the next one (see the `prob.u0` test below)
@@ -76,9 +83,9 @@ inactive_norm(u, t) = Enzyme.ignore_derivatives(DiffEqBase.ODE_DEFAULT_NORM(u, t
         # which gives a wrong gradient (relative error ~1)
         solver_kwargs = (; tight..., internalnorm=inactive_norm)
         g = gradient(
-            toy_loss_direct, enzyme_reverse, p_model, Constant(model.f), Constant(model.u0),
-            Constant(model.t_span), Constant(saveat_toy), Constant(y_obs),
-            Constant(solver_kwargs),
+            toy_loss_direct, enzyme_reverse, p_model, Constant(model.f),
+            Constant(model.prob.p), Constant(model.u0), Constant(model.t_span),
+            Constant(saveat_toy), Constant(y_obs), Constant(solver_kwargs),
         )
         @test isapprox(g, g_ref; rtol=1e-3)
     end
@@ -91,7 +98,9 @@ end
     p_obs = copy(p_model)
     p_obs.r_smin *= 1.2
     tol = state_tolerances(model, (; abstol=1e-10, reltol=1e-10))
-    y_obs = λE_means(solve(remake(model.prob; p=p_obs), Tsit5(); saveat=saveat_toy, tol...))
+    y_obs = λE_means(
+        solve(with_parameters(model.prob, p_obs), Tsit5(); saveat=saveat_toy, tol...)
+    )
     context(sensealg) = (
         Constant(remake(model.prob; u0=copy(model.prob.u0))), Constant(saveat_toy),
         Constant(y_obs), Constant(sensealg), Constant(tol), Constant(λE_means),

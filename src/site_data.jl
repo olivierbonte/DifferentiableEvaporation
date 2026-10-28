@@ -2,7 +2,6 @@
 # scripts/data_processing in data/exp_pro. Load with `include(srcdir("site_data.jl"))` after
 # `@quickactivate "DifferentiableEvaporation"`.
 using ComponentArrays
-using DataInterpolations
 using Dates
 using EvaporationModel
 using NetCDF
@@ -15,17 +14,16 @@ site_soil_file(site) = datadir("exp_pro", "soil", site * "_total_agg.nc")
     site_forcing(file, start_date=typemin(DateTime), end_date=typemax(DateTime); FT=Float64)
 
 Forcing of an eddy-covariance `file` at the time stamps ``t_1, …, t_n`` between `start_date`
-and `end_date` (inclusive; the whole file by default), with constant piecewise interpolation
-(`ConstantInterpolation`, `dir=:left`: the value stamped ``t_k`` holds on ``[t_k, t_{k+1})``).
-The last value holds on ``[t_n, t_n + Δt]``, with ``Δt = t_n - t_{n-1}`` the (regular) time
-step of the forcing, and beyond. Returns `(forcings, times, ds)`: the forcing NamedTuple, the times
-(local standard time, unix seconds) and the selected dataset (for observations), with `times`
-a NamedTuple of
+and `end_date` (inclusive; the whole file by default), as vectors of the ``n`` window
+values: the value stamped ``t_k`` holds over ``[t_k, t_{k+1}]``, the last one over
+``[t_n, t_n + Δt]`` with ``Δt`` the (regular) forcing time step. Returns
+`(forcings, times, ds)`: the forcing NamedTuple, the times (local standard time, unix seconds)
+and the selected dataset (for observations), with `times` a NamedTuple of
 - `stamps`: the time stamps ``t_1, …, t_n`` of `ds`, the starts of the windows;
 - `bounds`: the window bounds ``t_1, …, t_n, t_n + Δt``, for `saveat`;
 - `span`: ``(t_1, t_n + Δt)``, for `t_span`.
-With `t_span = times.span` and `saveat = times.bounds`, the window means of the model are on
-the time stamps of `ds`.
+With `t_span = times.span` and `saveat = times.bounds`, the model's forcing windows and
+window means line up with the time stamps of `ds`.
 """
 function site_forcing(
     file, start_date=typemin(DateTime), end_date=typemax(DateTime); FT=Float64
@@ -34,12 +32,7 @@ function site_forcing(
     t = datetime2unix.(collect(ds.time.val)) # plain Vector, without the time lookup
     t_end = t[end] + (t[end] - t[end-1]) # end of the last window
     times = (; stamps=t, bounds=[t; t_end], span=(t[1], t_end))
-    # Extra knot at the end of the last window, with the last value.
-    # Extrapolate last value beyond end of last window (needed for some adaptive timesteppers)
-    forcing(x) = ConstantInterpolation(
-        [FT.(vec(x)); FT(x[end])], times.bounds;
-        dir=:left, extrapolation_right=ExtrapolationType.Constant,
-    )
+    forcing(x) = FT.(vec(x)) # one value per window
     forcings = (
         R_n=forcing(ds.Rnet[:]),
         T_a=forcing(ds.Tair[:]),
