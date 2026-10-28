@@ -12,6 +12,7 @@ using OrdinaryDiffEq
 using OrdinaryDiffEqLowOrderRK: Euler, Heun
 using OrdinaryDiffEqSDIRK: ImplicitEuler
 using Parameters
+using SciMLStructures: SciMLStructures
 using StatsBase: cor, mean, std
 using YAXArrays
 
@@ -81,6 +82,9 @@ export penman_monteith, total_evaporation, transpiration, interception_loss, soi
 include("ground_heat_flux.jl")
 export ground_heat_flux,
     compute_harmonic_sum, GroundHeatFluxMethod, Allen07, SantanelloFriedl03
+
+include("parameters.jl")
+export ModelParameters, with_parameters, forcing_table
 
 include("model.jl")
 export AbstractModel,

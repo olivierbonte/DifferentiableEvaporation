@@ -58,7 +58,7 @@ figdir(args...) = plotsdir("2025egu", args...)
 mkpath(figdir())
 cm = 37.8 #1cm = 37.8 px
 time_plot = unix2datetime.(times.stamps)
-precip_plot_mm_h = forcings_real.P.(times.stamps) * 3600 #kg/(m²s) -> mm/h
+precip_plot_mm_h = forcings_real.P * 3600 #kg/(m²s) -> mm/h
 state_labels = ["w₁ [-]", "w₂ [-]", "wᵣ [kg/m²]"]
 state_ylims = (0, maximum(model_ie.sol[1, :]) * 1.5)
 colors = Makie.wong_colors()

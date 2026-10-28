@@ -19,6 +19,13 @@ stamp).
 `solver_kwargs` (default `abstol = reltol = 1e-6`, as SUMMA-SUNDIALS,
 [Spiteri et al., 2024](https://doi.org/10.1029/2024MS004256)) are stored in `model.prob` and
 used by [`solve!`](@ref); keyword arguments of `solve!` take precedence.
+
+The forcing is constant within each window between the `tstops` (by default `saveat`).
+Each forcing in `forcings` is a vector with one value per window or a number for a constant
+forcing (see [`forcing_table`](@ref)); `lon` and `utc_offset` are numbers. Every evaluation within a
+window, also at its end, uses that window's forcing (see [`ModelParameters`](@ref) and
+[`window_callback`](@ref)). Change the parameters of `model.prob` with
+[`with_parameters`](@ref). `model.f_diagnostics(u, θ, t)` gives the diagnostics at any `t`.
 """
 @kwdef mutable struct ProcessBasedModel{FT} <: AbstractModel
     forcings::NamedTuple
@@ -26,7 +33,7 @@ used by [`solve!`](@ref); keyword arguments of `solve!` take precedence.
     t_span::Tuple
     u0
     saveat::AbstractArray
-    tstops::AbstractArray = saveat
+    tstops::Union{Nothing,AbstractArray} = nothing # forcing window bounds, see `window_bounds`
     accumulated::Tuple{Vararg{Symbol}} = (:λE_tot, :H_tot, :G)
     f = nothing
     f_diagnostics = nothing
@@ -42,21 +49,32 @@ end
     initialize!(model::ProcessBasedModel)
 
 Build the right-hand side, the diagnostics function and the `ODEProblem` (with the
-accumulators appended to `u0`) of `model`.
+accumulators appended to `u0`) of `model`, with a [`ModelParameters`](@ref) as `p` and the
+[`window_callback`](@ref).
 """
 function initialize!(model::ProcessBasedModel)
     length(model.u0) == N_STATES ||
         throw(ArgumentError("`u0` must hold the $N_STATES physical states `[w_1, w_2, w_r]`"))
+    window_starts = forcing_window_starts(model.t_span, window_bounds(model))
+    table = forcing_table(model.forcings, window_starts)
+    p = ModelParameters(model.parameters, table, window_starts)
     model.f = create_rhs(model)
-    model.f_diagnostics = create_f_diagnostics(model)
+    model.f_diagnostics = create_f_diagnostics(model, p)
     check_accumulated(model)
     u0 = vcat(model.u0, zeros(eltype(model.u0), length(model.accumulated)))
     model.prob = ODEProblem(
-        model.f, u0, model.t_span, model.parameters;
-        state_tolerances(model, model.solver_kwargs)...,
+        model.f, u0, model.t_span, p;
+        callback=window_callback(), state_tolerances(model, model.solver_kwargs)...,
     )
     return nothing
 end
+
+"""
+    window_bounds(model::ProcessBasedModel)
+
+Bounds of the forcing windows: `model.tstops`, or `model.saveat` if that is `nothing`.
+"""
+window_bounds(model::ProcessBasedModel) = something(model.tstops, model.saveat)
 
 function check_accumulated(model::ProcessBasedModel)
     d = model.f_diagnostics(model.u0, model.parameters, model.t_span[1])
@@ -68,16 +86,27 @@ function check_accumulated(model::ProcessBasedModel)
     return nothing
 end
 
+# Right-hand side `f(du, u, p, t)`, with `p` a `ModelParameters`
 function create_rhs(model::ProcessBasedModel)
-    return let forcings = model.forcings, thresholds = model.thresholds, accumulated = Val(model.accumulated)
-
-        (du, u, p, t) -> compute_tendencies!(du, u, p, t, forcings, thresholds, accumulated)
+    return let thresholds = model.thresholds, accumulated = Val(model.accumulated)
+        function rhs!(du, u, p, t)
+            forcing = current_forcing(p)
+            θ = p.tunable
+            return compute_tendencies!(du, u, θ, t, forcing, thresholds, accumulated)
+        end
     end
 end
 
-function create_f_diagnostics(model::ProcessBasedModel)
-    return let forcings = model.forcings, thresholds = model.thresholds
-        (u, p, t) -> compute_diagnostics(u, p, t, forcings, thresholds)
+# `f_diagnostics(u, θ, t)`: diagnostics at any time `t`, with the forcing of the window
+# containing `t`
+function create_f_diagnostics(model::ProcessBasedModel, p::ModelParameters)
+    return let thresholds = model.thresholds, table = p.forcing_table, window_starts = p.window_starts
+
+        function f_diagnostics(u, θ, t)
+            window = window_index(window_starts, t)
+            forcing = window_forcing(table, window)
+            return compute_diagnostics(u, θ, t, forcing, thresholds)
+        end
     end
 end
 
@@ -133,27 +162,27 @@ end
     state_clamping_callback(model::ProcessBasedModel)
 
 Callback clamping the physical states to their range after every step,
-``0 ≤ w_1, w_2 ≤ w_{sat}`` and ``0 ≤ w_r ≤ w_{r,max}(t)`` ([`max_canopy_capacity`](@ref) of
-the LAI forcing), as in classic fixed-step hydrological models. Meant for explicit Euler at
-a fixed time step, see [`solve!`](@ref) with `clamp_states=true`.
+``0 ≤ w_1, w_2 ≤ w_{sat}`` and ``0 ≤ w_r ≤ w_{r,max}`` ([`max_canopy_capacity`](@ref) of
+the LAI of the current window), as in classic fixed-step hydrological models. Meant for
+explicit Euler at a fixed time step, see [`solve!`](@ref) with `clamp_states=true`.
 
 Hard clamps: not mass conserving (the clipped water is not accounted for in the accumulated
 diagnostics) and with a zero derivative with respect to the state while a bound is active.
 """
 function state_clamping_callback(model::ProcessBasedModel)
-    affect! = let forcings = model.forcings
-        function (integrator)
-            u, p, t = integrator.u, integrator.p, integrator.t
-            u[1] = clamp(u[1], zero(u[1]), p.w_sat)
-            u[2] = clamp(u[2], zero(u[2]), p.w_sat)
-            u[3] = clamp(u[3], zero(u[3]), max_canopy_capacity(forcings.LAI(t)))
-            # `saveat` values are stored before the callbacks are applied
-            sol = integrator.sol
-            if !isempty(sol.t) && sol.t[end] == t
-                sol.u[end][1:N_STATES] .= @view u[1:N_STATES]
-            end
-            return nothing
+    function affect!(integrator)
+        u, p, t = integrator.u, integrator.p, integrator.t
+        LAI = current_forcing(p).LAI
+        w_sat = p.tunable.w_sat
+        u[1] = clamp(u[1], zero(u[1]), w_sat)
+        u[2] = clamp(u[2], zero(u[2]), w_sat)
+        u[3] = clamp(u[3], zero(u[3]), max_canopy_capacity(LAI))
+        # `saveat` values are stored before the callbacks are applied
+        sol = integrator.sol
+        if !isempty(sol.t) && sol.t[end] == t
+            sol.u[end][1:N_STATES] .= @view u[1:N_STATES]
         end
+        return nothing
     end
     return DiscreteCallback(Returns(true), affect!; save_positions=(false, false))
 end
@@ -162,9 +191,10 @@ end
     solve_kwargs(model::ProcessBasedModel; clamp_states=false, kwargs...)
 
 Keyword arguments of `OrdinaryDiffEq.solve` used by [`solve!`](@ref): `model.saveat`,
-`model.tstops`, `model.solver_kwargs` merged with `kwargs` with the per-state tolerances of
-[`state_tolerances`](@ref), and the [`state_clamping_callback`](@ref) if `clamp_states`. For
-solving `model.prob` (or a `remake` of it, e.g. in an `EnsembleProblem`) without `solve!`.
+`model.solver_kwargs` merged with `kwargs` with the per-state tolerances of
+[`state_tolerances`](@ref), and [`state_clamping_callback`](@ref) if `clamp_states` (after a
+user `callback`). For solving `model.prob` (or a `remake` of it, e.g. in an `EnsembleProblem`)
+without `solve!`.
 """
 function solve_kwargs(model::ProcessBasedModel; clamp_states=false, kwargs...)
     kwargs = NamedTuple(kwargs)
@@ -174,7 +204,7 @@ function solve_kwargs(model::ProcessBasedModel; clamp_states=false, kwargs...)
         kwargs = merge(kwargs, (; callback))
     end
     return merge(
-        (; saveat=model.saveat, tstops=model.tstops),
+        (; saveat=model.saveat),
         state_tolerances(model, merge(model.solver_kwargs, kwargs)),
     )
 end
@@ -184,13 +214,14 @@ end
 
 Solve the model, saving the states at `model.saveat`, and store the [`window_means`](@ref)
 of the accumulated diagnostics in `model.diagnostics`. `kwargs` (e.g. `alg`, `callback`,
-`d_discontinuities`) are passed to `OrdinaryDiffEq.solve`. `yaxarray_output=true` stores the
+`tstops`) are passed to `OrdinaryDiffEq.solve`; extra `tstops` come on top of the window
+bounds. `yaxarray_output=true` stores the
 states and window means in a YAXArrays `Dataset` in `model.output`; off by default as it
 interferes with AD.
 
 Implicit solvers take their Jacobian from ForwardDiff, `ImplicitEuler(; autodiff=AutoForwardDiff())`,
 or Enzyme, `ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=EvaporationModel.Enzyme.Duplicated))`
-(`Duplicated` because the right-hand side is a closure over the forcings).
+(`Duplicated` because the right-hand side is a closure).
 
 `clamp_states=true` clamps the states to their physical range after every step with
 [`state_clamping_callback`](@ref) (applied after a user `callback`). Meant to be combined
@@ -272,8 +303,15 @@ function window_means(sol, accumulated::Tuple{Vararg{Symbol}})
 end
 window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulated)
 
+"""
+    compute_diagnostics(u, p, t, forcing, thresholds=HardThresholds())
+
+All fluxes and other diagnostics for the state `u`, parameters `p` and the `forcing` values
+(`P, T_a, u_a, p_a, VPD_a, SW_in, R_n, LAI, lon, utc_offset`) at time `t`. `t` only sets the
+solar time of the ground heat flux.
+"""
 @inline function compute_diagnostics(
-    u, p::AbstractArray, t, forcings::NamedTuple, thresholds::ThresholdTreatment=HardThresholds()
+    u, p::AbstractArray, t, forcing::NamedTuple, thresholds::ThresholdTreatment=HardThresholds()
 )
     w_1, w_2, w_r = u
     @unpack h,
@@ -295,16 +333,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     g_d,
     r_smin,
     k_ext = p
-    P, T_a, u_a, p_a, VPD_a, SW_in, R_n, LAI = (
-        forcings.P(t),
-        forcings.T_a(t),
-        forcings.u_a(t),
-        forcings.p_a(t),
-        forcings.VPD_a(t),
-        forcings.SW_in(t),
-        forcings.R_n(t),
-        forcings.LAI(t),
-    )
+    @unpack P, T_a, u_a, p_a, VPD_a, SW_in, R_n, LAI, lon, utc_offset = forcing
     # A floor on a forcing, not on a state, hence a plain max (no threshold treatment)
     u_a = max(u_a, of_value_type(u_a, U_MIN))
     d_c, z_0mc = Bigleaf.roughness_parameters(
@@ -318,7 +347,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
     C_1 = c_1(w_1, w_sat, b, C_1sat, w_wp, thresholds) # no allocs
     C_2 = c_2(w_2, w_sat, C_2ref) # no allocs
 
-    t_sol = seconds_since_solar_noon(t, forcings.lon, forcings.utc_offset)
+    t_sol = seconds_since_solar_noon(t, lon, utc_offset)
     R_nc, R_ns = net_radiation_partitioning(R_n, f_veg)
     G = ground_heat_flux(SantanelloFriedl03(), R_ns, w_1, w_sat, t_sol, thresholds)
     A, A_c, A_s = available_energy_partitioning(R_nc, R_ns, G)
@@ -422,7 +451,7 @@ window_means(model::ProcessBasedModel) = window_means(model.sol, model.accumulat
 end
 
 """
-    compute_tendencies!(du, u, p, t, forcings, thresholds=HardThresholds(), accumulated=Val(()))
+    compute_tendencies!(du, u, p, t, forcing, thresholds=HardThresholds(), accumulated=Val(()))
 
 Tendencies of `[w_1, w_2, w_r]`, followed by the `accumulated` diagnostics (a `Val` of names).
 """
@@ -431,11 +460,11 @@ function compute_tendencies!(
     u,
     p::AbstractArray,
     t,
-    forcings::NamedTuple,
+    forcing::NamedTuple,
     thresholds::ThresholdTreatment=HardThresholds(),
     accumulated::Val=Val(()),
 )
-    diagnostics = compute_diagnostics(u, p, t, forcings, thresholds)
+    diagnostics = compute_diagnostics(u, p, t, forcing, thresholds)
     @unpack d_1, d_2 = p
     @unpack P_c, D_c, I_s, f_1, D_1, K_2, E_s, E_t, E_i, C_1 = diagnostics
     du[1] = C_1 / (ρ_w * d_1) * (f_1 * I_s - E_s) - D_1

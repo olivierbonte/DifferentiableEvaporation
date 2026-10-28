@@ -26,7 +26,7 @@ include(srcdir("site_data.jl")) # site_forcing, site_parameters
 FT = Float64
 site = "DE-Tha"
 file_ec = datadir("exp_pro", "eddy_covariance", "experimental", site * "_ICOS_HH_2023-2024.nc")
-# Forcings: constant piecewise interpolation
+# Forcings: one value per half-hour window
 forcings, times, ds_ec = site_forcing(file_ec; FT=FT) # local standard time
 time_ec = ds_ec.time.val # start of the half-hours windows
 
@@ -54,7 +54,7 @@ println(model.sol.retcode, ", number of steps: ", length(model.sol.t), " saved, 
 λE_mod = model.diagnostics.λE_tot
 H_mod = model.diagnostics.H_tot
 # Available energy Rₙ - G, with Rₙ constant over each half-hour
-A_mod = forcings.R_n.(times.stamps) .- model.diagnostics.G
+A_mod = forcings.R_n .- model.diagnostics.G
 
 ## Observed energy balance components
 # Uncorrected (F_MDS) and energy balance corrected (CORR) fluxes
@@ -231,7 +231,7 @@ end
 
 # Window means of the accumulated diagnostics, nothing if the solve failed
 function simulate(x)
-    prob = remake(model.prob; p=calibration_parameters(x))
+    prob = with_parameters(model.prob, calibration_parameters(x))
     sol = solve(prob, solver; options...)
     return SciMLBase.successful_retcode(sol) ? window_means(sol, model.accumulated) : nothing
 end

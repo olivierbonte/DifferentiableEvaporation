@@ -23,7 +23,7 @@ end
         thresholds in treatments,
         u0 in map(u0_from_fractions, u0_fractions)
 
-        forcings = merge(constant_forcings(P), (; R_n=Returns(R_n)))
+        forcings = merge(constant_forcings(P), (; R_n))
         d = compute_diagnostics(u0, p_model, t, forcings, thresholds)
         λE_c = d.λE_t + d.λE_i
         # 1) Total energy balance
@@ -64,6 +64,53 @@ end
     EvaporationModel.solve!(model_tight; alg=Tsit5(), abstol=1e-10, reltol=1e-10)
     # tighter tolerances require more accepted steps
     @test model_tight.sol.stats.naccept > model_default.sol.stats.naccept
+end
+
+@testset "Piecewise constant forcing at the window bounds" begin
+    t_0, t_1, t_2 = t_unix, t_unix + 1800.0, t_unix + 3600.0
+    window_starts = EvaporationModel.forcing_window_starts((t_0, t_2), [t_0, t_1, t_2])
+    @test window_starts == [t_0, t_1] # no window starts at the end
+    # A window bound belongs to the window starting there
+    window_index(t) = EvaporationModel.window_index(window_starts, t)
+    @test window_index.([t_0, t_1 - 1, t_1, t_2]) == [1, 1, 2, 2]
+    # A vector holds one value per window, a number is constant
+    table = forcing_table((; P=[1.0, 2.0], T_a=290.0, lon=4.5), window_starts)
+    @test table == (; P=[1.0, 2.0], T_a=290.0, lon=4.5)
+    @test_throws ArgumentError forcing_table((; P=[1.0, 2.0, 3.0]), window_starts)
+    @test_throws ArgumentError forcing_table((; P=t -> 1.0), window_starts)
+
+    # Rain in the given windows
+    P_rain = 1e-3 # kg/(m² s), 3.6 mm/h
+    rain(P_values) = merge(constant_forcings(0.0), (; P=P_values))
+    function run_windows(forcings, alg; kwargs...)
+        model = ProcessBasedModel{Float64}(;
+            forcings, parameters=p_model, t_span=(t_0, t_2), u0=copy(u0_toy),
+            saveat=[t_0, t_1, t_2],
+        )
+        initialize!(model)
+        EvaporationModel.solve!(model; alg, kwargs...)
+        return model
+    end
+    # As in scripts/reference/dt_study.jl: a new Jacobian every Newton solve and no divergence
+    # check, as a fixed-step solver can't recover from a failed Newton solve by rejecting the step
+    newton = NLNewton(; max_iter=30, always_new=true, relax=BackTracking(), check_div=false)
+    backward_euler = ImplicitEuler(; autodiff=AutoForwardDiff(), nlsolve=newton)
+    for (alg, kwargs) in (
+        (backward_euler, (; adaptive=false, dt=1800.0)), # forcing at the end of each step
+        (Euler(), (; adaptive=false, dt=1800.0)), # at the start of each step
+        (Heun(), (; adaptive=false, dt=900.0)), # at both
+        (Tsit5(), (; abstol=1e-10, reltol=1e-10)), # first stage reused from the last (FSAL)
+    )
+        # The first window has the rain until its end, the second none
+        stepped = run_windows(rain([P_rain, 0.0]), alg; kwargs...)
+        rain_throughout = run_windows(rain(P_rain), alg; kwargs...)
+        rain_never = run_windows(rain(0.0), alg; kwargs...)
+        @test stepped.sol.u[2][1:3] ≈ rain_throughout.sol.u[2][1:3] # the states at t_1
+        @test stepped.diagnostics.λE_tot[1] ≈ rain_throughout.diagnostics.λE_tot[1]
+        # The canopy drains in the second window, as without any rain from the same state
+        @test stepped.sol[3, end] < stepped.sol[3, 2]
+        @test stepped.sol[3, 2] > rain_never.sol[3, 2]
+    end
 end
 
 @testset "Explicit Euler with state clamping" begin
