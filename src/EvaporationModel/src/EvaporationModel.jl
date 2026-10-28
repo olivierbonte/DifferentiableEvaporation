@@ -151,6 +151,8 @@ export compute_amplitude_and_phase,
     of_value_type,
     KGE,
     KGEmod,
-    RMSE
+    RMSE,
+    RRMSE,
+    metric_skipnan
 
 end # module EvaporationModel
