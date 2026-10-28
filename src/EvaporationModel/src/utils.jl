@@ -187,6 +187,9 @@ ErrorMetrics.purpose(::Type{KGEmod}) = "Modified Kling-Gupta Efficiency (Kling e
 struct RMSE <: ErrorMetric end
 ErrorMetrics.purpose(::Type{RMSE}) = "Root Mean Squared Error: Square root of the average squared difference between predicted and observed values"
 
+struct RRMSE <: ErrorMetric end
+ErrorMetrics.purpose(::Type{RRMSE}) = "Relative Root Mean Squared Error: RMSE over the mean absolute observation"
+
 # Correlation ρ, variability ratio α and bias ratio β of simulations ŷ and observations y
 function kge_components(ŷ::AbstractArray, y::AbstractArray)
     ρ = cor(y, ŷ)
@@ -208,4 +211,31 @@ end
 
 function ErrorMetrics.metric(::RMSE, ŷ::AbstractArray, y::AbstractArray, yσ::AbstractArray)
     return √(ErrorMetrics.metric(ErrorMetrics.MSE(), ŷ, y, yσ))
+end
+
+function ErrorMetrics.metric(::RRMSE, ŷ::AbstractArray, y::AbstractArray, yσ::AbstractArray)
+    return ErrorMetrics.metric(RMSE(), ŷ, y, yσ) / mean(abs, y)
+end
+
+"""
+    metric_skipnan(m::ErrorMetric, ŷ, y)
+
+The error metric `m` of the simulations `ŷ` against the observations `y`, both arrays, over
+the entries where `y` is not NaN.
+NaNs in `ŷ` are kept, so a failed simulation gives a NaN metric.
+
+# Examples
+```jldoctest
+using EvaporationModel
+metric_skipnan(RMSE(), [1.0, 2.0, 5.0], [1.0, 3.0, NaN]) ≈ sqrt(0.5)
+
+# output
+
+true
+```
+"""
+function metric_skipnan(m::ErrorMetric, ŷ::AbstractArray, y::AbstractArray)
+    ŷ, y = collect(ŷ), collect(y) # e.g. YAXArrays
+    keep = .!isnan.(y)
+    return ErrorMetrics.metric(m, ŷ[keep], y[keep])
 end
