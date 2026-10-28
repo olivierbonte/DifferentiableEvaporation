@@ -46,12 +46,34 @@ u0_from_fractions(f) = f .* [w_sat, w_sat, max_canopy_capacity(LAI)]
 t_unix = datetime2unix(DateTime(2010, 7, 1, 10)) # model time [s since Unix epoch], 10:00 local
 treatments = (HardThresholds(), KavetskiSmoothing())
 
-# Toy case: one day of constant forcing with light rain, output every 30 minutes.
-# w_1 < w_fc, where the Jacobian of the hard thresholds is finite (r_ss = 0 above w_fc).
+# Toy case: one day from 10:00 with half-hourly forcing (a diurnal cycle and a one-hour
+# shower), output every 30 minutes. w_1 stays below w_fc, where the Jacobian of the hard
+# thresholds is finite (r_ss = 0 above w_fc).
 u0_toy = [0.2, 0.2, 0.001]
 t_span_toy = (t_unix, t_unix + 86400.0)
 saveat_toy = collect(t_span_toy[1]:1800.0:t_span_toy[2])
-forcings_toy = constant_forcings(5e-6) # kg/(m² * s)
+window_starts_toy = saveat_toy[1:(end - 1)]
+
+hour_of_day(t) = mod(t, 86400.0) / 3600.0 # local standard time
+diurnal_cycle(t) = -cos(2π * hour_of_day(t) / 24) # -1 at midnight, +1 at noon
+in_shower(t) = 14 <= hour_of_day(t) < 15
+
+diurnal_toy = diurnal_cycle.(window_starts_toy)
+SW_in_toy = max.(800.0 .* diurnal_toy, 0.0)
+forcings_toy = (
+    P=ifelse.(in_shower.(window_starts_toy), 5e-5, 0.0), # kg/(m² s), 0.18 mm/h
+    T_a=293.0 .+ 5.0 .* diurnal_toy,
+    u_a=u,
+    p_a=p_a,
+    VPD_a=1000.0 .+ 600.0 .* diurnal_toy,
+    SW_in=SW_in_toy,
+    R_n=0.7 .* SW_in_toy .- 40.0,
+    LAI=LAI,
+    lon=4.52,
+    utc_offset=1,
+)
+# Constant forcing with light rain, for calling the right-hand side directly
+constant_forcing_toy = constant_forcings(5e-6) # kg/(m² * s)
 
 function toy_model(; thresholds=HardThresholds(), parameters=p_model, u0=u0_toy, kwargs...)
     model = ProcessBasedModel{Float64}(;

@@ -14,11 +14,13 @@ end
 # For differentiating directly through the solver with Enzyme: the problem is built inside the
 # loss, with `FullSpecialize` (no FunctionWrappers around `f`), instead of a `remake` of a
 # `Constant` problem, and `SensitivityADPassThrough` skips the SciMLSensitivity adjoint rules.
-# `p_template` is the `ModelParameters` of the model; the forcing is constant, so the problem
-# needs no window callback.
+# `p_template` is the `ModelParameters` of the model.
 function toy_loss_direct(p, f, p_template, u0, tspan, saveat, y_obs, solver_kwargs)
     model_parameters = SciMLStructures.replace(SciMLStructures.Tunable(), p_template, p)
-    prob = ODEProblem{true,SciMLBase.FullSpecialize}(f, copy(u0), tspan, model_parameters)
+    callback = EvaporationModel.window_callback()
+    prob = ODEProblem{true,SciMLBase.FullSpecialize}(
+        f, copy(u0), tspan, model_parameters; callback
+    )
     sensealg = DiffEqBase.SensitivityADPassThrough()
     sol = solve(prob, Tsit5(); saveat, sensealg, solver_kwargs...)
     return sum(abs2, Array(sol) .- y_obs) / length(y_obs)
@@ -39,6 +41,8 @@ inactive_norm(u, t) = Enzyme.ignore_derivatives(DiffEqBase.ODE_DEFAULT_NORM(u, t
             model.solver_kwargs...,
         )
     )
+    # The hard thresholds have a finite Jacobian below field capacity
+    @test maximum(y_obs[1, :]) < p_model.w_fc
     # Every gradient call gets its own copy of the problem, so that a gradient cannot change
     # the problem used by the next one (see the `prob.u0` test below)
     fresh_prob() = remake(model.prob; u0=copy(model.u0))
