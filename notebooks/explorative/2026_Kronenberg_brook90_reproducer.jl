@@ -13,11 +13,9 @@ using ComponentArrays
 using Dates
 using ErrorMetrics
 using EvaporationModel
-using LineSearches: BackTracking
 using Optim
 using OrdinaryDiffEq
 using OrdinaryDiffEq: SciMLBase
-using OrdinaryDiffEqNonlinearSolve: NLNewton
 using Statistics
 using YAXArrays
 
@@ -213,7 +211,7 @@ sel_cal = in_2024 .& (λE_qc .== 0)
 # time stepping with ImplicitEuler (tried before) accepted/rejected steps
 # change with the parameters. Newton settings as in scripts/calibration/synthetic.jl.
 solver = ImplicitEuler(;
-    nlsolve=NLNewton(; max_iter=50, always_new=true, relax=BackTracking(), check_div=false),
+    nlsolve=fixed_step_newton(; max_iter=50),
     autodiff=AutoForwardDiff(),
 )
 options = solve_kwargs(model; dt=1800 / 8, adaptive=false, maxiters=10^7)

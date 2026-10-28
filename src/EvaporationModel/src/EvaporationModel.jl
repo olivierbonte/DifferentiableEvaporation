@@ -7,9 +7,11 @@ using Dates
 using Enzyme: Enzyme
 using ErrorMetrics: ErrorMetrics, ErrorMetric
 using ForwardDiff
+using LineSearches: BackTracking
 using LinearSolve
 using OrdinaryDiffEq
 using OrdinaryDiffEqLowOrderRK: Euler, Heun
+using OrdinaryDiffEqNonlinearSolve: NLNewton
 using OrdinaryDiffEqSDIRK: ImplicitEuler
 using Parameters
 using SciMLStructures: SciMLStructures
@@ -92,7 +94,8 @@ export AbstractModel,
     window_means,
     state_tolerances,
     solve_kwargs,
-    state_clamping_callback
+    state_clamping_callback,
+    fixed_step_newton
 
 include("resistances.jl")
 export soil_aerodynamic_resistance,

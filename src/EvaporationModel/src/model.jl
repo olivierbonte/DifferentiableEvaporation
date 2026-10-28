@@ -188,6 +188,23 @@ function state_clamping_callback(model::ProcessBasedModel)
 end
 
 """
+    fixed_step_newton(; max_iter=30, kwargs...)
+
+Newton solver for fixed-step implicit solvers: the `nlsolve` of fixed-step backward Euler,
+`solve!(model; alg=ImplicitEuler(; nlsolve=fixed_step_newton(), autodiff=AutoForwardDiff()), dt, adaptive=false)`.
+An `NLNewton` with a new Jacobian at every Newton solve (`always_new=true`), a backtracking
+line search and no divergence check (`check_div=false`). The default quasi-Newton reuses the
+Jacobian across steps, and the divergence check stops Newton after 2 iterations when the
+first update grows (e.g. at the onset of heavy rain). Both fail after forcing jumps, and a
+fixed-step solver can't recover by rejecting the step. `kwargs` are passed to `NLNewton`.
+"""
+function fixed_step_newton(; max_iter=30, kwargs...)
+    return NLNewton(;
+        max_iter, always_new=true, relax=BackTracking(), check_div=false, kwargs...
+    )
+end
+
+"""
     solve_kwargs(model::ProcessBasedModel; clamp_states=false, kwargs...)
 
 Keyword arguments of `OrdinaryDiffEq.solve` used by [`solve!`](@ref): `model.saveat`,
@@ -221,7 +238,8 @@ interferes with AD.
 
 Implicit solvers take their Jacobian from ForwardDiff, `ImplicitEuler(; autodiff=AutoForwardDiff())`,
 or Enzyme, `ImplicitEuler(; autodiff=AutoEnzyme(; function_annotation=EvaporationModel.Enzyme.Duplicated))`
-(`Duplicated` because the right-hand side is a closure).
+(`Duplicated` because the right-hand side is a closure). At a fixed step, use
+[`fixed_step_newton`](@ref) as their `nlsolve`.
 
 `clamp_states=true` clamps the states to their physical range after every step with
 [`state_clamping_callback`](@ref) (applied after a user `callback`). Meant to be combined

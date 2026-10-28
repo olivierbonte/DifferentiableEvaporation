@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "a1af418fd9c02d2a23ccb003de6f4abe79a36b69"
+project_hash = "32ed65415c703cc2724f5a5ff9ae4b418b72d378"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -887,7 +887,7 @@ uuid = "c324fbf6-076a-4da5-8ad2-21081a6b285c"
 version = "0.1.0"
 
 [[deps.EvaporationModel]]
-deps = ["ADTypes", "Bigleaf", "ComponentArrays", "Dates", "Enzyme", "ErrorMetrics", "ForwardDiff", "LinearSolve", "OrdinaryDiffEq", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqSDIRK", "Parameters", "SciMLStructures", "StatsBase", "YAXArrays"]
+deps = ["ADTypes", "Bigleaf", "ComponentArrays", "Dates", "Enzyme", "ErrorMetrics", "ForwardDiff", "LineSearches", "LinearSolve", "OrdinaryDiffEq", "OrdinaryDiffEqLowOrderRK", "OrdinaryDiffEqNonlinearSolve", "OrdinaryDiffEqSDIRK", "Parameters", "SciMLStructures", "StatsBase", "YAXArrays"]
 path = "src/EvaporationModel"
 uuid = "49da8130-70c8-449e-9091-2395ad2fb07e"
 version = "0.1.0"

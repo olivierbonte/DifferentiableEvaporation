@@ -91,10 +91,7 @@ end
         EvaporationModel.solve!(model; alg, kwargs...)
         return model
     end
-    # As in scripts/reference/dt_study.jl: a new Jacobian every Newton solve and no divergence
-    # check, as a fixed-step solver can't recover from a failed Newton solve by rejecting the step
-    newton = NLNewton(; max_iter=30, always_new=true, relax=BackTracking(), check_div=false)
-    backward_euler = ImplicitEuler(; autodiff=AutoForwardDiff(), nlsolve=newton)
+    backward_euler = ImplicitEuler(; autodiff=AutoForwardDiff(), nlsolve=fixed_step_newton())
     for (alg, kwargs) in (
         (backward_euler, (; adaptive=false, dt=1800.0)), # forcing at the end of each step
         (Euler(), (; adaptive=false, dt=1800.0)), # at the start of each step

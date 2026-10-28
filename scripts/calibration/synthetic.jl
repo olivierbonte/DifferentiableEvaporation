@@ -4,9 +4,7 @@ using CairoMakie
 using OrdinaryDiffEq
 using OrdinaryDiffEqSDIRK
 using ErrorMetrics: metric
-using LineSearches: BackTracking
 using OrdinaryDiffEq: SciMLBase
-using OrdinaryDiffEqNonlinearSolve: NLNewton
 using Random: Xoshiro
 
 
@@ -84,7 +82,7 @@ p_true = copy(model.parameters)
 # Newton fix for fixed-step implicit Euler, see https://github.com/SciML/OrdinaryDiffEq.jl/issues/4905
 OrdinaryDiffEq.OrdinaryDiffEqCore.isadaptive(::ImplicitEuler) = false
 backward_euler = ImplicitEuler(;
-    nlsolve=NLNewton(; max_iter=50, always_new=true, relax=BackTracking(), check_div=false),
+    nlsolve=fixed_step_newton(; max_iter=50),
     autodiff=AutoForwardDiff(),
 )
 solvers = [
