@@ -1,6 +1,7 @@
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using CairoMakie
+using DifferentiationInterface: value_and_derivative
 using OrdinaryDiffEq
 using OrdinaryDiffEqSDIRK
 using ErrorMetrics: metric
@@ -77,12 +78,40 @@ period = Dates.format(start_date, "yyyy-mm") # 1 month
 
 
 ## Synthetic observations: truth + constant Gaussian noise
-p_true = copy(model.parameters)
-λE_truth = copy(model.diagnostics.λE_tot)
-σ_noise = 10.0 # W m⁻²
-λE_noisy = λE_truth .+ σ_noise .* randn(Xoshiro(42), length(λE_truth))
+"""
+    synthetic_target(truth_sol, name, label, unit, observe_function, σ_noise)
 
-## Loss landscapes (RMSE of λE_tot) in the (kB⁻¹, r_smin) and (b, C_1sat) planes
+Calibration target `name`: `observe_function(sol)` gives the observed quantity of a solution
+, here of the synthetic truth `truth_sol`, with Gaussian noise of standard deviation
+`σ_noise` [`unit`] added for the noisy observations.
+"""
+function synthetic_target(truth_sol, name, label, unit, observe_function, σ_noise)
+    truth = observe_function(truth_sol)
+    noisy = truth .+ σ_noise .* randn(Xoshiro(seed), length(truth))
+    return (; name, label, unit, observe_function, truth, noisy, σ_noise)
+end
+observe_λE_tot(sol) = window_means(sol, model.accumulated).λE_tot
+observe_w_1(sol) = sol[1, :] # states at `saveat`
+targets = (
+    λE_tot=synthetic_target(model.sol, :λE_tot, "λE_tot", "W m⁻²", observe_λE_tot, 10.0),
+    w_1=synthetic_target(model.sol, :w_1, "w₁", "m³ m⁻³", observe_w_1, 0.02),
+)
+
+"""
+    target_rmses(target, sol)
+
+RMSEs of the solution `sol` against the noise-free truth and the noisy observations of
+`target`.
+"""
+function target_rmses(target, sol)
+    simulated = target.observe_function(sol)
+    rmse_vs_truth = metric(RMSE(), simulated, target.truth)
+    rmse_vs_noisy = metric(RMSE(), simulated, target.noisy)
+    return [rmse_vs_truth, rmse_vs_noisy]
+end
+
+## Loss landscapes: RMSE of λE_tot in the (kB⁻¹, r_smin) plane, RMSE of w₁ in the
+## (b, C_2ref) plane
 # Conceptually as Fig. 1 of Kavetski & Clark (2010)
 
 # Solvers to compare
@@ -92,9 +121,10 @@ backward_euler = ImplicitEuler(;
     nlsolve=fixed_step_newton(; max_iter=50),
     autodiff=AutoForwardDiff(),
 )
-# Adaptive solvers at a tight and a loose tolerance (loose: microscale noise from changes in
-# the step-size sequence, Fig. 3 of Kavetski & Clark (2010)), fixed-step solvers with one step
-# per forcing window (a bias of the optimum that grows with Δt)
+# Adaptive solvers at a tight and a loose tolerance (microscale noise from changes
+# in the step-size sequence, Fig. 3 of Kavetski & Clark (2010)), fixed-step solvers with one
+# step per forcing window (a bias of the optimum that grows with Δt). Explicit Euler without
+# clamping is unstable at Δt = 30 min
 solvers = [
     (name="Tsit5 (adaptive, tol = 10⁻⁶)", alg=Tsit5(), kwargs=(;)),
     (
@@ -102,7 +132,6 @@ solvers = [
         alg=Tsit5(),
         kwargs=(; abstol=1e-3, reltol=1e-3),
     ),
-    (name="KenCarp4 (adaptive, tol = 10⁻⁶)", alg=KenCarp4(), kwargs=(;)),
     (
         name="KenCarp4 (adaptive, tol = 10⁻³)",
         alg=KenCarp4(),
@@ -113,14 +142,12 @@ solvers = [
         alg=backward_euler,
         kwargs=(; dt=1800.0, adaptive=false),
     ),
-    # Without clipping, explicit Euler is unstable at Δt = 30 min (|λ|Δt > 2 in ~30% of the
-    # windows). At Δt = 225 s it fails at high b only (where w₁ is stiffest), leaving blank,
-    # failed grid points as in Fig. 1 of Kavetski & Clark (2010); Δt ≤ 75 s is stable at the
-    # corners of both parameter grids
+    # Stable at Δt = 30 min by clamping the states to their physical range after every step,
+    # as in classic hydrological models.
     (
-        name="Explicit Euler (Δt = 30/8 min)",
+        name="Explicit Euler (Δt = 30 min), clamping",
         alg=Euler(),
-        kwargs=(; dt=225.0, adaptive=false),
+        kwargs=(; dt=1800.0, adaptive=false, clamp_states=true),
     ),
 ]
 
