@@ -195,8 +195,14 @@ Newton solver for fixed-step implicit solvers: the `nlsolve` of fixed-step backw
 An `NLNewton` with a new Jacobian at every Newton solve (`always_new=true`), a backtracking
 line search and no divergence check (`check_div=false`). The default quasi-Newton reuses the
 Jacobian across steps, and the divergence check stops Newton after 2 iterations when the
-first update grows (e.g. at the onset of heavy rain). Both fail after forcing jumps, and a
-fixed-step solver can't recover by rejecting the step. `kwargs` are passed to `NLNewton`.
+first update grows (e.g. at the onset of heavy rain), while Newton converges when continued.
+Both fail after forcing jumps, and a fixed-step solver can't recover by rejecting the step
+
+The consequence of `check_div=false`: a Newton solve that does not converge within `max_iter` is
+accepted as converged, without warning or failed `ReturnCode`. Check the results against a
+larger `max_iter` (or the residuals of the steps).
+
+`kwargs` are passed to `NLNewton`.
 """
 function fixed_step_newton(; max_iter=30, kwargs...)
     return NLNewton(;
