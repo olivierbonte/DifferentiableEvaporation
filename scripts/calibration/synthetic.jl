@@ -242,37 +242,49 @@ end
 """
     plot_landscapes(plane, landscape_data, rmse_per_solver, title; colorscale=identity)
 
-3 × 2 heatmaps with contours of the RMSE landscapes of the 6 solvers in the parameter `plane`
-on a shared colour scale, with the true parameters and the grid minimum marked.
+2 × 3 heatmaps with contours of the RMSE landscapes of the 5 solvers in the parameter `plane`
+on a shared colour scale, with the true parameters and the grid minimum marked. The colour
+bar and legend go in the empty sixth panel.
 """
 function plot_landscapes(plane, landscape_data, rmse_per_solver, title; colorscale=identity)
     @unpack x_values, y_values, solver_names = landscape_data
-    fig = Figure(; size=(950, 1250))
-    Label(fig[0, 1:2], title; fontsize=18, font=:bold)
+    (; label, unit) = plane.target
+    fig = Figure(; size=(1100, 680))
+    Label(fig[0, 1:3], title; fontsize=18, font=:bold)
 
     all_values = reduce(vcat, vec.(rmse_per_solver))
     colorrange = extrema(filter(isfinite, all_values))
 
-    # (row, column) of the 6 solvers: one row per solver pair of `solvers`
-    panel_positions = [(1, 1), (1, 2), (2, 1), (2, 2), (3, 1), (3, 2)]
-    for k in 1:6
+    # (row, column) of the 5 solvers, (2, 3) is left for the colour bar and legend
+    panel_positions = [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2)]
+    axes = Makie.Axis[]
+    for k in 1:5
         rmse = rmse_per_solver[k]
         row, col = panel_positions[k]
-        ax = Makie.Axis(fig[row, col]; title=solver_names[k], xlabel=plane.xlabel,
-            ylabel=plane.ylabel)
+        ax = Makie.Axis(fig[row, col]; title=solver_names[k], xlabel=param_labels[plane.x],
+            ylabel=param_labels[plane.y])
+        push!(axes, ax)
         heatmap!(ax, x_values, y_values, rmse; colorrange, colorscale, colormap=:viridis)
         contour!(ax, x_values, y_values, colorscale.(rmse); levels=15, color=:white,
             linewidth=0.6)
 
         scatter!(ax, [getproperty(p_true, plane.x)], [getproperty(p_true, plane.y)];
             marker=:star5, color=:red, markersize=15, label="true")
-        i_min, j_min = Tuple(argmin(replace(rmse, NaN => Inf)))
+        i_min, j_min = Tuple(argmin(replace(rmse, NaN => Inf))) # failed runs are NaN
         scatter!(ax, [x_values[i_min]], [y_values[j_min]]; marker=:xcross,
             color=:orange, markersize=13, label="grid minimum")
     end
-    axislegend(content(fig[1, 1]); position=:rt)
-    Colorbar(fig[1:3, 3]; colorrange, colormap=:viridis, scale=colorscale,
-        label="RMSE λE_tot [W m⁻²]")
+    # Shared axes: tick labels only in the left column and below the bottom panels
+    linkaxes!(axes...)
+    hidexdecorations!.(axes[1:2])
+    hideydecorations!.(axes[[2, 3, 5]])
+
+    # tellwidth/tellheight=false so the colour bar and legend don't set the size of their panel
+    Colorbar(fig[2, 3][1, 1]; colorrange, colormap=:viridis, scale=colorscale,
+        label="RMSE $label [$unit]", vertical=false, flipaxis=false, tellwidth=false,
+        tellheight=false, valign=:bottom)
+    Legend(fig[2, 3][2, 1], axes[1]; framevisible=false, orientation=:horizontal,
+        tellwidth=false, tellheight=false, valign=:top)
     return fig
 end
 
