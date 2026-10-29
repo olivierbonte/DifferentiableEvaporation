@@ -188,6 +188,20 @@ function state_clamping_callback(model::ProcessBasedModel)
 end
 
 """
+    unphysical_states(dt, u, p, t; w_margin=0.01)
+
+`unstable_check` of `OrdinaryDiffEq.solve`: true when a soil moisture state leaves its
+physical range ``[0, w_{sat}]`` by more than `w_margin` (the overshoot the smoothed thresholds
+allow), e.g. `solve!(model; unstable_check=unphysical_states)`. The solve then stops with
+`ReturnCode.Unstable` instead of running on to unphysical values (e.g. unstable explicit
+Euler). A NaN state also counts as unphysical.
+"""
+function unphysical_states(dt, u, p, t; w_margin=0.01)
+    w_min, w_max = -w_margin, p.tunable.w_sat + w_margin
+    return !(w_min ≤ u[1] ≤ w_max && w_min ≤ u[2] ≤ w_max)
+end
+
+"""
     fixed_step_newton(; max_iter=30, kwargs...)
 
 Newton solver for fixed-step implicit solvers: the `nlsolve` of fixed-step backward Euler,

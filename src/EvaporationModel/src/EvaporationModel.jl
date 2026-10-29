@@ -95,6 +95,7 @@ export AbstractModel,
     state_tolerances,
     solve_kwargs,
     state_clamping_callback,
+    unphysical_states,
     fixed_step_newton
 
 include("resistances.jl")
