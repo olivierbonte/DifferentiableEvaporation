@@ -291,13 +291,19 @@ end
 for plane in planes
     landscape_data = compute_landscapes(plane)
     @unpack rmse_truth, rmse_noisy = landscape_data
-    name = "loss_landscape_$(plane.x)_$(plane.y)_$(period)"
-
-    fig_truth = plot_landscapes(plane, landscape_data, rmse_truth,
-        "Loss-landscapes of the noise-free synthetic truth"; colorscale=log10)
-    safesave(plotsdir("calibration", "$(name).png"), fig_truth)
-
-    fig_noisy = plot_landscapes(plane, landscape_data, rmse_noisy,
-        "Loss-landscapes of the synthetic truth + Gaussian noise (σ = $σ_noise W m⁻²)")
-    safesave(plotsdir("calibration", "$(name)_noisy.png"), fig_noisy)
+    (; name, label, unit, σ_noise) = plane.target
+    figure_name = "loss_landscape_$(plane.x)_$(plane.y)_$(name)_$(period)"
+    # The noise-free RMSE goes to zero at the truth: log colour scale
+    variants = [
+        (suffix="", rmse=rmse_truth, colorscale=log10,
+            description="the noise-free synthetic truth"),
+        (suffix="_noisy", rmse=rmse_noisy, colorscale=identity,
+            description="the synthetic truth + Gaussian noise (σ = $σ_noise $unit)"),
+    ]
+    for (; suffix, rmse, colorscale, description) in variants
+        fig = plot_landscapes(plane, landscape_data, rmse,
+            "Loss-landscapes ($label) of $description"; colorscale)
+        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig)
+    end
 end
+
