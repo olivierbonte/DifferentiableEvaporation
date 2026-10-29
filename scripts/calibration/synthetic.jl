@@ -1,7 +1,10 @@
+# Run multithreaded, e.g. `julia -t 8 scripts/calibration/synthetic.jl`:
+# ` the landscape ensembles (EnsembleThreads) and the slice points
+# (Threads.@threads) run in parallel over the threads, sequentially with one thread
 using DrWatson
 @quickactivate "DifferentiableEvaporation"
 using CairoMakie
-using DifferentiationInterface: value_and_derivative
+using DifferentiationInterface: AutoFiniteDiff, derivative, value_and_derivative
 using OrdinaryDiffEq
 using OrdinaryDiffEqSDIRK
 using ErrorMetrics: metric
@@ -10,6 +13,7 @@ using Random: Xoshiro
 FT = Float64
 seed = 42 # of the noise of the synthetic observations
 truth_tol = 1e-10
+forced_rerun = false
 
 
 include(srcdir("site_data.jl"))
@@ -179,10 +183,6 @@ function grid_values(name, n=n_grid)
     return range(1 - rel_range, 1 + rel_range; length=n) .* getproperty(p_true, name)
 end
 
-# Only runs the ensembles if `rerun` or if no saved results exist for this plane, target,
-# period, grid size, noise level and threshold treatment (set `rerun = true` after changing
-# e.g. the solvers)
-rerun = false
 threshold_treatment = nameof(typeof(model.thresholds))
 
 """
@@ -218,7 +218,7 @@ function compute_landscapes(plane)
         (; target=target.name, n_grid, rel_range, σ_noise, thresholds=threshold_treatment,
             period),
         datadir("sims", "calibration", "synthetic");
-        prefix="loss_landscape_$(plane.x)_$(plane.y)", force=rerun,
+        prefix="loss_landscape_$(plane.x)_$(plane.y)", force=forced_rerun,
     ) do _
         solver_names = String[]
         rmse_truth = Matrix{FT}[] # one n_grid × n_grid matrix per solver
@@ -307,3 +307,86 @@ for plane in planes
     end
 end
 
+## Loss and its forward mode AD derivative along slices: b and C_2ref on w₁, r_smin on λE_tot
+# Compared with central finite differences of the loss, which the microscale noise of the
+# step-size sequence makes noisy (Fig. 3 of Kavetski & Clark, 2010).
+slices = [
+    (param=:b, target=targets.w_1),
+    (param=:C_2ref, target=targets.w_1),
+    # On λE_tot: r_smin controls the transpiration, the largest part of λE_tot at this forest site
+    (param=:r_smin, target=targets.λE_tot),
+]
+n_slice = 201
+
+"""
+    slice_rmses(slice, solver, param_value)
+
+RMSEs of the model run with `solver` and `slice.param` set to `param_value` against the
+noise-free truth and the noisy observations of `slice.target` (NaN, also for the derivative,
+if the solve failed or diverged).
+"""
+function slice_rmses(slice, solver, param_value)
+    p = parameters_with(slice.param => param_value)
+    prob = with_parameters(model.prob, p)
+    sol = solve(prob, solver.alg; solve_options(solver)...)
+    if !SciMLBase.successful_retcode(sol)
+        # param_value * NaN: NaN partials too (with NaN of type param_value they would be 0)
+        return fill(param_value * NaN, 2)
+    end
+    return target_rmses(slice.target, sol)
+end
+
+"""
+    compute_slice(slice)
+
+RMSEs and their derivatives (forward mode AD and central finite differences, with the default
+step of FiniteDiff) along `n_slice` values of `slice.param` for all `solvers`, against the
+noise-free truth and the noisy observations, loaded from
+`datadir("sims", "calibration", "synthetic")` if already computed. The derivatives of failed
+runs are NaN.
+"""
+function compute_slice(slice)
+    (; target) = slice
+    (; σ_noise) = target
+    slice_data, _ = produce_or_load(
+        (; target=target.name, n_slice, rel_range, σ_noise, thresholds=threshold_treatment,
+            period),
+        datadir("sims", "calibration", "synthetic");
+        prefix="loss_slice_$(slice.param)", force=forced_rerun,
+    ) do _
+        param_values = collect(grid_values(slice.param, n_slice))
+        solver_names = [solver.name for solver in solvers]
+        # One vector along the slice per solver
+        rmse_truth, rmse_noisy = Vector{FT}[], Vector{FT}[]
+        derivative_truth, derivative_noisy = Vector{FT}[], Vector{FT}[]
+        derivative_fd_truth, derivative_fd_noisy = Vector{FT}[], Vector{FT}[]
+        for solver in solvers
+            rmses = Matrix{FT}(undef, 2, n_slice) # [vs truth, vs noisy] per slice point
+            derivatives = Matrix{FT}(undef, 2, n_slice)
+            derivatives_fd = Matrix{FT}(undef, 2, n_slice)
+            Threads.@threads for i in 1:n_slice
+                rmses_at(param_value) = slice_rmses(slice, solver, param_value)
+                rmses[:, i], derivatives[:, i] = value_and_derivative(
+                    rmses_at, AutoForwardDiff(), param_values[i]
+                )
+                derivatives_fd[:, i] = derivative(
+                    rmses_at, AutoFiniteDiff(; fdtype=Val(:central)), param_values[i]
+                )
+            end
+            solver_rmse_truth = rmses[1, :]
+            push!(rmse_truth, solver_rmse_truth)
+            push!(rmse_noisy, rmses[2, :])
+            push!(derivative_truth, derivatives[1, :])
+            push!(derivative_noisy, derivatives[2, :])
+            push!(derivative_fd_truth, derivatives_fd[1, :])
+            push!(derivative_fd_noisy, derivatives_fd[2, :])
+            n_failed = count(isnan, solver_rmse_truth)
+            @info "Slice $(slice.param): $(solver.name) done" n_failed
+        end
+        return @strdict(
+            param_values, solver_names, rmse_truth, rmse_noisy, derivative_truth,
+            derivative_noisy, derivative_fd_truth, derivative_fd_noisy, σ_noise
+        )
+    end
+    return slice_data
+end
