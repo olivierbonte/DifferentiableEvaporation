@@ -6,6 +6,8 @@ using OrdinaryDiffEqSDIRK
 using ErrorMetrics: metric
 using OrdinaryDiffEq: SciMLBase
 using Random: Xoshiro
+seed = 42 # of the noise of the synthetic observations
+truth_tol = 1e-10
 
 
 include(srcdir("site_data.jl"))
@@ -58,7 +60,7 @@ w1_end, w2_end = model.sol[1, end], model.sol[2, end]
 # 2010-07 as the period of interest: dry (w₁ near w_wp ~40% of the time), with ~100 mm of rain
 start_date = DateTime(2010, 07, 01, 00, 00)
 end_date = DateTime(2010, 07, 31, 23, 30)
-forcings, times, ds_ec = site_forcing(file_ec, start_date, end_date; FT=FT)
+forcings, times, _ = site_forcing(file_ec, start_date, end_date; FT=FT)
 model.forcings = forcings
 model.t_span = times.span
 model.u0 = [w1_end, w2_end, 0]
@@ -66,8 +68,13 @@ model.saveat = times.bounds
 initialize!(model)
 # Note: use a high tolerance and a different solver than what we would
 # typically use here.
-EvaporationModel.solve!(model; alg=Kvaerno5(), abstol=1e-8, reltol=1e-8, yaxarray_output=true)
-λE_syn_truth = model.output.λE_tot
+# Recommendation from https://docs.sciml.ai/DiffEqDocs/stable/api/ordinarydiffeq/implicit/SDIRK/#Low-tolerance-(1e-8)
+EvaporationModel.solve!(model; alg=Kvaerno5(), abstol=truth_tol, reltol=truth_tol)
+
+p_true = copy(model.parameters)
+period = Dates.format(start_date, "yyyy-mm") # 1 month
+
+
 
 ## Synthetic observations: truth + constant Gaussian noise
 p_true = copy(model.parameters)
