@@ -7,6 +7,7 @@ using OrdinaryDiffEqSDIRK
 using ErrorMetrics: metric
 using OrdinaryDiffEq: SciMLBase
 using Random: Xoshiro
+FT = Float64
 seed = 42 # of the noise of the synthetic observations
 truth_tol = 1e-10
 
@@ -151,81 +152,89 @@ solvers = [
     ),
 ]
 
-# Parameter planes: the original (kB⁻¹, r_smin) and the soil parameters of the fast surface
-# layer (b, C_1sat), whose stiffness grows when w₁ is dry
-planes = [
-    (x=:kB⁻¹, y=:r_smin, xlabel="kB⁻¹ [-]", ylabel="r_smin [s m⁻¹]"),
-    (x=:b, y=:C_1sat, xlabel="b [-]", ylabel="C₁sat [-]"),
-]
+# Runs that leave the physical range of the states are considered diverged
+solve_options(solver) = solve_kwargs(model; unstable_check=unphysical_states, solver.kwargs...)
 
-# Parameter grid: 0.5 to 1.5 times the true values
+"""
+    parameters_with(changes...)
+
+Copy of `p_true` with the parameters in `changes` (`name => value` pairs) set. The
+`ComponentArray` constructor promotes the number type to that of the new values (e.g.
+ForwardDiff dual numbers).
+"""
+parameters_with(changes...) = ComponentArray(merge(NamedTuple(p_true), (; changes...)))
+
+# Parameter planes with their calibration target. The soil parameters of the fast surface
+# layer are calibrated on w₁ itself: they only act on λE_tot through the small soil
+# evaporation. b sets the force term of w₁, C_2ref the restore term
+planes = [(x=:kB⁻¹, y=:r_smin, target=targets.λE_tot), (x=:b, y=:C_2ref, target=targets.w_1)]
+param_labels = (kB⁻¹="kB⁻¹ [-]", r_smin="r_smin [s m⁻¹]", b="b [-]", C_2ref="C₂ref [-]")
+
+# Parameter grids: (1 ± rel_range) times the true values
+rel_range = 0.5
 n_grid = 41
-n_runs = n_grid * n_grid
 # Run k of the ensemble is grid point (i, j): x_values[i], y_values[j]
 grid_points = CartesianIndices((n_grid, n_grid))
-grid_values(name) = range(0.5, 1.5; length=n_grid) .* getproperty(p_true, name)
-
-# Keep only the RMSEs of a run (NaN if the solve failed), not the full solution
-function compute_rmses(sol, ctx)
-    rerun_run = false
-    if !SciMLBase.successful_retcode(sol)
-        return (NaN, NaN), rerun_run
-    end
-    λE_model = window_means(sol, model.accumulated).λE_tot
-    rmse_truth = metric(RMSE(), λE_model, λE_truth)
-    rmse_noisy = metric(RMSE(), λE_model, λE_noisy)
-    return (rmse_truth, rmse_noisy), rerun_run
+function grid_values(name, n=n_grid)
+    return range(1 - rel_range, 1 + rel_range; length=n) .* getproperty(p_true, name)
 end
 
-# Only runs the ensembles if `rerun` or if no saved results exist for this plane, period, grid
-# size, noise level and threshold treatment (set `rerun = true` after changing e.g. the solvers)
-rerun = true
-thresholds = nameof(typeof(model.thresholds))
-period = Dates.format(start_date, "yyyy-mm")
+# Only runs the ensembles if `rerun` or if no saved results exist for this plane, target,
+# period, grid size, noise level and threshold treatment (set `rerun = true` after changing
+# e.g. the solvers)
+rerun = false
+threshold_treatment = nameof(typeof(model.thresholds))
 
 """
     compute_landscapes(plane)
 
-RMSE landscapes of all `solvers` on the `n_grid × n_grid` grid of the parameters `plane.x`
-and `plane.y`, loaded from `datadir("sims", "calibration")` if already computed.
+RMSE landscapes of `plane.target` of all `solvers` on the `n_grid × n_grid` grid of the
+parameters `plane.x` and `plane.y`, loaded from `datadir("sims", "calibration", "synthetic")`
+if already computed.
 """
 function compute_landscapes(plane)
+    (; target) = plane
+    (; σ_noise) = target
     x_values, y_values = grid_values(plane.x), grid_values(plane.y)
+    # Keep only the RMSEs of a run (NaN if the solve failed or diverged), not the full solution
+    function compute_rmses(sol, ctx)
+        if !SciMLBase.successful_retcode(sol)
+            return [NaN, NaN], false
+        end
+        return target_rmses(target, sol), false
+    end
     # Ensemble of runs, one per grid point
     function set_parameters(prob, ctx)
         i, j = Tuple(grid_points[ctx.sim_id])
-        p = copy(p_true)
-        setproperty!(p, plane.x, x_values[i])
-        setproperty!(p, plane.y, y_values[j])
+        p = parameters_with(plane.x => x_values[i], plane.y => y_values[j])
         return with_parameters(prob, p)
     end
     # safetycopy=false: `set_parameters` does not change `prob`, so no need to copy it (and the
     # forcings) for every run; `with_parameters` gives every run its own current forcing window
-    ensemble = EnsembleProblem(
+    ensemble_problem = EnsembleProblem(
         model.prob; prob_func=set_parameters, output_func=compute_rmses, safetycopy=false
     )
     landscape_data, _ = produce_or_load(
-        (; n_grid, σ_noise, thresholds, period), datadir("sims", "calibration");
+        (; target=target.name, n_grid, rel_range, σ_noise, thresholds=threshold_treatment,
+            period),
+        datadir("sims", "calibration", "synthetic");
         prefix="loss_landscape_$(plane.x)_$(plane.y)", force=rerun,
     ) do _
         solver_names = String[]
-        rmse_truth = Matrix{Float64}[] # one n_grid × n_grid matrix per solver
-        rmse_noisy = Matrix{Float64}[]
+        rmse_truth = Matrix{FT}[] # one n_grid × n_grid matrix per solver
+        rmse_noisy = Matrix{FT}[]
         for solver in solvers
-            solve_options = solve_kwargs(model; solver.kwargs...)
-            sim = solve(ensemble, solver.alg, EnsembleThreads(); trajectories=n_runs,
-                solve_options...)
-            rmses = reshape(sim.u, n_grid, n_grid) # (rmse_truth, rmse_noisy) per grid point
+            sim = solve(ensemble_problem, solver.alg, EnsembleThreads();
+                trajectories=length(grid_points), solve_options(solver)...)
+            rmses = reshape(sim.u, n_grid, n_grid) # [vs truth, vs noisy] per grid point
+            solver_rmse_truth = first.(rmses)
             push!(solver_names, solver.name)
-            push!(rmse_truth, first.(rmses))
+            push!(rmse_truth, solver_rmse_truth)
             push!(rmse_noisy, last.(rmses))
-            @info "$(plane.x), $(plane.y): $(solver.name) done" n_failed = count(
-                isnan, rmse_truth[end]
-            )
+            n_failed = count(isnan, solver_rmse_truth)
+            @info "$(plane.x), $(plane.y): $(solver.name) done" n_failed
         end
-        return @strdict(
-            x_values, y_values, solver_names, rmse_truth, rmse_noisy, λE_noisy, σ_noise
-        )
+        return @strdict(x_values, y_values, solver_names, rmse_truth, rmse_noisy, σ_noise)
     end
     return landscape_data
 end
