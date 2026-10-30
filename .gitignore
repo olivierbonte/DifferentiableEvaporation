@@ -9,11 +9,13 @@ src/EvaporationModel/Manifest.toml
 # Folders to ignore - files may be too large, too many, etc. NOTE: EDIT IF NEEDED.
 /data
 /videos
-/plots
+/plots/*
 #/notebooks
 /_research
 /figures
 # Exception: if used within paper!
+!/plots/reference/
+/plots/reference/*
 !/plots/reference/dt_study_rrmse_cost.png
 
 ################################################################################

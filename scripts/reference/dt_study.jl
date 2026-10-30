@@ -18,7 +18,8 @@ using Statistics
 
 const WINDOW = 1800.0 # s, forcing window
 const DTS = WINDOW ./ [1, 2, 4, 8, 16, 32] # fixed steps: 1 to 32 sub-steps per window
-const TOL = 1e-6 # SUMMA-SUNDIALS production tolerance; also the Newton tolerance of BE-N
+# SUMMA-SUNDIALS production tolerance; also the Newton tolerance of fixed-step ImplicitEuler
+const TOL = 1e-6
 const TRUTH_TOL = 1e-10
 
 # Accuracy criterion: RMSE of the states at the window bounds and of the window means of λE_tot,
@@ -31,7 +32,7 @@ const REFERENCE_RRMSE = 0.1
 
 const TREATMENTS = ["hard" => HardThresholds(), "smooth" => KavetskiSmoothing()]
 
-# Fixed-step backward Euler (BE-N, N sub-steps per window), with the Newton settings of
+# Fixed-step backward Euler (N sub-steps per window), with the Newton settings of
 # `fixed_step_newton`
 backward_euler() = ImplicitEuler(; nlsolve=fixed_step_newton(), autodiff=AutoForwardDiff())
 
@@ -43,11 +44,11 @@ for dt in DTS
 end
 for dt in DTS
     backward_euler_kwargs = (adaptive=false, dt=dt, abstol=TOL, reltol=TOL)
-    push!(RUNS, (solver="BE-N", dt=dt, tol=missing, alg=backward_euler(), kwargs=backward_euler_kwargs))
+    push!(RUNS, (solver="ImplicitEuler", dt=dt, tol=missing, alg=backward_euler(), kwargs=backward_euler_kwargs))
 end
 const ADAPTIVE_RUNS = [
     # (solver, tolerance, algorithm, extra kwargs)
-    ("ImplicitEuler", TOL, ImplicitEuler(; autodiff=AutoForwardDiff()), (dtmax=WINDOW,)),
+    ("ImplicitEuler-adaptive", TOL, ImplicitEuler(; autodiff=AutoForwardDiff()), (dtmax=WINDOW,)),
     ("KenCarp4", TOL, KenCarp4(; autodiff=AutoForwardDiff()), (dtmax=WINDOW,)),
     ("Heun-adaptive", TOL, Heun(), (;)),
     ("Tsit5", TOL, Tsit5(), (;)),
@@ -101,10 +102,10 @@ function errors(output, truth)
     )
     accurate =
         all(isfinite, e) &&
-        e.rmse_w_1 < MAX_RMSE_W &&
-        e.rmse_w_2 < MAX_RMSE_W &&
-        e.rmse_λE_tot < MAX_RMSE_LE &&
-        e.rel_cum_λE < MAX_REL_CUM
+            e.rmse_w_1 < MAX_RMSE_W &&
+            e.rmse_w_2 < MAX_RMSE_W &&
+            e.rmse_λE_tot < MAX_RMSE_LE &&
+            e.rel_cum_λE < MAX_REL_CUM
     return merge((accurate=accurate,), e)
 end
 
@@ -237,9 +238,9 @@ end
 
 # A color per time stepper, a marker per threshold treatment (Wong palette)
 const SOLVERS = unique([run.solver for run in RUNS])
-const FIXED_STEP_SOLVERS = ["Heun", "BE-N"]
+const FIXED_STEP_SOLVERS = ["Heun", "ImplicitEuler"]
 const SOLVER_COLORS = Dict(zip(SOLVERS, Makie.wong_colors()))
-const TREATMENT_MARKERS = Dict("hard" => :circle, "smooth" => :rect)
+const TREATMENT_MARKERS = Dict("hard" => :rect, "smooth" => :circle)
 
 """
     plot_rrmse(results, xaxis, file)
@@ -270,7 +271,7 @@ function plot_rrmse(results, xaxis, file)
         push!(panels, ax)
     end
     linkxaxes!(panels...)
-    for ax in panels[1:(end - 1)]
+    for ax in panels[1:(end-1)]
         hidexdecorations!(ax; grid=false)
     end
     panels[end].xlabel = xlabel
@@ -316,7 +317,8 @@ function plot_rrmse(results, xaxis, file)
             push!(solver_labels, "$solver (fixed Δt)")
         else
             push!(solver_elements, MarkerElement(; marker=:circle, color, markersize=11))
-            push!(solver_labels, solver)
+            # The fixed-step runs are labelled as such, so no suffix is needed for the adaptive ones
+            push!(solver_labels, replace(solver, "-adaptive" => ""))
         end
     end
     treatment_elements = []
@@ -326,7 +328,7 @@ function plot_rrmse(results, xaxis, file)
         push!(treatment_labels, treatment)
     end
     Legend(
-        fig[length(metrics) + 1, 1],
+        fig[length(metrics)+1, 1],
         [solver_elements, treatment_elements],
         [solver_labels, treatment_labels],
         ["Time stepper", "Threshold treatment"];
