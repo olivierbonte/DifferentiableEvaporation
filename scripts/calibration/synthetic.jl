@@ -390,3 +390,108 @@ function compute_slice(slice)
     end
     return slice_data
 end
+
+"""
+    derivative_ylims(derivatives, reference; max_factor=2)
+
+y-limits covering all finite `derivatives` (vectors) up to `max_factor` times the largest
+absolute value of the `reference` derivative: leaves out the exploding derivatives of a
+failing solve. Pass only the AD derivatives, so the noisy finite differences (e.g. of the
+loose tolerance adaptive solvers) don't hide them: finite differences outside are clipped.
+"""
+function derivative_ylims(derivatives, reference; max_factor=2)
+    bound = max_factor * maximum(abs, filter(isfinite, reference))
+    in_bounds = filter(d -> isfinite(d) && abs(d) <= bound, reduce(vcat, derivatives))
+    low, high = extrema(in_bounds)
+    margin = 0.1 * (high - low)
+    return low - margin, high + margin
+end
+
+"""
+    plot_slice(slice, slice_data, rmse_per_solver, derivative_per_solver,
+        derivative_fd_per_solver, title)
+
+3 × 2 panels with the RMSE (left y-axis) and its derivative (right y-axis) along the slice of
+the 5 solvers: forward mode AD (line) and central finite differences (dots). All panels share
+the x-axis, the RMSE and the derivative axes each share their range across the solvers. The
+legend goes in the empty sixth panel.
+"""
+function plot_slice(
+    slice, slice_data, rmse_per_solver, derivative_per_solver, derivative_fd_per_solver, title
+)
+    @unpack param_values, solver_names = slice_data
+    (; unit) = slice.target
+    fig = Figure(; size=(1000, 830))
+    Label(fig[0, 1:2], title; fontsize=18, font=:bold)
+    xlabel = param_labels[slice.param]
+    color_rmse, color_ad, color_fd = :black, Makie.wong_colors()[1], :orange
+    # Limits from the AD derivatives only, the first solver is the reference
+    derivative_axis_limits = derivative_ylims(derivative_per_solver, derivative_per_solver[1])
+    param_true = getproperty(p_true, slice.param)
+
+    # (row, column) of the 5 solvers, (3, 2) is left for the legend
+    panel_positions = [(1, 1), (1, 2), (2, 1), (2, 2), (3, 1)]
+    axes_rmse, axes_derivative = Makie.Axis[], Makie.Axis[]
+    for k in 1:5
+        row, col = panel_positions[k]
+        # Axis labels only on the outer sides: RMSE left in the left column, derivative
+        # right in the right column (tick labels everywhere, coloured per axis)
+        ax_rmse = Makie.Axis(fig[row, col]; title=solver_names[k], xlabel,
+            ylabel=col == 1 ? "RMSE [$unit]" : "")
+        ax_derivative = Makie.Axis(fig[row, col]; yaxisposition=:right,
+            ylabel=col == 2 ? "∂RMSE/∂$(slice.param)" : "", ylabelcolor=color_ad,
+            yticklabelcolor=color_ad, ytickcolor=color_ad)
+        hidespines!(ax_derivative)
+        hidexdecorations!(ax_derivative)
+        push!(axes_rmse, ax_rmse)
+        push!(axes_derivative, ax_derivative)
+
+        hlines!(ax_derivative, 0; color=color_ad, linestyle=:dot, linewidth=0.8)
+        vlines!(ax_rmse, param_true; color=:red, linestyle=:dash, linewidth=0.8)
+        scatter!(ax_derivative, param_values, derivative_fd_per_solver[k]; color=color_fd,
+            markersize=4)
+        lines!(ax_derivative, param_values, derivative_per_solver[k]; color=color_ad)
+        lines!(ax_rmse, param_values, rmse_per_solver[k]; color=color_rmse, linewidth=2)
+    end
+    # x tick labels only at the bottom of each column
+    hidexdecorations!.(axes_rmse[1:3]; grid=false)
+    linkxaxes!(axes_rmse..., axes_derivative...)
+    linkyaxes!(axes_rmse...)
+    linkyaxes!(axes_derivative...)
+    ylims!(axes_derivative[1], derivative_axis_limits)
+
+    legend_entries = [
+        LineElement(; color=color_rmse, linewidth=2),
+        LineElement(; color=color_ad),
+        MarkerElement(; color=color_fd, marker=:circle, markersize=6),
+        LineElement(; color=:red, linestyle=:dash),
+    ]
+    legend_labels = [
+        "RMSE (left axis)", "∂RMSE/∂$(slice.param), forward mode AD (right axis)",
+        "∂RMSE/∂$(slice.param), finite differences (right axis)", "true value",
+    ]
+    # tellwidth/tellheight=false so the legend doesn't set the size of its panel
+    Legend(fig[3, 2], legend_entries, legend_labels; framevisible=false, tellwidth=false,
+        tellheight=false)
+    return fig
+end
+
+for slice in slices
+    slice_data = compute_slice(slice)
+    @unpack rmse_truth, rmse_noisy, derivative_truth, derivative_noisy = slice_data
+    @unpack derivative_fd_truth, derivative_fd_noisy = slice_data
+    (; name, label, unit, σ_noise) = slice.target
+    figure_name = "loss_slice_$(slice.param)_$(name)_$(period)"
+    variants = [
+        (suffix="", rmse=rmse_truth, derivative_ad=derivative_truth,
+            derivative_fd=derivative_fd_truth, description="noise-free synthetic truth"),
+        (suffix="_noisy", rmse=rmse_noisy, derivative_ad=derivative_noisy,
+            derivative_fd=derivative_fd_noisy,
+            description="truth + noise (σ = $σ_noise $unit)"),
+    ]
+    for (; suffix, rmse, derivative_ad, derivative_fd, description) in variants
+        fig = plot_slice(slice, slice_data, rmse, derivative_ad, derivative_fd,
+            "RMSE ($label) and its derivative along $(slice.param), $description")
+        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig)
+    end
+end
