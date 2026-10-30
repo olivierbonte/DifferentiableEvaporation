@@ -20,6 +20,7 @@ src/EvaporationModel/Manifest.toml
 /plots/calibration/*
 !/plots/calibration/loss_landscape_b_C_2ref_w_1_2010-07.png
 !/plots/calibration/loss_slice_b_w_1_2010-07.png
+!/plots/calibration/loss_slice_r_smin_λE_tot_2010-07.png
 
 ################################################################################
 #                                    Julia                                     #

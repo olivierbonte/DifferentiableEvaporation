@@ -236,6 +236,16 @@ end
 
 ## Plot
 
+# Physical size, font size and resolution of the saved figures, see
+# https://docs.makie.org/stable/how-to/match-figure-size-font-sizes-and-dpi
+inch = 96 # figure units (CSS px) per inch
+pt = 4 / 3
+cm = inch / 2.54
+dpi = 300
+# AGU full page width (two-column figure) with ~8 pt lettering
+figure_size = (17cm, 10.5cm)
+fontsize = 8pt
+
 # A color per time stepper, a marker per threshold treatment (Wong palette)
 const SOLVERS = unique([run.solver for run in RUNS])
 const FIXED_STEP_SOLVERS = ["Heun", "ImplicitEuler"]
@@ -263,7 +273,7 @@ function plot_rrmse(results, xaxis, file)
         xlabel = "RHS evaluations per 30-min window"
     end
 
-    fig = Figure(; size=(900, 800))
+    fig = Figure(; size=figure_size, fontsize)
     # One panel per metric, with a shared x-axis labelled under the last panel
     panels = []
     for (row, (_, ylabel)) in enumerate(metrics)
@@ -298,7 +308,7 @@ function plot_rrmse(results, xaxis, file)
                 # The treatments overlap, so label the N of the hard thresholds only
                 if xaxis == :cost && treatment == "hard"
                     labels = ["N=$(round(Int, WINDOW / dt))" for dt in series.dt]
-                    text!(ax, x, y; text=labels, color, fontsize=9, offset=(4, 4))
+                    text!(ax, x, y; text=labels, color, fontsize=6pt, offset=(4, 4))
                 end
             else
                 scatter!(ax, x, y; color, marker, markersize=11)
@@ -332,9 +342,9 @@ function plot_rrmse(results, xaxis, file)
         [solver_elements, treatment_elements],
         [solver_labels, treatment_labels],
         ["Time stepper", "Threshold treatment"];
-        orientation=:horizontal, tellheight=true, labelsize=11, titlesize=12, nbanks=2,
+        orientation=:horizontal, tellheight=true, labelsize=fontsize, titlesize=fontsize, nbanks=2,
     )
-    safesave(plotsdir("reference", file), fig)
+    safesave(plotsdir("reference", file), fig; px_per_unit=dpi / inch)
     return nothing
 end
 

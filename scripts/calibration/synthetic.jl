@@ -14,7 +14,16 @@ FT = Float64
 seed = 42 # of the noise of the synthetic observations
 truth_tol = 1e-10
 forced_rerun = false
-figure_size = (1100, 680) # of the 2 × 3 panel landscape and slice figures
+# Physical size, font size and resolution of the saved figures, see
+# https://docs.makie.org/stable/how-to/match-figure-size-font-sizes-and-dpi
+inch = 96 # figure units (CSS px) per inch
+pt = 4 / 3
+cm = inch / 2.54
+dpi = 300
+# AGU full page width (two-column figure) with ~8 pt lettering
+figure_size = (17cm, 10.5cm)
+fontsize = 8pt # all text except the figure titles
+title_fontsize = 10pt
 
 
 include(srcdir("site_data.jl"))
@@ -250,8 +259,8 @@ bar and legend go in the empty sixth panel.
 function plot_landscapes(plane, landscape_data, rmse_per_solver, title; colorscale=identity)
     @unpack x_values, y_values, solver_names = landscape_data
     (; label, unit) = plane.target
-    fig = Figure(; size=figure_size)
-    Label(fig[0, 1:3], title; fontsize=18, font=:bold)
+    fig = Figure(; size=figure_size, fontsize)
+    Label(fig[0, 1:3], title; fontsize=title_fontsize, font=:bold)
 
     all_values = reduce(vcat, vec.(rmse_per_solver))
     colorrange = extrema(filter(isfinite, all_values))
@@ -304,7 +313,8 @@ for plane in planes
     for (; suffix, rmse, colorscale, description) in variants
         fig_landscape = plot_landscapes(plane, landscape_data, rmse,
             "Loss-landscapes ($label) of $description"; colorscale)
-        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig_landscape)
+        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig_landscape;
+            px_per_unit=dpi / inch)
     end
 end
 
@@ -422,8 +432,8 @@ function plot_slice(
 )
     @unpack param_values, solver_names = slice_data
     (; unit) = slice.target
-    fig = Figure(; size=figure_size)
-    Label(fig[0, 1:3], title; fontsize=18, font=:bold)
+    fig = Figure(; size=figure_size, fontsize)
+    Label(fig[0, 1:3], title; fontsize=title_fontsize, font=:bold)
     xlabel = param_labels[slice.param]
     color_rmse, color_ad, color_fd = :black, Makie.wong_colors()[1], :orange
     # Limits from the AD derivatives only, the first solver is the reference
@@ -502,6 +512,7 @@ for slice in slices
     for (; suffix, rmse, derivative_ad, derivative_fd, description) in variants
         fig_slice = plot_slice(slice, slice_data, rmse, derivative_ad, derivative_fd,
             "RMSE ($label) and its derivative along $(slice.param), $description")
-        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig_slice)
+        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig_slice;
+            px_per_unit=dpi / inch)
     end
 end
