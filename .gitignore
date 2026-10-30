@@ -17,6 +17,9 @@ src/EvaporationModel/Manifest.toml
 !/plots/reference/
 /plots/reference/*
 !/plots/reference/dt_study_rrmse_cost.png
+/plots/calibration/*
+!/plots/calibration/loss_landscape_b_C_2ref_w_1_2010-07.png
+!/plots/calibration/loss_slice_b_w_1_2010-07.png
 
 ################################################################################
 #                                    Julia                                     #
