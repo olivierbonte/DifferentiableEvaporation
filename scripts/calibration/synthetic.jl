@@ -14,6 +14,7 @@ FT = Float64
 seed = 42 # of the noise of the synthetic observations
 truth_tol = 1e-10
 forced_rerun = false
+figure_size = (1100, 680) # of the 2 × 3 panel landscape and slice figures
 
 
 include(srcdir("site_data.jl"))
@@ -249,7 +250,7 @@ bar and legend go in the empty sixth panel.
 function plot_landscapes(plane, landscape_data, rmse_per_solver, title; colorscale=identity)
     @unpack x_values, y_values, solver_names = landscape_data
     (; label, unit) = plane.target
-    fig = Figure(; size=(1100, 680))
+    fig = Figure(; size=figure_size)
     Label(fig[0, 1:3], title; fontsize=18, font=:bold)
 
     all_values = reduce(vcat, vec.(rmse_per_solver))
@@ -411,7 +412,7 @@ end
     plot_slice(slice, slice_data, rmse_per_solver, derivative_per_solver,
         derivative_fd_per_solver, title)
 
-3 × 2 panels with the RMSE (left y-axis) and its derivative (right y-axis) along the slice of
+2 × 3 panels with the RMSE (left y-axis) and its derivative (right y-axis) along the slice of
 the 5 solvers: forward mode AD (line) and central finite differences (dots). All panels share
 the x-axis, the RMSE and the derivative axes each share their range across the solvers. The
 legend goes in the empty sixth panel.
@@ -421,28 +422,37 @@ function plot_slice(
 )
     @unpack param_values, solver_names = slice_data
     (; unit) = slice.target
-    fig = Figure(; size=(1000, 830))
-    Label(fig[0, 1:2], title; fontsize=18, font=:bold)
+    fig = Figure(; size=figure_size)
+    Label(fig[0, 1:3], title; fontsize=18, font=:bold)
     xlabel = param_labels[slice.param]
     color_rmse, color_ad, color_fd = :black, Makie.wong_colors()[1], :orange
     # Limits from the AD derivatives only, the first solver is the reference
     derivative_axis_limits = derivative_ylims(derivative_per_solver, derivative_per_solver[1])
     param_true = getproperty(p_true, slice.param)
 
-    # (row, column) of the 5 solvers, (3, 2) is left for the legend
-    panel_positions = [(1, 1), (1, 2), (2, 1), (2, 2), (3, 1)]
+    # (row, column) of the 5 solvers, (2, 3) is left for the legend
+    panel_positions = [(1, 1), (1, 2), (1, 3), (2, 1), (2, 2)]
+    # Panels with the derivative y-axis labelled: the rightmost one of each row
+    derivative_labelled = [3, 5]
     axes_rmse, axes_derivative = Makie.Axis[], Makie.Axis[]
     for k in 1:5
         row, col = panel_positions[k]
-        # Axis labels only on the outer sides: RMSE left in the left column, derivative
-        # right in the right column (tick labels everywhere, coloured per axis)
         ax_rmse = Makie.Axis(fig[row, col]; title=solver_names[k], xlabel,
-            ylabel=col == 1 ? "RMSE [$unit]" : "")
+            ylabel="RMSE [$unit]")
         ax_derivative = Makie.Axis(fig[row, col]; yaxisposition=:right,
-            ylabel=col == 2 ? "∂RMSE/∂$(slice.param)" : "", ylabelcolor=color_ad,
+            ylabel="∂RMSE/∂$(slice.param)", ylabelcolor=color_ad,
             yticklabelcolor=color_ad, ytickcolor=color_ad)
         hidespines!(ax_derivative)
         hidexdecorations!(ax_derivative)
+        # y-axis (tick) labels only on the outer sides: RMSE in the left column, derivative
+        # in the rightmost panel of each row
+        col == 1 || hideydecorations!(ax_rmse; grid=false, ticks=false)
+        k in derivative_labelled || hideydecorations!(ax_derivative; grid=false, ticks=false)
+        # The derivative labels of the panel next to the legend reach into the legend cell
+        # (zero protrusion), so they don't widen the gap to the third column for the top row
+        if k in derivative_labelled && col < 3
+            ax_derivative.alignmode = Mixed(; right=Makie.Protrusion(0))
+        end
         push!(axes_rmse, ax_rmse)
         push!(axes_derivative, ax_derivative)
 
@@ -454,7 +464,7 @@ function plot_slice(
         lines!(ax_rmse, param_values, rmse_per_solver[k]; color=color_rmse, linewidth=2)
     end
     # x tick labels only at the bottom of each column
-    hidexdecorations!.(axes_rmse[1:3]; grid=false)
+    hidexdecorations!.(axes_rmse[1:2]; grid=false)
     linkxaxes!(axes_rmse..., axes_derivative...)
     linkyaxes!(axes_rmse...)
     linkyaxes!(axes_derivative...)
@@ -467,12 +477,12 @@ function plot_slice(
         LineElement(; color=:red, linestyle=:dash),
     ]
     legend_labels = [
-        "RMSE (left axis)", "∂RMSE/∂$(slice.param), forward mode AD (right axis)",
-        "∂RMSE/∂$(slice.param), finite differences (right axis)", "true value",
+        "RMSE", "∂RMSE/∂$(slice.param) (AD)", "∂RMSE/∂$(slice.param) (FD)", "true value",
     ]
-    # tellwidth/tellheight=false so the legend doesn't set the size of its panel
-    Legend(fig[3, 2], legend_entries, legend_labels; framevisible=false, tellwidth=false,
-        tellheight=false)
+    # tellwidth/tellheight=false so the legend doesn't set the size of its panel, right
+    # aligned to leave room for the derivative labels of the panel on its left
+    Legend(fig[2, 3], legend_entries, legend_labels; framevisible=false, tellwidth=false,
+        tellheight=false, halign=:right)
     return fig
 end
 
