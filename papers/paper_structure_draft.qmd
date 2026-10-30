@@ -115,6 +115,24 @@ Main conclusions from @fig-rrmse-numerics:
 - In general, adaptive time stepping schemes are more efficient: lower error per amount of RHS evaluations. Exception = adaptive implicit Euler.
 - If limited to simple numerics (e.g. Terrarium.jl): use fixed-step Heun at e.g. $\Delta t/ 16$ ($\Delta t = 30$ min)
 
+## Differentiation 
+
+### Synthetic truth
+
+Loss landscape compared to strict tolerances solution. *Idea: confirm the numerical time stepping artifacts in loss landscapes from Figure 1 of @kavetski2010*
+
+![Loss landscape for $w_1$ compared to synthetic truth for soil-related parameters ($b$, $C_{2,ref}$)](../plots/calibration/loss_landscape_b_C_2ref_w_1_2010-07.png){#fig-loss-landscape-b-C2ref-w1}
+
+Both $b$ and $C_{2,ref}$ are soil parameters, goal of being similar to @kavetski2010 where also parameters are chosen that directly affect the state. Notable observations from @fig-loss-landscape-b-C2ref-w1:
+
+- Tolerance from $10^{-6}$ to $10^{-3}$ has for explicit adaptive `Tsit5` introduces a small amount of numerical noise (bottom left corner)
+- At $10^{-3}$, the implicit adaptive solver `KenCarp4` has less numerical noise (bottom left corner smoother again)
+- Implicit Euler is smooth, but to match the reference solution it's parameter has to be biased. Fixed-step implicit Euler being smoother than adaptive methods, is as in @kavetski2010. 
+- Explicit Euler with state clipping has the most clearly numerically distorted loss landscape (as in @kavetski2010) with a bias in the parameter estimated. 
+
+*Idea: as in Figure 2 of @kavetski2010, show the gradient for 1 parameter, here $b$, to show has the gradient, used in optimisation, is distorted*. 
+
+
 # Discussion
 
 # Conclusion
