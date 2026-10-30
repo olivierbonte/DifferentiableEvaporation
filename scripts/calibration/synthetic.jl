@@ -301,9 +301,9 @@ for plane in planes
             description="the synthetic truth + Gaussian noise (σ = $σ_noise $unit)"),
     ]
     for (; suffix, rmse, colorscale, description) in variants
-        fig = plot_landscapes(plane, landscape_data, rmse,
+        fig_landscape = plot_landscapes(plane, landscape_data, rmse,
             "Loss-landscapes ($label) of $description"; colorscale)
-        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig)
+        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig_landscape)
     end
 end
 
@@ -490,8 +490,8 @@ for slice in slices
             description="truth + noise (σ = $σ_noise $unit)"),
     ]
     for (; suffix, rmse, derivative_ad, derivative_fd, description) in variants
-        fig = plot_slice(slice, slice_data, rmse, derivative_ad, derivative_fd,
+        fig_slice = plot_slice(slice, slice_data, rmse, derivative_ad, derivative_fd,
             "RMSE ($label) and its derivative along $(slice.param), $description")
-        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig)
+        safesave(plotsdir("calibration", "$(figure_name)$(suffix).png"), fig_slice)
     end
 end
