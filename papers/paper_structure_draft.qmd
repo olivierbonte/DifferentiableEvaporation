@@ -144,9 +144,9 @@ Both $b$ and $C_{2,ref}$ are soil parameters, goal of being similar to @kavetski
 
 Most apparent results for @fig-loss-slice-b-w1:
 
-- For `Tsit5` (adaptive explicit), going to a less strict tolerance introduces more numerical noise in the finite-difference (FD) approximation of the gradient. This is also reported in @kavetski2010 and has to do with the fact that a small change in parameter leads to a different number of time steps. This noise is not present in the automatic differentiation (AD) gradient, as it does not rely on this perturbation concept. 
-- For `KenCarp4` (adaptive implicit), the FD gradient is even more noisy
-- For fixed-step implicit Euler, the FD gradient does not contain this noise. Smooth gradient to biased minimum (as seen in @fig-loss-landscape-b-C2ref-w1). 
+- For `Tsit5` (adaptive explicit), going to a less strict tolerance introduces more numerical noise in the finite-difference (FD) approximation of the gradient. This is also reported in @kavetski2010 and @kavetski2006 and has to do with the fact that a small change in parameter leads to a different number of time steps. This noise is not present in the automatic differentiation (AD) gradient, as it does not rely on this perturbation concept. 
+- For `KenCarp4` (adaptive implicit), the FD gradient is even more noisy. Following the floating point analysis of @kavetski2006, it is likely that the chosen step-size (LOOK UP) is too small (i.e. floating point error dominates over truncation error) for the current setup. 
+- For fixed-step implicit Euler, the FD gradient does not contain this noise. This is the reason that is is the recommended numerical method in @kavetski2006. With AD resolves the issues of micro-scale roughness of adaptive explicit schemes, it seems like this advice can be reconsidered (new finding)! Smooth gradient to biased minimum (as seen in @fig-loss-landscape-b-C2ref-w1). 
 - Fixed step explicit Euler with clipping has numerical noise due to its timestepping algorithm, present in both FD and AD gradients. The switch from positive to negative gradient and back around $b \gtrsim 6$ could be problematic for a gradient-based optimisation. 
 
 ![$RMSE$ of $\lambda E_{tot}$ compared to synthetic truth for parameter $r_{s,min}$ alongside its sensitivity $\frac{\partial RMSE}{\partial r_{s,min}}$](../plots/calibration/loss_slice_r_smin_λE_tot_2010-07.png){#fig-loss-slice-rsmin-lambdaE-tot width=100%}
