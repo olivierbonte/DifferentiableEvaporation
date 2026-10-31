@@ -40,11 +40,13 @@ function c_2(w_2, w_sat, c_2ref)
 end
 
 """
-    w_geq(w_2, w_sat, a, p)
+    w_geq(w_2, w_sat, a, p, t=HardThresholds())
 
 Compute `w_geq` [m³ m⁻³], the equilibrium surface soil moisture (i.e. when capillary and
 gravitational forces are in equilibrium).
 See equation 19 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(95)00043-7).
+The powers of ``w_2 / w_{sat}`` are zero for an unphysical negative `w_2`, through
+[`nonneg_pow`](@ref) under the threshold treatment `t`.
 
 # Arguments
 - `w_2`: The second layer soil moisture [m³ m⁻³].
@@ -52,8 +54,9 @@ See equation 19 of [Noilhan & Mahfouf, 1996](https://doi.org/10.1016/0921-8181(9
 - `a`: Clapp-Hornberger parameter `a` (see [`compute_a`](@ref compute_a))
 - `p`: Clapp-Hornberger parameter `a` (see [`compute_p`](@ref compute_p))
 """
-function w_geq(w_2, w_sat, a, p)
-    return w_2 - a * w_sat * (w_2 / w_sat)^p * (1 - (w_2 / w_sat)^(8 * p))
+function w_geq(w_2, w_sat, a, p, t=HardThresholds())
+    x, s = w_2 / w_sat, moisture_scale(t) / w_sat
+    return w_2 - a * w_sat * nonneg_pow(t, x, p, s) * (1 - nonneg_pow(t, x, 8 * p, s))
 end
 
 """

@@ -7,11 +7,14 @@ using Dates
 using Enzyme: Enzyme
 using ErrorMetrics: ErrorMetrics, ErrorMetric
 using ForwardDiff
+using LineSearches: BackTracking
 using LinearSolve
 using OrdinaryDiffEq
 using OrdinaryDiffEqLowOrderRK: Euler, Heun
+using OrdinaryDiffEqNonlinearSolve: NLNewton
 using OrdinaryDiffEqSDIRK: ImplicitEuler
 using Parameters
+using SciMLStructures: SciMLStructures
 using StatsBase: cor, mean, std
 using YAXArrays
 
@@ -22,15 +25,18 @@ include("thresholds.jl")
 export smooth_min,
     smooth_max,
     smooth_clamp,
-    smoothing_kernel,
-    KernelMethod,
+    logistic_step,
+    exponential_kernel,
+    tanh_kernel,
+    BoundSide,
     LowerBound,
     UpperBound,
     ThresholdTreatment,
     HardThresholds,
     KavetskiSmoothing,
-    lower_bound_kernel,
     step_function,
+    nonneg_pow,
+    bound_kernel,
     moisture_scale,
     storage_scale,
     factor_scale,
@@ -79,11 +85,18 @@ include("ground_heat_flux.jl")
 export ground_heat_flux,
     compute_harmonic_sum, GroundHeatFluxMethod, Allen07, SantanelloFriedl03
 
+include("parameters.jl")
+export ModelParameters, with_parameters, forcing_table
+
 include("model.jl")
 export AbstractModel,
     ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!,
     window_means,
-    state_tolerances
+    state_tolerances,
+    solve_kwargs,
+    state_clamping_callback,
+    unphysical_states,
+    fixed_step_newton
 
 include("resistances.jl")
 export soil_aerodynamic_resistance,
@@ -138,6 +151,9 @@ export compute_amplitude_and_phase,
     value_type,
     of_value_type,
     KGE,
-    KGEmod
+    KGEmod,
+    RMSE,
+    RRMSE,
+    metric_skipnan
 
 end # module EvaporationModel

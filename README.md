@@ -40,7 +40,7 @@ To (locally) reproduce this project, do the following:
    ```
 
 This will install all necessary packages for you to be able to run the scripts and
-everything should work out of the box, including correctly finding local paths. To avoid dependency conflicts, it is recommend to use the Julia version given in the `compat` section of `Project.toml`.
+everything should work out of the box, including correctly finding local paths. To avoid dependency conflicts, it is recommend to use the Julia version given in the `julia_version` section of [`Manifest.toml`](Manifest.toml).
 
 You may notice that most scripts start with the commands:
 

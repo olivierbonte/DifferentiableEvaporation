@@ -1,7 +1,7 @@
 # AD of the right-hand side of the ODE system (no solver involved)
 function rhs(u, thresholds, accumulated=Val(()))
     du = similar(u)
-    compute_tendencies!(du, u, p_model, t_unix, forcings_toy, thresholds, accumulated)
+    compute_tendencies!(du, u, p_model, t_unix, constant_forcing_toy, thresholds, accumulated)
     return du
 end
 
