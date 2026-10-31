@@ -55,9 +55,16 @@ Many challenges lie in the use and development of models of land surface models 
 
 *Text above comes from FWO exchange proposal, mostly a placeholder. Sources are missing in places*
 
+To effectively calibrate these hybrid models, the differentiable modelling framework has been proposed [@shen2023]. Here, it is argued that a key part of the success of neural network-based machine learning, is its training procedure which effectively leverages gradient-based parameter optimisation methods. Therefore, the hybrid model should be constructed to allow for efficient gradient calculation to parameters.
 
+Challenge 1 (well-established): this requires automatic differentiation techniques 
 
-One of these uncertain processes = the effect of environmental stressors on plan transpiration (stomatal / surface resistance in LSM terminology). Idea = keep physical processes related to energy / water balances (bulk-surface formulae / potential evaporation), 
+Challenge 2 (less researched): the use of gradient-based optimisation techniques requires sufficiently smooth loss landscapes. In conceptual hydrology, well established that the usual numerical implementation (operator-splitting, explicit times stepping without error control), leads to geometrically complex objective functions not amenable to gradient based optimisation [@kavetski2007; @kavetski2010; @clark2010]. Hybrid modeling requires gradient-based optimisation, but effect of numerics understudied. Previous work of @song2024 on streamflow prediction with daily input data, comparing explicit euler with direct reverse-mode AD to adjoint-based implicit euler (implicit function theorem on the Newton solves). Not explored there:
+
+- adaptive timestepping methods
+- sciml type adjoint methods vs AD on discretised code.  
+
+*One of these uncertain processes = the effect of environmental stressors on plan transpiration (stomatal / surface resistance in LSM terminology). Idea = keep physical processes related to energy / water balances (bulk-surface formulae / potential evaporation)*
 
 # Methods
 
