@@ -1,35 +1,29 @@
 # %% Imports
-import logging
-from datetime import datetime
-from importlib.machinery import SourceFileLoader
-from pathlib import Path
+from conf import LOG_FORMAT, conf_module, logger
+from eddy_covariance_process import main as process_eddy_covariance
+from land_cover_translation_process import main as process_land_cover_translation
+from soil_moisture_fluxnet_process import main as process_soil_moisture_fluxnet
+from soil_process import main as process_soil
+from vegetation_process import main as process_vegetation
 
-from conf import conf_module
+# %% Run all processing steps, logging to file
+if __name__ == "__main__":
+    conf_module.dataprodir.mkdir(exist_ok=True, parents=True)
+    logger.add(
+        str(conf_module.dataprodir / "data_process_log_{time:YYYY-MM-DD_HH-mm}.txt"),
+        format=LOG_FORMAT,
+        enqueue=True,
+        mode="w",
+    )
 
-project_folder = Path(__file__).parent.parent.parent.resolve()
-py_functions_module = SourceFileLoader(
-    "py_functions", (project_folder / "src" / "py_functions.py").as_posix()
-).load_module()
-
-# %% Logging set up
-conf_module.dataprodir.mkdir(exist_ok=True, parents=True)
-current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M")
-log_file = Path(conf_module.dataprodir / f"data_process_log_{current_datetime}.txt")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-    handlers=[logging.FileHandler(log_file), logging.StreamHandler()],
-)
-
-# %% Logging of the subprocesses
-logging.info("\n Starting data processing scripts \n")
-logging.info("\n 1: Processing eddy covaraince data \n")
-py_functions_module.run_and_log("python 01_eddy_covariance.py", sys_info=True)
-logging.info("\n 2: Processing soil data \n")
-py_functions_module.run_and_log("python 02_soil.py")
-logging.info("\n 3: Processing vegetation data \n")
-py_functions_module.run_and_log("python 03_vegetation.py")
-logging.info("\n 4: Processing soil moisture data from flux towers \n")
-py_functions_module.run_and_log("python 04_soil_moisture_fluxnet.py")
-logging.info("\n 5: Processing land cover data for IBGP with BATS mapping \n")
-py_functions_module.run_and_log("python 05_land_cover_translation.py")
+    logger.info("Starting data processing scripts")
+    logger.info("1: Processing eddy covariance data")
+    process_eddy_covariance()
+    logger.info("2: Processing soil data")
+    process_soil()
+    logger.info("3: Processing vegetation data")
+    process_vegetation()
+    logger.info("4: Processing soil moisture data from flux towers")
+    process_soil_moisture_fluxnet()
+    logger.info("5: Processing land cover data for IBGP with BATS mapping")
+    process_land_cover_translation()

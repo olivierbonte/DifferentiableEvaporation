@@ -1,5 +1,9 @@
 # %% Configuration file for the data downloads
-import pathlib
+import rootutils
+from loguru import logger  # noqa: F401  (re-exported for the scripts)
+
+# %% Logging
+LOG_FORMAT = "{time:YYYY-MM-DD HH:mm:ss} - {message}"
 
 # %% Google Earth Engine project ID
 gee_project_id = "ee-bonteolivier15"  # Replace by your own project ID!
@@ -25,8 +29,7 @@ url_glcc_dict = {
 }
 
 # %% folder paths
-conf_file_path = pathlib.Path(__file__)
-root_project_path = conf_file_path.parent.parent.parent
+root_project_path = rootutils.find_root(__file__, indicator=".project-root")
 datadir = root_project_path / "data"
 datarawdir = datadir / "exp_raw"
 dataprodir = datadir / "exp_pro"

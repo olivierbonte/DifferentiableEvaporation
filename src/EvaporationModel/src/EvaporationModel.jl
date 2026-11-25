@@ -1,22 +1,57 @@
 module EvaporationModel
 
+using ADTypes: AutoEnzyme, AutoForwardDiff
 using Bigleaf
 using ComponentArrays
 using Dates
-using DataFrames
-using DiffEqCallbacks
+using Enzyme: Enzyme
+using ErrorMetrics: ErrorMetrics, ErrorMetric
 using ForwardDiff
+using LineSearches: BackTracking
+using LinearSolve
 using OrdinaryDiffEq
+using OrdinaryDiffEqLowOrderRK: Euler, Heun
+using OrdinaryDiffEqNonlinearSolve: NLNewton
+using OrdinaryDiffEqSDIRK: ImplicitEuler
 using Parameters
+using SciMLStructures: SciMLStructures
+using StatsBase: cor, mean, std
 using YAXArrays
+
+# Solvers and AD backends for the Jacobian of implicit solvers
+export Tsit5, Euler, Heun, ImplicitEuler, AutoForwardDiff, AutoEnzyme
+
+include("thresholds.jl")
+export smooth_min,
+    smooth_max,
+    smooth_clamp,
+    logistic_step,
+    exponential_kernel,
+    tanh_kernel,
+    BoundSide,
+    LowerBound,
+    UpperBound,
+    ThresholdTreatment,
+    HardThresholds,
+    KavetskiSmoothing,
+    step_function,
+    nonneg_pow,
+    bound_kernel,
+    moisture_scale,
+    storage_scale,
+    factor_scale,
+    flux_scale
 
 include("canopy.jl")
 export fractional_vegetation_cover,
-    available_energy_partioning,
+    net_radiation_partitioning,
+    available_energy_partitioning,
     max_canopy_capacity,
     fraction_wet_vegetation,
+    fraction_wet_vegetation_with_condensation,
     canopy_drainage,
     precip_below_canopy,
+    canopy_input,
     vpd_veg_source_height
 
 include("config.jl")
@@ -44,20 +79,27 @@ include("constants.jl")
 export ρ_w, τ
 
 include("evaporation.jl")
-export penman_monteith, total_evaporation, transpiration, interception, soil_evaporation
+export penman_monteith, total_evaporation, transpiration, interception_loss, soil_evaporation
 
 include("ground_heat_flux.jl")
 export ground_heat_flux,
     compute_harmonic_sum, GroundHeatFluxMethod, Allen07, SantanelloFriedl03
 
+include("parameters.jl")
+export ModelParameters, with_parameters, forcing_table
+
 include("model.jl")
 export AbstractModel,
-    ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!
+    ProcessBasedModel, compute_diagnostics, compute_tendencies!, initialize!, solve!,
+    window_means,
+    state_tolerances,
+    solve_kwargs,
+    state_clamping_callback,
+    unphysical_states,
+    fixed_step_newton
 
 include("resistances.jl")
-export jarvis_stewart,
-    aerodynamic_resistance,
-    soil_aerodynamic_resistance,
+export soil_aerodynamic_resistance,
     ustar_from_u,
     surface_resistance,
     soil_evaporation_efficiency,
@@ -71,11 +113,17 @@ export jarvis_stewart,
     Martens17,
     Pielke92
 
+include("sensible_heat.jl")
+export sensible_heat, sensible_heat_soil, sensible_heat_canopy
+
 include("soil.jl")
 export c_1,
     c_2,
     c_3,
     c_1sat,
+    C1satMethod,
+    NoilhanMahfouf96,
+    NoilhanPlanton89,
     c_2ref,
     w_geq,
     compute_a,
@@ -87,6 +135,7 @@ export c_1,
 
 include("soil_fluxes.jl")
 export surface_runoff,
+    surface_infiltration_factor,
     diffusion_layer_1,
     vertical_drainage_layer_2,
     InfiltrationMethod,
@@ -99,13 +148,12 @@ export compute_amplitude_and_phase,
     fit_fourier_coefficients,
     local_to_solar_time,
     seconds_since_solar_noon,
-    smooth_min,
-    smooth_max,
-    smoothing_kernel,
     value_type,
     of_value_type,
-    KernelMethod,
-    LowerBound,
-    UpperBound
+    KGE,
+    KGEmod,
+    RMSE,
+    RRMSE,
+    metric_skipnan
 
 end # module EvaporationModel

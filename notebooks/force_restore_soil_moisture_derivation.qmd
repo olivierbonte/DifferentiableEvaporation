@@ -1,0 +1,579 @@
+---
+title: "Derivation of the force-restore equation for surface soil moisture"
+format:
+    html:
+        embed-resources: true
+        toc: true
+        number-sections: true
+jupyter: python3
+---
+
+This notebook works out the analytical derivation behind the force-restore equation for the surface soil moisture $w_g$ (called $w_1$ in `EvaporationModel`):
+
+$$
+\frac{\partial w_g}{\partial t} = \frac{C_1}{\rho_w d_1}\left(P_g - E_g\right) - \frac{C_2}{\tau}\left(w_g - w_{geq}\right)
+$$ {#eq-force_restore_wg}
+
+$$
+C_1 = C_{1sat}\left(\frac{w_{sat}}{w_g}\right)^{b/2+1}.
+$$ {#eq-c1}
+
+It follows the appendix of "A Simple Parameterization of Land Surface Processes for Meteorological Models" by [Noilhan & Planton (1989)](https://doi.org/10.1175/1520-0493(1989)117%3C0536:ASPOLS%3E2.0.CO;2) (NP89, Eqs. A1–A7). That appendix in turn applies to soil moisture the force-restore method that [Bhumralkar (1975)](https://doi.org/10.1175/1520-0450(1975)014%3C1246:NEOTCO%3E2.0.CO;2) (BH75) and Blackadar (1976, *Proc. Third Symp. on Atmospheric Turbulence, Diffusion and Air Quality*, AMS, 46–49; no DOI) (BL76) introduced for the surface temperature, as [Deardorff (1977)](https://doi.org/10.1029/JC082i037p05917) (DE77) did before. [Deardorff (1978)](https://doi.org/10.1029/JC083iC04p01889) (DE78) evaluated the force-restore method for the surface temperature. The soil hydraulic functions are those of [Clapp & Hornberger (1978)](https://doi.org/10.1029/WR014i004p00601) (CH78).
+
+The main outcome is the physical meaning of $C_1$ [-]:
+
+$$
+C_1 = \frac{2 d_1}{d}
+$$
+
+and the depth $d$ [m] reached by the diurnal soil moisture wave
+$$
+d = \sqrt{\frac{2K}{\omega C_w}},
+$$
+Note that $C_1$ is dimensionless and proportional to the arbitrary normalization depth $d_1$. Only $C_1/d_1 = 2/d$ influences the dynamics in @eq-force_restore_wg. 
+
+```{python}
+import numpy as np
+import sympy as sp
+
+sp.init_printing()
+```
+
+## Conventions {.unnumbered}
+
+| Symbol | Meaning | Units |
+|---|---|---|
+| $z$ | vertical coordinate, positive **upward**, surface at $z = 0$, soil at $z \le 0$ | m |
+| $w$ | volumetric soil water content | m³ m⁻³ |
+| $\phi = -p/(\rho_w g)$ | suction (matric) head, $\phi \ge 0$ in the unsaturated zone | m |
+| $K$ | hydraulic conductivity | m s⁻¹ |
+| $C_w = -\mathrm{d}w/\mathrm{d}\phi$ | specific moisture capacity, $> 0$ (NP89's $\lvert c_w\rvert$) | m⁻¹ |
+| $q$ | Darcy flux, positive **upward** | m s⁻¹ |
+| $P_{net} = P_g - E_g$ | net precipitation: net water flux **into** the soil at the surface ($W_0$ in NP89) | kg m⁻² s⁻¹ |
+| $\rho_w$ | density of water | kg m⁻³ |
+| $\tau$, $\omega = 2\pi/\tau$ | period (one day) and angular frequency of the forcing | s, s⁻¹ |
+
+NP89 use $z$ positive downward and switch sign conventions for $\psi$ and $W_0$ between their equations (see @sec-restore). The results below are derived consistently with the conventions in the table, and every sign is checked for physical consistency.
+
+## Richards equation and its linearization {#sec-richards}
+
+The total hydraulic head is the pressure head plus the elevation, $H = -\phi + z$. Darcy's law and conservation of mass give
+
+$$
+q = -K\frac{\partial H}{\partial z} = K\left(\frac{\partial \phi}{\partial z} - 1\right),
+\qquad
+\frac{\partial w}{\partial t} = -\frac{\partial q}{\partial z}.
+$$
+
+In hydrostatic equilibrium the suction increases with height, $\partial\phi/\partial z = 1$, and $q = 0$. Writing $\partial w/\partial t = -C_w\,\partial \phi/\partial t$ gives the capacity form of the Richards equation:
+
+$$
+C_w \frac{\partial \phi}{\partial t} = \frac{\partial}{\partial z}\left[K\left(\frac{\partial \phi}{\partial z} - 1\right)\right].
+$$
+
+**Assumption 1 (homogeneous, linearized soil).** $K$ and $C_w$ are taken constant, evaluated at a representative state. The gravity term then drops from the interior equation, which becomes the diffusion equation (NP89 Eq. A1)
+
+$$
+\frac{\partial \phi}{\partial t} = D\frac{\partial^2 \phi}{\partial z^2},
+\qquad D = \frac{K}{C_w},
+$$ {#eq-diffusion_phi}
+
+with $D$ [m² s⁻¹] the soil water diffusivity (in terms of suction head). Gravity is still present in the surface flux (@sec-surface_bc).
+
+## Periodic solution {#sec-periodic}
+
+**Assumption 2 (diurnal forcing).** The surface is forced by a single harmonic of period $\tau$ = 1 day. The forcing is imposed on the suction head at the surface, which oscillates around the surface value of the mean profile $\bar\phi_0 = \bar\phi(0)$:
+
+$$
+\phi(0, t) = \bar\phi_0 + \Delta\phi \sin(\omega t), \qquad \omega = \frac{2\pi}{\tau},
+$$ {#eq-surface_forcing}
+
+with $\Delta\phi$ [m] the amplitude of the diurnal suction cycle. Physically, the driver is the diurnal cycle of the net precipitation $P_{net} = P_g - E_g$ at the surface (@sec-surface_bc). Because the problem is linear, a sinusoidal surface flux produces a sinusoidal surface suction with the same period, shifted in phase by $\pi/4$ (as for the soil temperature and the ground heat flux). Prescribing the surface suction (@eq-surface_forcing) is therefore equivalent, up to a phase, to prescribing a sinusoidal flux. Any phase can be absorbed into the origin of $t$.
+
+The solution that decays with depth ($z \to -\infty$) is (NP89 Eq. A2, with $z \to -z$)
+
+$$
+\phi(z, t) = \bar\phi(z) + \Delta\phi\, e^{z/d}\sin\left(\omega t + z/d\right)
+$$  {#eq-periodic_solution}
+
+with $d < 0$ [m] the damping depth of the diurnal soil moisture wave
+$$
+d = \sqrt{\frac{2D}{\omega}} = \sqrt{\frac{2K}{\omega C_w}}
+$$ {#eq-damping_depth}
+
+and $\bar\phi(z)$ a linear mean profile,
+$$
+\bar\phi(z) = \bar\phi_0 + \Gamma z, \qquad \Gamma = \frac{\mathrm{d}\bar\phi}{\mathrm{d}z} \text{ [-]}.
+$$ {#eq-mean_profile}
+
+A linear profile is required so that $\bar\phi$ itself satisfies the diffusion equation ($\partial^2\bar\phi/\partial z^2 = 0$, $\partial \bar\phi / \partial t = 0$). With constant $K$, a linear profile means a vertically uniform mean Darcy flux, $\bar q = K(\Gamma - 1)$.
+
+This is the classical solution for a periodic surface condition on a semi-infinite medium, well known for heat conduction [Carslaw & Jaeger (1959), §2.6] and for the soil temperature wave (e.g. Shuttleworth (2012), Eq. 6.12). With $\kappa = 1/d = \sqrt{\omega/(2D)}$ the wave number, it is the same solution as for the temperature, with $T$ replaced by $\phi$ and the thermal diffusivity replaced by $D$.
+
+::: {.callout-tip title="Derivation" collapse="true" icon="false"}
+
+The derivation follows Carslaw & Jaeger (1959) [pp. 65–66], as for the soil temperature wave, with $T$ replaced by the suction head $\phi$ and with $z$ positive upward.
+
+The deviation from the mean profile, $\phi'(z, t) = \phi(z, t) - \bar\phi(z)$, satisfies the same diffusion equation, because $\partial^2\bar\phi/\partial z^2 = 0$ for a linear mean profile:
+$$
+\frac{\partial \phi'}{\partial t} = D \frac{\partial^2 \phi'}{\partial z^2},
+$$
+on the half space $z \le 0$, with the surface condition and boundedness at depth
+$$
+\phi'(0, t) = \Delta\phi \sin(\omega t), \qquad \phi'(z, t) \to 0 \text{ for } z \to -\infty.
+$$
+Only the periodic (steady oscillation) solution is sought: the transient caused by the initial condition is assumed to have died out.
+
+The sine boundary condition is written as a cosine for convenience:
+$$
+\phi'(0, t) = \Delta\phi \sin(\omega t) = \Delta\phi \cos\left(\omega t - \frac{\pi}{2}\right).
+$$
+
+A trial solution is proposed:
+$$
+\phi'(z, t) = \Delta\phi\, f(z) \exp\left(i\left(\omega t - \frac{\pi}{2}\right)\right).
+$$
+
+Substituting in the right-hand side of the diffusion equation gives
+$$
+\frac{\partial^2 \phi'}{\partial z^2} = \Delta\phi \exp\left(i\left(\omega t - \frac{\pi}{2}\right)\right) \frac{\mathrm{d}^2 f}{\mathrm{d}z^2} = \frac{\phi'(z, t)}{f(z)} \frac{\mathrm{d}^2 f}{\mathrm{d}z^2},
+$$
+and in the left-hand side
+$$
+\frac{\partial \phi'}{\partial t} = i\omega\, \phi'(z, t).
+$$
+
+Combining gives an ODE in $f(z)$:
+$$
+\frac{\phi'(z,t)}{f(z)} \frac{\mathrm{d}^2 f}{\mathrm{d}z^2} = \frac{i\omega}{D}\phi'(z,t)
+\iff
+\frac{\mathrm{d}^2 f}{\mathrm{d}z^2} - \frac{i\omega}{D} f = 0 .
+$$
+
+This is a second order, homogeneous ODE. With the trial solution $f(z) = \exp(\lambda z)$, the characteristic polynomial is
+$$
+\lambda^2 - \frac{i\omega}{D} = 0 \iff \lambda = \pm\sqrt{\frac{i\omega}{D}} .
+$$
+
+The square root is rewritten as
+$$
+\sqrt{\frac{i\omega}{D}} = \sqrt{\frac{2i\,\omega}{2D}} = \sqrt{\frac{(1 + i)^2\,\omega}{2D}} = (1 + i)\sqrt{\frac{\omega}{2D}} = (1 + i)\,\kappa,
+\qquad
+\kappa = \sqrt{\frac{\omega}{2D}} = \frac{1}{d},
+$$
+with $\kappa$ the (angular) wave number [rad m⁻¹] and $d$ the damping depth.
+
+The general solution of the ODE is
+$$
+f(z) = c_1 \exp\left((1 + i)\kappa z\right) + c_2 \exp\left(-(1 + i)\kappa z\right).
+$$
+
+Because $z \le 0$, the second term grows without bound for $z \to -\infty$, so boundedness at depth requires $c_2 = 0$. The surface condition, $f(0) = 1$, gives $c_1 = 1$. The trial solution becomes
+$$
+\phi'(z, t) = \Delta\phi \exp(\kappa z) \exp\left(i\left(\kappa z + \omega t - \frac{\pi}{2}\right)\right).
+$$
+
+Using Euler's formula and taking the real part (the equation is linear with real coefficients, so the real part is itself a solution):
+$$
+\phi'(z, t) = \Delta\phi \exp(\kappa z) \cos\left(\kappa z + \omega t - \frac{\pi}{2}\right)
+= \Delta\phi \exp\left(\frac{z}{d}\right) \sin\left(\omega t + \frac{z}{d}\right).
+$$
+
+The damping depth is therefore
+$$
+d = \frac{1}{\kappa} = \sqrt{\frac{2D}{\omega}} = \sqrt{\frac{2K}{\omega C_w}},
+$$
+and adding the mean profile back, $\phi = \bar\phi + \phi'$, gives @eq-periodic_solution.
+
+:::
+
+### Check: the periodic solution satisfies the diffusion equation
+
+With the full suction profile $\phi = \bar\phi + \phi'$ and $D = K/C_w$:
+
+```{python}
+z, t = sp.symbols("z t", real=True)
+K, C_w, omega, d, Dphi = sp.symbols("K C_w omega d Delta_phi", positive=True)
+phi_bar0, Gamma = sp.symbols(r"\bar{\phi}_0 Gamma", real=True)  # mean profile: phi_bar = phi_bar0 + Gamma z
+
+phi_bar = phi_bar0 + Gamma * z
+phi = phi_bar + Dphi * sp.exp(z / d) * sp.sin(omega * t + z / d)
+display(phi)
+```
+
+```{python}
+residual = sp.diff(phi, t) - K / C_w * sp.diff(phi, z, 2)
+sp.simplify(residual.subs(d, sp.sqrt(2 * K / (omega * C_w)))) == 0
+```
+
+
+## Surface boundary condition {#sec-surface_bc}
+
+At the surface the upward Darcy flux equals minus the net water input:
+
+$$
+q(0, t) = -\frac{P_{net}}{\rho_w}
+$$
+
+so that
+$$ 
+\left.\frac{\partial \phi}{\partial z}\right|_0 = \frac{q(0, t)}{K} + 1 = 1 - \frac{P_{net}}{\rho_w K}.
+$$ {#eq-surface_flux_bc}
+
+## Force-restore equation for the surface suction {#sec-force_restore}
+
+The force-restore idea is to write the tendency $\partial\phi_0/\partial t$ of the surface suction, with $\phi_0 = \phi(0, t)$, in terms of two quantities only: the surface gradient (the *force*, set by the surface flux, @sec-surface_bc) and the departure from the mean (the *restore*). This leads to the ansatz
+
+$$
+\frac{\partial \phi_0}{\partial t} = \alpha\left(\left.\frac{\partial \phi}{\partial z}\right|_0 - \Gamma\right) - \beta\left(\phi_0 - \bar\phi_0\right),
+$$ {#eq-force_restore_ansatz}
+
+with two constant coefficients, $\alpha$ [m s⁻¹] and $\beta$ [s⁻¹], that are not known yet. Using the analytical solution @eq-periodic_solution, we can get the restore term
+
+```{python}
+phi0 = phi.subs(z, 0)
+restore_term = phi0 - phi_bar0
+display(restore_term)
+```
+
+, the tendency 
+
+```{python}
+dphi0_dt = sp.diff(phi0, t)
+display(dphi0_dt)
+```
+
+and the force term
+
+```{python}
+dphi_dz_0 = sp.diff(phi, z).subs(z, 0)
+force_term = dphi_dz_0 - Gamma
+display(force_term)
+```
+
+```{python}
+alpha, beta = sp.symbols("alpha beta", real=True)
+mismatch = sp.expand(dphi0_dt - (alpha * force_term - beta * restore_term))
+display(mismatch)
+```
+
+To be valid at all $t$, the coefficients of $\sin(\omega t)$ and $\cos(\omega t)$ must vanish separately. 
+
+```{python}
+sin_terms = mismatch.coeff(sp.sin(omega * t))
+cos_terms = mismatch.coeff(sp.cos(omega * t))
+coeffs = sp.solve([sin_terms, cos_terms], [alpha, beta])
+display(coeffs)
+```
+
+
+With $\alpha = \omega d$ and $\beta = \omega$, @eq-force_restore_ansatz becomes
+
+$$
+\frac{\partial \phi_0}{\partial t} = \omega d\left(\left.\frac{\partial \phi}{\partial z}\right|_0 - \Gamma\right) - \omega\left(\phi_0 - \bar\phi_0\right).
+$$ {#eq-force_restore_identity}
+
+
+Substituting the boundary condition $\left.\frac{\partial \phi}{\partial z}\right|_0$ ( @eq-surface_flux_bc):
+
+```{python}
+P_net, rho_w = sp.symbols("P_{net} rho_w", real=True)
+grad0_bc = 1 - P_net / (rho_w * K)
+dphi0_dt_bc = sp.expand(coeffs[alpha] * (grad0_bc - Gamma) - coeffs[beta] * (sp.Symbol(r"\phi_0") - phi_bar0))
+sp.collect(dphi0_dt_bc, [P_net, omega])
+```
+
+or, grouped:
+
+$$
+\frac{\partial \phi_0}{\partial t}
+= \underbrace{-\frac{\omega d}{\rho_w K} P_{net}}_{\text{force}}
+\;\underbrace{- \;\omega\left(\phi_0 - \bar\phi_0\right)}_{\text{restore}}
+\;\underbrace{+ \;\omega d\left(1 - \Gamma\right)}_{\text{gravity / mean flux}}.
+$$ {#eq-phi0_tendency}
+
+Physical checks:
+
+- **Force:** infiltration ($P_{net} > 0$) lowers the surface suction.
+- **Restore:** $\phi_0$ relaxes towards $\bar\phi_0$ with rate $\omega$.
+- **Gravity / mean flux:** with $\bar q = K(\Gamma - 1)$, this term equals $-\frac{\omega d}{K}\,\bar q$. It is the same force as for $P_{net}$, but driven by the mean flux through the profile. It vanishes for a hydrostatic mean profile ($\Gamma = 1$). For a uniform mean profile ($\Gamma = 0$, unit-gradient drainage) it raises the surface suction, i.e. gravitational drainage dries the surface.
+
+This is NP89 Eq. A3 written in these conventions.
+
+**Assumption 3.** Applying this relation to *any* surface flux, not only a pure diurnal harmonic, is the central approximation of force-restore. It is exact for the diurnal harmonic and approximate for other frequencies.
+
+## From suction to water content: $C_1$ {#sec-c1}
+
+@sec-force_restore gives the tendency of the surface **suction** $\phi_0$, whereas the model predicts the surface **water content** $w_g$. The two are linked by the retention curve $w(\phi)$, so their tendencies are related by the chain rule:
+
+$$
+\frac{\partial w_g}{\partial t} = \frac{\mathrm{d}w}{\mathrm{d}\phi}\,\frac{\partial \phi_0}{\partial t} = -C_w\,\frac{\partial \phi_0}{\partial t},
+$$
+
+with $C_w = -\mathrm{d}w/\mathrm{d}\phi > 0$ the specific moisture capacity from @sec-richards. Going from $\phi$ back to $w$ therefore means multiplying every term of @eq-phi0_tendency by $-C_w$. Consistent with Assumption 1, $C_w$ is taken at the same representative state as $K$, so it is a constant factor.
+
+Applied to the force term, $-\frac{\omega d}{\rho_w K} P_{net}$, this gives
+
+$$
+-C_w\left(-\frac{\omega d}{\rho_w K} P_{net}\right) = C_w\frac{\omega d}{\rho_w K} P_{net} = \frac{2}{\rho_w d} P_{net},
+$$
+
+because $d^2 = 2K/(\omega C_w)$, i.e. $K = \omega C_w d^2/2$. Infiltration ($P_{net} > 0$) now increases $w_g$, as it should. The restore and gravity terms are converted in the same way in @sec-restore.
+
+```{python}
+force_coef = C_w * omega * d / (rho_w * K)
+force_term_w_sol = sp.simplify(force_coef.subs(K, omega * C_w * d**2 / 2))
+display(force_term_w_sol)
+```
+
+Comparing with the force term $\frac{C_1}{\rho_w d_1}P_{net}$ of @eq-force_restore_wg:
+```{python}
+d_1 = sp.symbols("d_1", positive=True)
+C_1 = sp.symbols("C_1", positive=True)
+force_term_w_pres = C_1 / (rho_w * d_1)
+sp.solve(force_term_w_pres - force_term_w_sol, C_1)
+```
+
+the definition of $C_1$ is given:
+
+$$
+\boxed{C_1 = \frac{2 d_1}{d}}
+$$ {#eq-c1_solution}
+
+Some intuitions:
+
+- $C_1$ is **dimensionless**. $d_1$ is an **arbitrary normalization depth**, and only $C_1/d_1 = 2/d$ [m⁻¹] affects the dynamics! 
+- Changing $d_1$ without rescaling $C_1$ changes the model by the same factor. A value of $C_{1sat}$ (@eq-c1) is only meaningful together with the $d_1$ it was computed for.
+
+## $C_1$ as a function of $w_g$ (Clapp & Hornberger) {#sec-c1_clapp_hornberger}
+
+CH78 give power laws for the retention curve and the conductivity:
+
+$$
+\phi = \phi_{sat}\left(\frac{w}{w_{sat}}\right)^{-b},
+\qquad
+K = K_{sat}\left(\frac{w}{w_{sat}}\right)^{2b+3}.
+$$
+
+These are the Brooks & Corey (1964) relations with zero residual water content, in the form of Campbell (1974). Brooks & Corey write the effective saturation $S_e = (w - w_r)/(w_{sat} - w_r) = (\phi_b/\phi)^{\lambda}$ for $\phi > \phi_b$ and $K = K_{sat} S_e^{3 + 2/\lambda}$. With $w_r = 0$, $b = 1/\lambda$ and $\phi_{sat} = \phi_b$ (the air-entry suction), both reduce to the expressions above. The variables in the code below carry the suffix `_ch` for Clapp & Hornberger.
+
+<!-- From these, $C_w = -\mathrm{d}w/\mathrm{d}\phi = w/(b\,\phi)$, and therefore $d$ and $C_1$ as functions of $w$: -->
+
+```{python}
+w, w_sat, b, phi_sat, K_sat, d_1, tau = sp.symbols(
+    r"w w_{sat} b \phi_{sat} K_{sat} d_1 tau", positive=True
+)
+phi_ch = phi_sat * (w / w_sat) ** (-b)
+K_ch = K_sat * (w / w_sat) ** (2 * b + 3)
+C_w_ch = sp.simplify(-1 / sp.diff(phi_ch, w))  # -dw/dphi
+display(C_w_ch)
+```
+
+With $C_w$ and $K$ parameterised, the penetration depth $d$ (@eq-damping_depth) can be expressed as a function of $w$:
+
+
+```{python}
+d_ch = sp.sqrt(2 * K_ch / (omega * C_w_ch))
+display(sp.simplify(d_ch))
+```
+
+Following the $C_1$ definition from @eq-c1_solution :
+```{python}
+C_1_ch = sp.simplify((2 * d_1 / d_ch).subs(omega, 2 * sp.pi / tau))
+display(C_1_ch)
+```
+
+To go from this form to the form in @eq-c1, $C_1$ is evaluated at the saturated water content $w_{sat}$ yielding $C_{1sat}$
+
+```{python}
+C_1sat = sp.simplify(C_1_ch.subs(w, w_sat))
+display(C_1sat)
+```
+
+This is identical to A7 of NP89. Note here that the $C_{1,sat}$ values in function of soil parameters (e.g. %clay) hence correspond with a specific $d_1$. Dividing $C_1$ by $C_{1sat}$ gives the dependence on $w_g$:
+
+```{python}
+ratio = sp.simplify(C_1_ch / C_1sat)
+display(sp.powsimp(sp.simplify(ratio), force=True))
+```
+
+
+
+## The restore term (including gravity): $C_2$ and $w_{geq}$ {#sec-restore}
+
+The restore and gravity terms become, after multiplying by $-C_w$ the remaining terms in the RHS of @eq-phi0_tendency:
+
+$$
+\omega C_w\left(\phi_0 - \bar\phi_0\right) - \omega d\, C_w\left(1 - \Gamma\right).
+$$
+
+NP89 make the additional hypothesis of an homogeneous mean profile, i.e. a constant $\bar\psi(z)$, and so $\Gamma = 0$. This is more restrictive than the linear profile of Sections -@sec-periodic–-@sec-force_restore: the mean state is a soil draining under gravity alone, $\bar q = -K$. With $\Gamma = 0$ the restore and gravity terms simplify to
+
+$$
+\omega C_w\left(\phi_0 - \bar\phi_0\right) - \omega d\, C_w 
+$$
+
+In SymPy:  
+
+```{python}
+phi_0, w_g = sp.symbols(r"\phi_0 w_g", positive=True)
+restore_gravity_term = omega * C_w * (phi_0 - phi_bar0) - omega * d * C_w
+display(restore_gravity_term)
+```
+
+For the CH78 retention curve (@sec-c1_clapp_hornberger), remember that $C_w$ is
+```{python}
+display(C_w_ch)
+```
+and $\phi$
+```{python}
+display(phi_ch)
+```
+
+Hence, $C_w$ can be equivalent expressed as
+$$
+C_w =\frac{b}{w \phi}
+$$
+
+```{python}
+sp.simplify(C_w_ch - w / (b * phi_ch)) == 0
+```
+
+Evaluating the restore-gravity term at the surface ($w = w_g$, $\phi = \phi_0$) and substituting the $C_w$ expression above:
+
+```{python}
+restore_gravity_term_g = restore_gravity_term.subs(C_w, w_g / (b * phi_0))
+display(sp.expand(restore_gravity_term_g))
+```
+
+Every term contains $\omega/b$, so this is taken out in front:
+
+```{python}
+prefactor = omega / b
+inside = sp.expand(sp.expand(restore_gravity_term_g) / prefactor)
+display(inside)
+```
+
+What remains inside the parentheses is regrouped into the term in $w_g$ only and the other terms, which share the factor $w_g/\phi_0$:
+
+```{python}
+others = sp.factor(inside - w_g)
+display(others)
+```
+
+Remember from @eq-force_restore_wg that the equation we are looking to match is
+$$
+\frac{C_2}{\tau}\left(w_g - w_{geq}\right)
+$$
+
+We define $w_{geq}$ as the `-others` term above:
+```{python}
+w_geq = -others
+display(w_geq)
+```
+
+equivalent to A7 of NP89. Consequently, it follows that $C_2/\tau = \omega/b$, the `prefactor` above:
+
+```{python}
+C_2 = prefactor * tau
+display(C_2)
+```
+
+To be sure, we can check the equivalence with the previously derived `restore_gravity_term_g`:
+```{python}
+restore_gravity_term_np89 = C_2 / tau * (w_g - w_geq)
+sp.simplify(restore_gravity_term_np89 - restore_gravity_term_g) == 0 
+```
+
+
+With $\omega = 2\pi/\tau$ the prefactor is $\omega/b = C_2/\tau$, so
+
+```{python}
+display(sp.simplify((omega / b).subs(omega, 2 * sp.pi / tau)))
+```
+
+which identifies
+
+$$
+\boxed{C_2 = \frac{2\pi}{b}},
+$$ {#eq-c2_solution}
+
+equivalent to A6 of NP89.
+
+
+
+In ISBA these analytical forms only fix the **structure**. $C_2$ and $w_{geq}$ were recalibrated
+against a multilayer model (NP89; Noilhan & Mahfouf 1996), giving
+$C_2 = C_{2ref}\, w_2/(w_{sat} - w_2 + 0.01)$ and the $a$, $p$ formulation of $w_{geq}$ used in
+`EvaporationModel`. $C_{1sat}$ was also fitted, but its analytical value (Eq. A5) is close to the
+fit (@sec-numbers).
+
+## Numbers: CH78 Table 2 {#sec-numbers}
+
+$C_{1sat}/d_1$ from Eq. A5 for the eleven textures of CH78 Table 2 (there $\phi_{sat}$ in cm and
+$K_{sat}$ in 10⁻⁴ cm s⁻¹, converted to SI here), compared with the $C_{1sat}$ values tabulated
+by NP89 (as reproduced in the WRF Pleim–Xiu code), which correspond to $d_1$ = 10 cm:
+
+```{python}
+#| output: asis
+import pandas as pd
+
+ch78 = pd.DataFrame(
+    [
+        ("sand", 0.395, 12.1, 176.0, 4.05, 0.082),
+        ("loamy sand", 0.410, 9.0, 156.3, 4.38, 0.098),
+        ("sandy loam", 0.435, 21.8, 34.1, 4.90, 0.132),
+        ("silt loam", 0.485, 78.6, 7.2, 5.30, 0.153),
+        ("loam", 0.451, 47.8, 6.95, 5.39, 0.191),
+        ("sandy clay loam", 0.420, 29.9, 6.30, 7.12, 0.213),
+        ("silty clay loam", 0.477, 35.6, 1.70, 7.75, 0.385),
+        ("clay loam", 0.476, 63.0, 2.45, 8.52, 0.227),
+        ("sandy clay", 0.426, 15.3, 2.17, 10.4, 0.421),
+        ("silty clay", 0.492, 49.0, 1.03, 10.4, 0.375),
+        ("clay", 0.482, 40.5, 1.28, 11.4, 0.342),
+    ],
+    columns=["texture", "w_sat", "phi_sat_cm", "K_sat_1e-4cm_s", "b", "C1sat_NP89"],
+).set_index("texture")
+
+tau_day = 86_400.0
+phi_sat_si = ch78["phi_sat_cm"] / 100  # cm -> m
+K_sat_si = ch78["K_sat_1e-4cm_s"] * 1e-6  # 1e-4 cm/s -> m/s
+c1_per_d1 = 2 * np.sqrt(np.pi) * np.sqrt(ch78["w_sat"] / (ch78["b"] * phi_sat_si * K_sat_si * tau_day)) #NP89 A5 divided by d1
+d_sat = 2 / c1_per_d1 # NP89 A4 at wg=wsat
+
+table = pd.DataFrame(
+    {
+        r"$C_{1sat}/d_1$ Eq. A5 [m⁻¹]": c1_per_d1,
+        r"NP89 $C_{1sat}$ / 0.1 m [m⁻¹]": ch78["C1sat_NP89"] / 0.1,
+        r"$d(w_{sat})$ [m]": d_sat,
+    }
+)
+print(table.to_markdown(floatfmt=".2f"))
+```
+
+The tabulated NP89 values are Eq. A5 with $d_1$ = 10 cm (within 1 %). The diurnal moisture
+wave reaches about 0.5–2.5 m in saturated soil. 
+
+
+## Time scales {#sec-time_scales}
+
+The force term gives the rate at which a flux changes $w_g$:
+$$
+\frac{\partial w_g}{\partial t} = \frac{C_1}{\rho_w d_1} P_{net} = \frac{2 d_1}{d}\frac{1}{\rho_w d_1} P_{net} = \frac{2}{\rho_w d}P_{net}. 
+$$
+For 1 mm h⁻¹ of net precipitation, the rate is
+```{python}
+net_precip_mmh = 1.0  # mm/h
+# Note: 1 mm of water = 1 kg m-2
+P_net_ = net_precip_mmh / 3600  # kg m-2 s-1 
+rho_w_ = 1000.0  # kg m-3
+d_val_list = (1.0, 0.1, 0.01, 0.001)  # m
+for d_val in d_val_list:
+    rate = 2 * P_net_ / (rho_w_ * d_val)  # m3 m-3 s-1
+    print(f"d = {d_val:6.3f} m:  dw_g/dt = {rate:9.2e} m3 m-3 s-1 = {3600 * rate:8.3f} m3 m-3 h-1")
+```
+
+The restore term relaxes $w_g$ towards $w_{geq}$ with time scale $\tau/C_2$, of the order of
+hours to days.
+
+A penetration depth below a centimetre means a response within minutes. For the ODE this means numerical stiffness! The stiffness increases with decreasing penetration depth. It is physical as long as $C_{1sat}$ and $d_1$ are paired consistently.  

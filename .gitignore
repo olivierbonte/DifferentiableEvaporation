@@ -9,10 +9,18 @@ src/EvaporationModel/Manifest.toml
 # Folders to ignore - files may be too large, too many, etc. NOTE: EDIT IF NEEDED.
 /data
 /videos
-/plots
+/plots/*
 #/notebooks
 /_research
 /figures
+# Exception: if used within paper!
+!/plots/reference/
+/plots/reference/*
+!/plots/reference/dt_study_rrmse_cost.png
+/plots/calibration/*
+!/plots/calibration/loss_landscape_b_C_2ref_w_1_2010-07.png
+!/plots/calibration/loss_slice_b_w_1_2010-07.png
+!/plots/calibration/loss_slice_r_smin_λE_tot_2010-07.png
 
 ################################################################################
 #                                    Julia                                     #
