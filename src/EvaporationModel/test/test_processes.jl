@@ -6,10 +6,37 @@
     @test step_function(hard, -1.0, 0.0, flux_scale(hard)) == 0
     @test step_function(hard, 1.0, 0.0, flux_scale(hard)) == 1
     @test step_function(smooth, 0.0, 0.0, flux_scale(smooth)) == 0.5
+    # Bound kernel: one when hard; zero at the bound, close to one inside, negative beyond
+    for side in (LowerBound(), UpperBound())
+        @test bound_kernel(hard, side, -1.0, 0.0, 0.1) == 1
+        @test bound_kernel(smooth, side, 0.0, 0.0, 0.1) == 0
+    end
+    @test bound_kernel(smooth, LowerBound(), 1.0, 0.0, 0.1) > 0.99
+    @test bound_kernel(smooth, LowerBound(), -0.1, 0.0, 0.1) < 0
+    @test bound_kernel(smooth, UpperBound(), -1.0, 0.0, 0.1) > 0.99
+    @test bound_kernel(smooth, UpperBound(), 0.1, 0.0, 0.1) < 0
+    # ... and bounded far beyond it (no exponential blow-up of an overshooting store)
+    @test bound_kernel(smooth, LowerBound(), -100.0, 0.0, 0.1) >= -1
+    @test bound_kernel(smooth, UpperBound(), 100.0, 0.0, 0.1) >= -1
+    # Pielke β: no soil evaporation below w_1 = 0, and NaN rather than an error for w_1 = -Inf
+    @test soil_evaporation_efficiency(Pielke92(), -0.1, 0.3, hard) == 0
+    @test isnan(soil_evaporation_efficiency(Pielke92(), -Inf, 0.3, smooth))
     # The smooth clamp never drops below the lower bound, and exceeds the upper by < s/2
     s = factor_scale(smooth)
     for x in (-1.0, 0.0, 0.5, 1.0, 2.0)
         @test 0 <= clamp(smooth, x, 0.0, 1.0, s) <= 1 + s / 2
+    end
+    # nonneg_pow: zero below zero when hard, finite slope at zero when smoothed
+    @test nonneg_pow(hard, -0.1, 2 / 3, moisture_scale(hard)) == 0
+    @test nonneg_pow(hard, 0.5, 2 / 3, moisture_scale(hard)) == 0.5^(2 / 3)
+    @test 0 < nonneg_pow(smooth, -0.1, 2 / 3, moisture_scale(smooth)) < 1e-3
+    @test isfinite(
+        derivative(x -> nonneg_pow(smooth, x, 2 / 3, moisture_scale(smooth)), AutoForwardDiff(), 0.0)
+    )
+    # Unphysical negative w_2: no runoff, and w_geq stays w_2 (both powers vanish)
+    for t in treatments
+        @test surface_runoff(StaticInfiltration(), P_s, -0.01, w_sat, t) < 1e-3 * P_s
+        @test w_geq(-0.01, w_sat, 0.15, 6.0, t) ≈ -0.01 atol = 1e-6
     end
     # Smoothed f_wet has a finite slope at w_r = 0 (the hard 2/3 power does not)
     w_rmax = 0.6
@@ -81,12 +108,21 @@ end
 @testset "Canopy condensation" begin
     # Night with a dry canopy: no transpiration, dew into the interception store
     night_forcings = merge(
-        constant_forcings(0.0), (R_n=Returns(-60.0), SW_in=Returns(0.0), VPD_a=Returns(50.0))
+        constant_forcings(0.0), (R_n=-60.0, SW_in=0.0, VPD_a=50.0)
     )
     for t in treatments
         d = compute_diagnostics([0.2, 0.25, 0.0], p_model, t_unix, night_forcings, t)
         @test d.λE_t ≈ 0 atol = 1e-6
         @test d.λE_i < 0
         @test d.λE_tot ≈ d.λE_t + d.λE_i + d.λE_s
+    end
+    # Day with an empty canopy store: no interception loss, also when smoothed (hard switch)
+    day_forcings = merge(
+        constant_forcings(0.0), (R_n=400.0, SW_in=600.0, VPD_a=1500.0)
+    )
+    for t in treatments
+        d = compute_diagnostics([0.2, 0.25, 0.0], p_model, t_unix, day_forcings, t)
+        @test d.λE_pc > 0
+        @test d.λE_i <= 0
     end
 end

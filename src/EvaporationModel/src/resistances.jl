@@ -153,7 +153,8 @@ With `approach = Martens17()`, the following inputs are
 
 With `approach = Pielke92()`, β is calculated using euqation (7) of
 [Lee & Pielke (1992)](https://doi.org/10.1175/1520-0450(1992)031%3C0480:ETSSSH%3E2.0.CO;2),
-with β = 1 for `w_1 ≥ w_fc`: `w_1` is capped at `w_fc` with a `min` under `t`.
+with β = 1 for `w_1 ≥ w_fc` and β = 0 for `w_1 ≤ 0`: `w_1` is clamped to ``[0, w_{fc}]`` with
+a using `clamp` under `t`.
 
 With `approach = Martens17()`, β is calculated using equation (6) of
 [Martens et al. (2017)](https://doi.org/10.5194/gmd-10-1903-2017): β is clamped to
@@ -177,7 +178,8 @@ true
 
 """
 function soil_evaporation_efficiency(approach::Pielke92, w_1, w_fc, t=HardThresholds())
-    return 1 / 4 * (1 - cos(π * min(t, w_1, w_fc, moisture_scale(t)) / w_fc))^2
+    w = clamp(t, w_1, zero(w_1), w_fc, moisture_scale(t))
+    return 1 / 4 * (1 - cos(π * w / w_fc))^2
 end
 
 function soil_evaporation_efficiency(

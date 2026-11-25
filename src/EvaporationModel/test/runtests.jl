@@ -5,6 +5,7 @@ using EvaporationModel
 # Import AD backend that are in EvaporationModel
 using EvaporationModel: Enzyme
 using EvaporationModel: ForwardDiff
+using EvaporationModel: SciMLStructures
 
 # Import packages used for testing
 using AllocCheck

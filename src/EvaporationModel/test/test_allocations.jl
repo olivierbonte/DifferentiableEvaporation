@@ -36,14 +36,36 @@
     end
 
     @testset "soil_fluxes.jl" begin
-        @test (@ballocations surface_runoff(StaticInfiltration(), $P_s, $w_2, $w_fc)) == 0
-        @test (@ballocations surface_runoff(
-            VegetationInfiltration(), $P_s, $w_2, $w_fc, $f_veg
-        )) == 0
-        @test isempty(check_allocs(c_1, (FT, FT, FT, FT, FT)))
+        for t in treatments
+            @test (@ballocations surface_runoff(StaticInfiltration(), $P_s, $w_2, $w_sat, $t)) ==
+                0
+            @test (@ballocations surface_runoff(
+                VegetationInfiltration(), $P_s, $w_2, $w_sat, $f_veg, $t
+            )) == 0
+        end
         @test isempty(check_allocs(surface_infiltration_factor, (FT, FT)))
         @test isempty(check_allocs(diffusion_layer_1, (FT, FT, FT)))
         @test isempty(check_allocs(vertical_drainage_layer_2, (FT, FT, FT, FT)))
+    end
+
+    @testset "soil.jl" begin
+        (; b, C_1sat, a, p_soil, d_1) = p_model
+        x_clay = 20.0 # %
+        for t in treatments
+            @test (@ballocations c_1($w_2, $w_sat, $b, $C_1sat, $w_wp, $t)) == 0
+            @test (@ballocations w_geq($w_2, $w_sat, $a, $p_soil, $t)) == 0
+        end
+        @test isempty(check_allocs(c_2, (FT, FT, FT)))
+        @test (@ballocations compute_b(Clay(), $x_clay)) == 0
+        @test (@ballocations compute_b(VanGenuchten(), 1.5)) == 0
+        @test (@ballocations c_1sat(NoilhanMahfouf96(), $x_clay, $d_1)) == 0
+        @test (@ballocations c_1sat(
+            NoilhanPlanton89(), $w_sat, $b, -0.2, 1e-5, $d_1
+        )) == 0
+        @test isempty(check_allocs(c_2ref, (FT,)))
+        @test isempty(check_allocs(c_3, (FT,)))
+        @test isempty(check_allocs(compute_a, (FT,)))
+        @test isempty(check_allocs(compute_p, (FT,)))
     end
 
     @testset "model.jl: diagnostics and tendencies" begin
